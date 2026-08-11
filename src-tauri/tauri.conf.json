@@ -27,7 +27,7 @@
   },
   "bundle": {
     "active": true,
-    "targets": "all",
+    "targets": ["nsis", "app", "dmg", "appimage", "deb"],
     "publisher": "BA8BAK",
     "shortDescription": "Professional Morse Code Training Terminal",
     "longDescription": "MoYu (摩语) - A Professional Morse Code Training Terminal with EPUB and TXT support.",
