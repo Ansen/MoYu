@@ -139,6 +139,28 @@ export default function Reader({ bookData, onClose, jumpToSibling }) {
     if (engineRef.current) engineRef.current.nextPage();
   };
 
+  // Keyboard Shortcuts (Space, ArrowLeft, ArrowRight)
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      // Ignore shortcuts if the user is typing in an input or textarea
+      if (['INPUT', 'TEXTAREA'].includes(document.activeElement.tagName)) return;
+
+      if (e.key === ' ' || e.code === 'Space') {
+        e.preventDefault();
+        togglePlay();
+      } else if (e.key === 'ArrowLeft') {
+        e.preventDefault();
+        handlePrev();
+      } else if (e.key === 'ArrowRight') {
+        e.preventDefault();
+        handleNext();
+      }
+    };
+    
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [togglePlay, handlePrev, handleNext]);
+
   const paginationLabel = engineRef.current ? engineRef.current.getPaginationLabel() : (bookData.type === 'epub' ? 'EPUB Navigation' : 'TXT Navigation');
 
   return (

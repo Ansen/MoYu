@@ -74,25 +74,6 @@ function App() {
     }
   }, [theme]);
 
-  // Global F11 Fullscreen toggle
-  useEffect(() => {
-    const handleKeyDown = async (e) => {
-      if (e.key === 'F11') {
-        e.preventDefault();
-        try {
-          const { getCurrentWindow } = await import('@tauri-apps/api/window');
-          const appWindow = getCurrentWindow();
-          const isFullscreen = await appWindow.isFullscreen();
-          await appWindow.setFullscreen(!isFullscreen);
-        } catch (err) {
-          console.error('Failed to toggle fullscreen', err);
-        }
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
-
   // Disable default document scrolling to make it feel like an app
   useEffect(() => {
     document.body.style.overflow = 'hidden';
