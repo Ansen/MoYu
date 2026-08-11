@@ -1,14 +1,30 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useI18n } from '../../i18n/index';
 import AboutModal from '../AboutModal';
-import { FolderOpen, LogOut, Sun, Moon, Monitor, Languages, Type, Settings, Info, Check, BookOpen, Minus, Square, X as CloseIcon } from 'lucide-react';
+import { FolderOpen, LogOut, Sun, Moon, Monitor, Languages, Type, Settings, Info, Check, BookOpen, Minus, Square, Copy, X as CloseIcon } from 'lucide-react';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 
 export default function Titlebar({ theme, setTheme, setView, openSettings, openHelp }) {
   const [activeMenu, setActiveMenu] = useState(null);
   const [isAboutOpen, setIsAboutOpen] = useState(false);
+  const [isMaximized, setIsMaximized] = useState(false);
   const menubarRef = useRef(null);
   const { t, langSetting, setLangSetting } = useI18n();
+
+  // 监听窗口最大化状态
+  useEffect(() => {
+    let unlisten;
+    const win = getCurrentWindow();
+    win.isMaximized().then(setIsMaximized).catch(() => {});
+    
+    win.onResized(() => {
+      win.isMaximized().then(setIsMaximized).catch(() => {});
+    }).then(u => unlisten = u).catch(() => {});
+
+    return () => {
+      if (unlisten) unlisten();
+    };
+  }, []);
 
   // 点击外部关闭菜单
   useEffect(() => {
@@ -209,8 +225,9 @@ export default function Titlebar({ theme, setTheme, setView, openSettings, openH
           <button 
             onClick={() => getCurrentWindow().toggleMaximize()}
             className="h-full px-3.5 hover:bg-slate-200 dark:hover:bg-[#333] transition-colors flex items-center justify-center text-slate-600 dark:text-slate-400"
+            title={isMaximized ? "向下还原" : "最大化"}
           >
-            <Square size={13} strokeWidth={2.5} />
+            {isMaximized ? <Copy size={13} strokeWidth={2.5} /> : <Square size={13} strokeWidth={2.5} />}
           </button>
           <button 
             onClick={() => getCurrentWindow().close()}
