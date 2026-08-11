@@ -164,7 +164,7 @@ export default function Reader({ bookData, onClose, jumpToSibling }) {
   const paginationLabel = engineRef.current ? engineRef.current.getPaginationLabel() : (bookData.type === 'epub' ? 'EPUB Navigation' : 'TXT Navigation');
 
   return (
-    <div className="fixed inset-0 z-50 bg-white dark:bg-[#1e1e1e] flex flex-col transition-colors select-none text-slate-800 dark:text-slate-200">
+    <div className="fixed top-8 left-0 right-0 bottom-0 z-40 bg-white dark:bg-[#1e1e1e] flex flex-col transition-colors select-none text-slate-800 dark:text-slate-200">
       
       {/* 注入滚动条等样式 */}
       <style>{`
