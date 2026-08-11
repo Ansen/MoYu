@@ -17,7 +17,7 @@ export default function Reader({ bookData, onClose, jumpToSibling }) {
   // Settings
   const [baseFontSize, setBaseFontSize] = useState(() => Number(localStorage.getItem('pref_base_font_size') || 20)); // px (baseline at 800px width)
   const [morseSpeed, setMorseSpeed] = useState(() => Number(localStorage.getItem('pref_morse_speed') || 20));
-  const [morseFreq, setMorseFreq] = useState(Number(localStorage.getItem('pref_morse_freq')) || 700);
+  const [morseFreq, setMorseFreq] = useState(() => Number(localStorage.getItem('pref_morse_freq')) || 380);
   const [skipTitle, setSkipTitle] = useState(localStorage.getItem('pref_skip_title') !== 'false');
   const [hideBodyTitle, setHideBodyTitle] = useState(localStorage.getItem('pref_hide_body_title') === 'true');
   const [numberMode, setNumberMode] = useState(localStorage.getItem('pref_number_mode') || 'long');

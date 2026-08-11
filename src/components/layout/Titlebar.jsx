@@ -1,9 +1,9 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useI18n } from '../../i18n/index';
 import AboutModal from '../AboutModal';
-import { FolderOpen, LogOut, Sun, Moon, Monitor, Languages, Type, Settings, Info, Check } from 'lucide-react';
+import { FolderOpen, LogOut, Sun, Moon, Monitor, Languages, Type, Settings, Info, Check, BookOpen } from 'lucide-react';
 
-export default function Titlebar({ theme, setTheme, setView, openSettings }) {
+export default function Titlebar({ theme, setTheme, setView, openSettings, openHelp }) {
   const [activeMenu, setActiveMenu] = useState(null);
   const [isAboutOpen, setIsAboutOpen] = useState(false);
   const menubarRef = useRef(null);
@@ -153,6 +153,13 @@ export default function Titlebar({ theme, setTheme, setView, openSettings }) {
           </button>
           {activeMenu === 'help' && (
             <div className="absolute top-full left-0 mt-1.5 w-max flex flex-col gap-0.5 p-1.5 bg-white/95 dark:bg-[#1a1a1a]/95 backdrop-blur-md border border-slate-200/80 dark:border-[#333]/80 rounded-xl shadow-2xl shadow-slate-200/40 dark:shadow-black/40 z-50 animate-in fade-in slide-in-from-top-1 duration-100">
+              <button 
+                className="w-full text-left px-2.5 py-1.5 rounded-md flex items-center gap-2.5 whitespace-nowrap hover:bg-indigo-500 hover:text-white transition-colors text-slate-700 dark:text-slate-300 group" 
+                onClick={() => { openHelp(); setActiveMenu(null); }}
+              >
+                <BookOpen size={15} className="text-slate-400 group-hover:text-white transition-colors" />
+                <span>{t('menu.help.guide')}</span>
+              </button>
               <button 
                 className="w-full text-left px-2.5 py-1.5 rounded-md flex items-center gap-2.5 whitespace-nowrap hover:bg-indigo-500 hover:text-white transition-colors text-slate-700 dark:text-slate-300 group" 
                 onClick={() => { setIsAboutOpen(true); setActiveMenu(null); }}

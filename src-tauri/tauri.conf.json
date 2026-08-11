@@ -1,8 +1,8 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
-  "productName": "moyu",
+  "productName": "MoYu",
   "version": "0.1.0",
-  "identifier": "com.tauri.dev",
+  "identifier": "com.moyu.app",
   "build": {
     "frontendDist": "../dist",
     "devUrl": "http://localhost:5173",
@@ -28,6 +28,10 @@
   "bundle": {
     "active": true,
     "targets": "all",
+    "publisher": "BA8BAK",
+    "shortDescription": "Professional Morse Code Training Terminal",
+    "longDescription": "MoYu (摩语) - A Professional Morse Code Training Terminal with EPUB and TXT support.",
+    "copyright": "Copyright © 2026 BA8BAK",
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",

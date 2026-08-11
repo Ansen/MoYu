@@ -5,11 +5,13 @@ import TranslatorView from './views/Translator';
 import LibraryView from './views/Library';
 import HomeView from './views/Home';
 import SettingsModal from './components/SettingsModal';
+import HelpModal from './components/HelpModal';
 import { useEbook } from './hooks/useEbook';
 
 function App() {
   const [currentView, setView] = useState('home');
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [isHelpModalOpen, setIsHelpModalOpen] = useState(false);
   const [theme, setTheme] = useState('system');
   const [isReady, setIsReady] = useState(false);
 
@@ -22,6 +24,15 @@ function App() {
     if (storedTheme) setTheme(storedTheme);
 
     const startupBehavior = localStorage.getItem('pref_startup') || 'restore';
+    
+    // Check if it's the very first time launch
+    const hasSeenGuide = localStorage.getItem('moyu_has_seen_guide');
+    if (!hasSeenGuide) {
+      // First launch onboarding: open Help modal directly
+      setIsHelpModalOpen(true);
+      localStorage.setItem('moyu_has_seen_guide', 'true');
+    }
+    
     if (startupBehavior === 'restore') {
       const lastView = localStorage.getItem('moyu_last_view');
       if (lastView && ['home', 'translator', 'library'].includes(lastView)) {
@@ -63,6 +74,25 @@ function App() {
     }
   }, [theme]);
 
+  // Global F11 Fullscreen toggle
+  useEffect(() => {
+    const handleKeyDown = async (e) => {
+      if (e.key === 'F11') {
+        e.preventDefault();
+        try {
+          const { getCurrentWindow } = await import('@tauri-apps/api/window');
+          const appWindow = getCurrentWindow();
+          const isFullscreen = await appWindow.isFullscreen();
+          await appWindow.setFullscreen(!isFullscreen);
+        } catch (err) {
+          console.error('Failed to toggle fullscreen', err);
+        }
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
   // Disable default document scrolling to make it feel like an app
   useEffect(() => {
     document.body.style.overflow = 'hidden';
@@ -73,7 +103,13 @@ function App() {
 
   return (
     <div className="flex flex-col h-screen w-screen overflow-hidden bg-white dark:bg-[#1e1e1e] transition-colors select-none text-slate-800 dark:text-slate-200">
-      <Titlebar theme={theme} setTheme={setTheme} setView={setView} openSettings={() => setSettingsOpen(true)} />
+      <Titlebar 
+        theme={theme} 
+        setTheme={setTheme} 
+        setView={setView} 
+        openSettings={() => setSettingsOpen(true)}
+        openHelp={() => setIsHelpModalOpen(true)}
+      />
       
       <div className="flex flex-1 min-h-0">
         <Sidebar currentView={currentView} setView={setView} />
@@ -91,7 +127,14 @@ function App() {
         </main>
       </div>
 
-      <SettingsModal isOpen={settingsOpen} onClose={() => setSettingsOpen(false)} />
+      <SettingsModal 
+        isOpen={settingsOpen} 
+        onClose={() => setSettingsOpen(false)} 
+      />
+      <HelpModal 
+        isOpen={isHelpModalOpen} 
+        onClose={() => setIsHelpModalOpen(false)} 
+      />
     </div>
   );
 }

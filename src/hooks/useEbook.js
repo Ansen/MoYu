@@ -153,6 +153,19 @@ export function useEbook() {
     }
   }, [bookData]);
 
+  const loadTextDirectly = useCallback((textData, fileName) => {
+    setBookData({
+      type: 'txt',
+      data: textData,
+      name: fileName,
+      path: 'internal://' + fileName,
+      siblings: [],
+      currentIndex: 0
+    });
+    setLoading(false);
+    setError(null);
+  }, []);
+
   const closeBook = useCallback(() => {
     if (bookData?.type === 'epub' && bookData.data) {
       bookData.data.destroy();
@@ -171,6 +184,7 @@ export function useEbook() {
     jumpToSibling,
     closeBook,
     clearRecentFiles,
-    removeRecentFile
+    removeRecentFile,
+    loadTextDirectly
   };
 }

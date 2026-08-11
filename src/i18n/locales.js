@@ -15,6 +15,7 @@ export const translations = {
     'menu.settings.prefs': '全局偏好设置',
     
     'menu.help': '帮助(H)',
+    'menu.help.guide': '使用帮助指南',
     'menu.help.about': '关于 摩语',
     
     // 侧边栏
@@ -81,6 +82,7 @@ export const translations = {
     'menu.settings.prefs': 'Preferences',
     
     'menu.help': 'Help(H)',
+    'menu.help.guide': 'User Guide',
     'menu.help.about': 'About MoYu',
     
     // Sidebar
