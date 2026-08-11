@@ -85,7 +85,7 @@ export default function HelpModal({ isOpen, onClose }) {
                 <span>上一页 / 上一章</span>
                 <kbd className="px-2 py-1 bg-white dark:bg-[#1a1a1a] border border-slate-200 dark:border-[#444] rounded shadow-sm text-xs font-mono font-bold">← 向左方向键</kbd>
               </div>
-              <div className="flex items-center justify-between py-1.5">
+              <div className="flex items-center justify-between py-1.5 border-b border-slate-200 dark:border-[#333333]">
                 <span>下一页 / 下一章</span>
                 <kbd className="px-2 py-1 bg-white dark:bg-[#1a1a1a] border border-slate-200 dark:border-[#444] rounded shadow-sm text-xs font-mono font-bold">→ 向右方向键</kbd>
               </div>
