@@ -7,6 +7,11 @@
   ],
   "permissions": [
     "core:default",
+    "core:window:allow-set-theme",
+    "core:window:allow-set-fullscreen",
+    "core:window:allow-minimize",
+    "core:window:allow-toggle-maximize",
+    "core:window:allow-close",
     "store:default",
     "dialog:default",
     "fs:default"

@@ -1,7 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useI18n } from '../../i18n/index';
 import AboutModal from '../AboutModal';
-import { FolderOpen, LogOut, Sun, Moon, Monitor, Languages, Type, Settings, Info, Check, BookOpen } from 'lucide-react';
+import { FolderOpen, LogOut, Sun, Moon, Monitor, Languages, Type, Settings, Info, Check, BookOpen, Minus, Square, X as CloseIcon } from 'lucide-react';
+import { getCurrentWindow } from '@tauri-apps/api/window';
 
 export default function Titlebar({ theme, setTheme, setView, openSettings, openHelp }) {
   const [activeMenu, setActiveMenu] = useState(null);
@@ -32,7 +33,13 @@ export default function Titlebar({ theme, setTheme, setView, openSettings, openH
     <div className="flex flex-col bg-white dark:bg-[#1e1e1e] border-b border-slate-200 dark:border-[#333333] shrink-0 select-none relative z-50">
       
       {/* 菜单栏 (Menubar) */}
-      <div className="h-8 flex items-center px-2 text-[13px] font-medium text-slate-700 dark:text-[#cccccc] relative" ref={menubarRef}>
+      <div className="h-8 flex items-center pl-2 text-[13px] font-medium text-slate-700 dark:text-[#cccccc] relative" ref={menubarRef} data-tauri-drag-region>
+        
+        {/* App Logo / Title */}
+        <div className="flex items-center gap-2 mr-4 pointer-events-none" data-tauri-drag-region>
+          <img src="/logo.png" className="w-4 h-4 object-contain" alt="MoYu" />
+          <span className="font-bold text-slate-900 dark:text-white tracking-wide">摩语</span>
+        </div>
         
         {/* 1. 主题 (Theme) */}
         <div className="relative">
@@ -171,6 +178,30 @@ export default function Titlebar({ theme, setTheme, setView, openSettings, openH
           )}
         </div>
         
+        {/* Spacer for drag region */}
+        <div className="flex-1 h-full" data-tauri-drag-region></div>
+
+        {/* Window Controls (Custom Native Titlebar) */}
+        <div className="flex h-full items-center">
+          <button 
+            onClick={() => getCurrentWindow().minimize()}
+            className="h-full px-3.5 hover:bg-slate-200 dark:hover:bg-[#333] transition-colors flex items-center justify-center text-slate-600 dark:text-slate-400"
+          >
+            <Minus size={14} />
+          </button>
+          <button 
+            onClick={() => getCurrentWindow().toggleMaximize()}
+            className="h-full px-3.5 hover:bg-slate-200 dark:hover:bg-[#333] transition-colors flex items-center justify-center text-slate-600 dark:text-slate-400"
+          >
+            <Square size={13} strokeWidth={2.5} />
+          </button>
+          <button 
+            onClick={() => getCurrentWindow().close()}
+            className="h-full px-4 hover:bg-red-500 hover:text-white transition-colors flex items-center justify-center text-slate-600 dark:text-slate-400"
+          >
+            <CloseIcon size={14} />
+          </button>
+        </div>
       </div>
 
       <AboutModal isOpen={isAboutOpen} onClose={() => setIsAboutOpen(false)} />

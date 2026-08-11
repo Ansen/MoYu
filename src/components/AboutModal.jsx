@@ -27,12 +27,10 @@ export default function AboutModal({ isOpen, onClose }) {
       <div className="relative w-full max-w-sm bg-white dark:bg-[#1a1a1a] rounded-2xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200 border border-slate-200 dark:border-[#333333]">
         
         {/* Header Background */}
-        <div className="h-24 bg-gradient-to-br from-indigo-500 to-purple-600 relative flex items-center justify-center">
-          <div className="absolute inset-0 bg-black/10"></div>
-          <h1 className="text-3xl font-extrabold text-white tracking-wider drop-shadow-md z-10 flex items-center gap-2">
-            <span className="text-indigo-200">/</span>
+        <div className="h-28 bg-gradient-to-br from-indigo-600 to-slate-900 relative flex flex-col items-center justify-center pt-2">
+          <img src="/logo.png" className="w-10 h-10 object-contain drop-shadow-md mb-1" alt="MoYu Logo" />
+          <h1 className="text-2xl font-extrabold text-white tracking-wider drop-shadow-md z-10 flex items-center gap-2">
             MoYu 摩语
-            <span className="text-indigo-200">/</span>
           </h1>
           <button 
             onClick={onClose}
