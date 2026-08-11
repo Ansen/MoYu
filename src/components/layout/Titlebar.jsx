@@ -33,7 +33,16 @@ export default function Titlebar({ theme, setTheme, setView, openSettings, openH
     <div className="flex flex-col bg-white dark:bg-[#1e1e1e] border-b border-slate-200 dark:border-[#333333] shrink-0 select-none relative z-50">
       
       {/* 菜单栏 (Menubar) */}
-      <div className="h-8 flex items-center pl-2 text-[13px] font-medium text-slate-700 dark:text-[#cccccc] relative" ref={menubarRef} data-tauri-drag-region>
+      <div 
+        className="h-8 flex items-center pl-2 text-[13px] font-medium text-slate-700 dark:text-[#cccccc] relative" 
+        ref={menubarRef} 
+        data-tauri-drag-region
+        onPointerDown={(e) => {
+          if (e.buttons === 1 && e.target.hasAttribute('data-tauri-drag-region')) {
+            getCurrentWindow().startDragging();
+          }
+        }}
+      >
         
         {/* App Logo / Title */}
         <div className="flex items-center gap-2 mr-4 pointer-events-none" data-tauri-drag-region>
@@ -179,7 +188,15 @@ export default function Titlebar({ theme, setTheme, setView, openSettings, openH
         </div>
         
         {/* Spacer for drag region */}
-        <div className="flex-1 h-full" data-tauri-drag-region></div>
+        <div 
+          className="flex-1 h-full" 
+          data-tauri-drag-region
+          onPointerDown={(e) => {
+            if (e.buttons === 1 && e.target.hasAttribute('data-tauri-drag-region')) {
+              getCurrentWindow().startDragging();
+            }
+          }}
+        ></div>
 
         {/* Window Controls (Custom Native Titlebar) */}
         <div className="flex h-full items-center">
