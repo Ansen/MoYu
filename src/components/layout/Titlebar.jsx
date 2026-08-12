@@ -1,7 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useI18n } from '../../i18n/index';
 import AboutModal from '../AboutModal';
-import { FolderOpen, LogOut, Sun, Moon, Monitor, Languages, Type, Settings, Info, Check, BookOpen, Minus, Square, Copy, X as CloseIcon } from 'lucide-react';
+import DropdownMenu from '../common/DropdownMenu';
+import { Sun, Moon, Monitor, Languages, Type, Settings, Info, Check, BookOpen, Minus, Square, Copy, X as CloseIcon } from 'lucide-react';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 
 export default function Titlebar({ theme, setTheme, setView, openSettings, openHelp }) {
@@ -75,38 +76,17 @@ export default function Titlebar({ theme, setTheme, setView, openSettings, openH
           >
             {t('menu.view')}
           </button>
-          {activeMenu === 'view' && (
-            <div className="absolute top-full left-0 mt-1.5 w-max flex flex-col gap-0.5 p-1.5 bg-white/95 dark:bg-[#1a1a1a]/95 backdrop-blur-md border border-slate-200/80 dark:border-[#333]/80 rounded-xl shadow-2xl shadow-slate-200/40 dark:shadow-black/40 z-50 animate-in fade-in slide-in-from-top-1 duration-100">
-              <button 
-                className="w-full text-left px-2.5 py-1.5 rounded-md flex items-center gap-2.5 whitespace-nowrap hover:bg-indigo-500 hover:text-white transition-colors text-slate-700 dark:text-slate-300 group" 
-                onClick={() => { setTheme('system'); setActiveMenu(null); }}
-              >
-                <Monitor size={15} className="text-slate-400 group-hover:text-white transition-colors" />
-                <span className="flex-1">{t('menu.view.system')}</span>
-                {theme === 'system' && <Check size={14} className="opacity-80" />}
-              </button>
-              
-              <div className="h-px w-full bg-slate-100 dark:bg-[#333] my-1"></div>
-              
-              <button 
-                className="w-full text-left px-2.5 py-1.5 rounded-md flex items-center gap-2.5 whitespace-nowrap hover:bg-indigo-500 hover:text-white transition-colors text-slate-700 dark:text-slate-300 group" 
-                onClick={() => { setTheme('light'); setActiveMenu(null); }}
-              >
-                <Sun size={15} className="text-slate-400 group-hover:text-white transition-colors" />
-                <span className="flex-1">{t('menu.view.light')}</span>
-                {theme === 'light' && <Check size={14} className="opacity-80" />}
-              </button>
-              
-              <button 
-                className="w-full text-left px-2.5 py-1.5 rounded-md flex items-center gap-2.5 whitespace-nowrap hover:bg-indigo-500 hover:text-white transition-colors text-slate-700 dark:text-slate-300 group" 
-                onClick={() => { setTheme('dark'); setActiveMenu(null); }}
-              >
-                <Moon size={15} className="text-slate-400 group-hover:text-white transition-colors" />
-                <span className="flex-1">{t('menu.view.dark')}</span>
-                {theme === 'dark' && <Check size={14} className="opacity-80" />}
-              </button>
-            </div>
-          )}
+          <DropdownMenu 
+            isOpen={activeMenu === 'view'}
+            items={[
+              { id: 'system', icon: Monitor, label: t('menu.view.system'), checked: theme === 'system', checkIcon: Check },
+              { type: 'divider' },
+              { id: 'light', icon: Sun, label: t('menu.view.light'), checked: theme === 'light', checkIcon: Check },
+              { id: 'dark', icon: Moon, label: t('menu.view.dark'), checked: theme === 'dark', checkIcon: Check },
+            ]}
+            onSelect={(id) => setTheme(id)}
+            onClose={() => setActiveMenu(null)}
+          />
         </div>
 
         {/* 3. 语言 (Language) */}
@@ -118,38 +98,17 @@ export default function Titlebar({ theme, setTheme, setView, openSettings, openH
           >
             {t('menu.language')}
           </button>
-          {activeMenu === 'lang' && (
-            <div className="absolute top-full left-0 mt-1.5 w-max flex flex-col gap-0.5 p-1.5 bg-white/95 dark:bg-[#1a1a1a]/95 backdrop-blur-md border border-slate-200/80 dark:border-[#333]/80 rounded-xl shadow-2xl shadow-slate-200/40 dark:shadow-black/40 z-50 animate-in fade-in slide-in-from-top-1 duration-100">
-              <button 
-                className="w-full text-left px-2.5 py-1.5 rounded-md flex items-center gap-2.5 whitespace-nowrap hover:bg-indigo-500 hover:text-white transition-colors text-slate-700 dark:text-slate-300 group" 
-                onClick={() => { setLangSetting('system'); setActiveMenu(null); }}
-              >
-                <Monitor size={15} className="text-slate-400 group-hover:text-white transition-colors" />
-                <span className="flex-1">{t('menu.language.system')}</span>
-                {langSetting === 'system' && <Check size={14} className="opacity-80" />}
-              </button>
-              
-              <div className="h-px w-full bg-slate-100 dark:bg-[#333] my-1"></div>
-              
-              <button 
-                className="w-full text-left px-2.5 py-1.5 rounded-md flex items-center gap-2.5 whitespace-nowrap hover:bg-indigo-500 hover:text-white transition-colors text-slate-700 dark:text-slate-300 group" 
-                onClick={() => { setLangSetting('zh'); setActiveMenu(null); }}
-              >
-                <Type size={15} className="text-slate-400 group-hover:text-white transition-colors" />
-                <span className="flex-1">{t('menu.language.zh')}</span>
-                {langSetting === 'zh' && <Check size={14} className="opacity-80" />}
-              </button>
-              
-              <button 
-                className="w-full text-left px-2.5 py-1.5 rounded-md flex items-center gap-2.5 whitespace-nowrap hover:bg-indigo-500 hover:text-white transition-colors text-slate-700 dark:text-slate-300 group" 
-                onClick={() => { setLangSetting('en'); setActiveMenu(null); }}
-              >
-                <Languages size={15} className="text-slate-400 group-hover:text-white transition-colors" />
-                <span className="flex-1">{t('menu.language.en')}</span>
-                {langSetting === 'en' && <Check size={14} className="opacity-80" />}
-              </button>
-            </div>
-          )}
+          <DropdownMenu 
+            isOpen={activeMenu === 'lang'}
+            items={[
+              { id: 'system', icon: Monitor, label: t('menu.language.system'), checked: langSetting === 'system', checkIcon: Check },
+              { type: 'divider' },
+              { id: 'zh', icon: Type, label: t('menu.language.zh'), checked: langSetting === 'zh', checkIcon: Check },
+              { id: 'en', icon: Languages, label: t('menu.language.en'), checked: langSetting === 'en', checkIcon: Check },
+            ]}
+            onSelect={(id) => setLangSetting(id)}
+            onClose={() => setActiveMenu(null)}
+          />
         </div>
 
         {/* 4. 设置 (Settings) */}
@@ -161,17 +120,14 @@ export default function Titlebar({ theme, setTheme, setView, openSettings, openH
           >
             {t('menu.settings')}
           </button>
-          {activeMenu === 'settings' && (
-            <div className="absolute top-full left-0 mt-1.5 w-max flex flex-col gap-0.5 p-1.5 bg-white/95 dark:bg-[#1a1a1a]/95 backdrop-blur-md border border-slate-200/80 dark:border-[#333]/80 rounded-xl shadow-2xl shadow-slate-200/40 dark:shadow-black/40 z-50 animate-in fade-in slide-in-from-top-1 duration-100">
-              <button 
-                className="w-full text-left px-2.5 py-1.5 rounded-md flex items-center gap-2.5 whitespace-nowrap hover:bg-indigo-500 hover:text-white transition-colors text-slate-700 dark:text-slate-300 group" 
-                onClick={() => { openSettings(); setActiveMenu(null); }}
-              >
-                <Settings size={15} className="text-slate-400 group-hover:text-white transition-colors" />
-                <span>{t('menu.settings.prefs')}</span>
-              </button>
-            </div>
-          )}
+          <DropdownMenu 
+            isOpen={activeMenu === 'settings'}
+            items={[
+              { id: 'settings', icon: Settings, label: t('menu.settings.prefs') }
+            ]}
+            onSelect={() => openSettings()}
+            onClose={() => setActiveMenu(null)}
+          />
         </div>
         
         {/* 5. 帮助 (Help) */}
@@ -183,24 +139,15 @@ export default function Titlebar({ theme, setTheme, setView, openSettings, openH
           >
             {t('menu.help')}
           </button>
-          {activeMenu === 'help' && (
-            <div className="absolute top-full left-0 mt-1.5 w-max flex flex-col gap-0.5 p-1.5 bg-white/95 dark:bg-[#1a1a1a]/95 backdrop-blur-md border border-slate-200/80 dark:border-[#333]/80 rounded-xl shadow-2xl shadow-slate-200/40 dark:shadow-black/40 z-50 animate-in fade-in slide-in-from-top-1 duration-100">
-              <button 
-                className="w-full text-left px-2.5 py-1.5 rounded-md flex items-center gap-2.5 whitespace-nowrap hover:bg-indigo-500 hover:text-white transition-colors text-slate-700 dark:text-slate-300 group" 
-                onClick={() => { openHelp(); setActiveMenu(null); }}
-              >
-                <BookOpen size={15} className="text-slate-400 group-hover:text-white transition-colors" />
-                <span>{t('menu.help.guide')}</span>
-              </button>
-              <button 
-                className="w-full text-left px-2.5 py-1.5 rounded-md flex items-center gap-2.5 whitespace-nowrap hover:bg-indigo-500 hover:text-white transition-colors text-slate-700 dark:text-slate-300 group" 
-                onClick={() => { setIsAboutOpen(true); setActiveMenu(null); }}
-              >
-                <Info size={15} className="text-slate-400 group-hover:text-white transition-colors" />
-                <span>{t('menu.help.about')}</span>
-              </button>
-            </div>
-          )}
+          <DropdownMenu 
+            isOpen={activeMenu === 'help'}
+            items={[
+              { id: 'guide', icon: BookOpen, label: t('menu.help.guide') },
+              { id: 'about', icon: Info, label: t('menu.help.about') }
+            ]}
+            onSelect={(id) => id === 'guide' ? openHelp() : setIsAboutOpen(true)}
+            onClose={() => setActiveMenu(null)}
+          />
         </div>
         
         {/* Spacer for drag region */}

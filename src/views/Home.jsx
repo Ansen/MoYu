@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Languages, Library, FileText, Folder, Play, ArrowRight } from 'lucide-react';
+import { Languages, Library } from 'lucide-react';
 import { useI18n } from '../i18n/index';
+import FeatureCard from '../components/common/FeatureCard';
+import RecentFileItem from '../components/common/RecentFileItem';
 
 export default function HomeView({ setView, recentFiles, openFileProgrammatically }) {
   const { t } = useI18n();
@@ -31,45 +33,20 @@ export default function HomeView({ setView, recentFiles, openFileProgrammaticall
 
         {/* Feature Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {/* Translator Card */}
-          <div 
+          <FeatureCard 
+            icon={Languages}
+            title={t('home.translator.title')}
+            desc={t('home.translator.desc')}
             onClick={() => setView('translator')}
-            className="group relative bg-white dark:bg-[#252526] rounded-xl border border-slate-200 dark:border-[#333333] p-8 hover:shadow-xl hover:-translate-y-1 transition-all cursor-pointer overflow-hidden"
-          >
-            <div className="absolute top-0 right-0 p-8 opacity-5 group-hover:opacity-10 transition-opacity pointer-events-none">
-              <Languages size={120} />
-            </div>
-            <div className="w-14 h-14 bg-indigo-100 dark:bg-indigo-900/40 text-indigo-600 dark:text-indigo-400 rounded-2xl flex items-center justify-center mb-6 shadow-sm">
-              <Languages size={28} />
-            </div>
-            <h2 className="text-xl font-bold mb-3">{t('home.translator.title')}</h2>
-            <p className="text-slate-500 dark:text-slate-400 text-sm leading-relaxed mb-6">
-              {t('home.translator.desc')}
-            </p>
-            <div className="flex items-center text-indigo-600 dark:text-indigo-400 font-medium text-sm gap-1 group-hover:gap-2 transition-all">
-              进入工具 <ArrowRight size={16} />
-            </div>
-          </div>
-
-          {/* Player Card */}
-          <div 
+            colorClass="indigo"
+          />
+          <FeatureCard 
+            icon={Library}
+            title={t('home.player.title')}
+            desc={t('home.player.desc')}
             onClick={() => setView('library')}
-            className="group relative bg-white dark:bg-[#252526] rounded-xl border border-slate-200 dark:border-[#333333] p-8 hover:shadow-xl hover:-translate-y-1 transition-all cursor-pointer overflow-hidden"
-          >
-            <div className="absolute top-0 right-0 p-8 opacity-5 group-hover:opacity-10 transition-opacity pointer-events-none">
-              <Library size={120} />
-            </div>
-            <div className="w-14 h-14 bg-emerald-100 dark:bg-emerald-900/40 text-emerald-600 dark:text-emerald-400 rounded-2xl flex items-center justify-center mb-6 shadow-sm">
-              <Play size={28} className="ml-1" />
-            </div>
-            <h2 className="text-xl font-bold mb-3">{t('home.player.title')}</h2>
-            <p className="text-slate-500 dark:text-slate-400 text-sm leading-relaxed mb-6">
-              {t('home.player.desc')}
-            </p>
-            <div className="flex items-center text-emerald-600 dark:text-emerald-400 font-medium text-sm gap-1 group-hover:gap-2 transition-all">
-              进入工具 <ArrowRight size={16} />
-            </div>
-          </div>
+            colorClass="emerald"
+          />
         </div>
 
         {/* Recent Files */}
@@ -78,22 +55,15 @@ export default function HomeView({ setView, recentFiles, openFileProgrammaticall
             <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-6">{t('home.recent')}</h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {recentFiles.slice(0, 6).map((item, idx) => (
-                <div 
+                <RecentFileItem
                   key={idx}
+                  item={item}
                   onClick={() => {
                     setView('library');
                     openFileProgrammatically(item.path, item.name, item.type === 'folder');
                   }}
-                  className="group flex items-center gap-3 p-4 bg-white dark:bg-[#252526] rounded-lg border border-slate-200 dark:border-[#333333] hover:border-indigo-300 dark:hover:border-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 cursor-pointer transition-all shadow-sm hover:shadow"
-                >
-                  <div className="text-indigo-500 dark:text-indigo-400 opacity-80 group-hover:opacity-100 shrink-0">
-                    {item.type === 'folder' ? <Folder size={24} strokeWidth={1.5} /> : <FileText size={24} strokeWidth={1.5} />}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <h3 className="text-sm font-medium text-slate-800 dark:text-[#dddddd] truncate">{item.name}</h3>
-                    <p className="text-[11px] text-slate-400 dark:text-[#666666] truncate mt-1">{item.path}</p>
-                  </div>
-                </div>
+                  styleVariant="home"
+                />
               ))}
             </div>
           </div>

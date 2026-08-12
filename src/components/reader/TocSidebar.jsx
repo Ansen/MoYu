@@ -1,28 +1,8 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React from 'react';
+import { useResizable } from '../../hooks/useResizable';
 
 export default function TocSidebar({ isOpen, toc, bookType, onTocClick }) {
-  const [width, setWidth] = useState(120);
-  const isResizing = useRef(false);
-
-  useEffect(() => {
-    function handleMouseMove(e) {
-      if (!isResizing.current) return;
-      const newWidth = Math.max(120, Math.min(e.clientX, 400));
-      setWidth(newWidth);
-    }
-    function handleMouseUp() {
-      if (isResizing.current) {
-        isResizing.current = false;
-        document.body.style.cursor = '';
-      }
-    }
-    document.addEventListener('mousemove', handleMouseMove);
-    document.addEventListener('mouseup', handleMouseUp);
-    return () => {
-      document.removeEventListener('mousemove', handleMouseMove);
-      document.removeEventListener('mouseup', handleMouseUp);
-    };
-  }, []);
+  const { width, startResizing } = useResizable(120, 120, 400);
 
   if (!isOpen || toc.length === 0) return null;
 
@@ -52,11 +32,7 @@ export default function TocSidebar({ isOpen, toc, bookType, onTocClick }) {
       {/* Resizer Handle */}
       <div 
         className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-indigo-500/50 transition-colors z-10"
-        onMouseDown={(e) => {
-          e.preventDefault();
-          isResizing.current = true;
-          document.body.style.cursor = 'col-resize';
-        }}
+        onMouseDown={(e) => startResizing(e, 'col-resize')}
       ></div>
     </div>
   );

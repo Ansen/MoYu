@@ -1,45 +1,12 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState } from 'react';
 import { Languages, Library, PanelLeftClose, PanelLeft, Home } from 'lucide-react';
 import { useI18n } from '../../i18n/index';
+import { useResizable } from '../../hooks/useResizable';
 
 export default function Sidebar({ currentView, setView }) {
   const [isCollapsed, setIsCollapsed] = useState(false);
-  const [sidebarWidth, setSidebarWidth] = useState(224); // 224px is w-56
-  const isResizing = useRef(false);
+  const { width: sidebarWidth, startResizing } = useResizable(224, 140, 400);
   const { t } = useI18n();
-
-  const startResizing = useCallback((e) => {
-    isResizing.current = true;
-    document.body.style.cursor = 'ew-resize';
-    document.body.style.userSelect = 'none';
-  }, []);
-
-  const stopResizing = useCallback(() => {
-    isResizing.current = false;
-    document.body.style.cursor = 'default';
-    document.body.style.userSelect = 'auto';
-  }, []);
-
-  const resize = useCallback((e) => {
-    if (isResizing.current) {
-      let newWidth = e.clientX;
-      if (newWidth < 140) newWidth = 140;
-      if (newWidth > 400) newWidth = 400;
-      setSidebarWidth(newWidth);
-      if (newWidth <= 140 && !isCollapsed) {
-        // Optionally auto collapse if dragged too small
-      }
-    }
-  }, [isCollapsed]);
-
-  useEffect(() => {
-    window.addEventListener('mousemove', resize);
-    window.addEventListener('mouseup', stopResizing);
-    return () => {
-      window.removeEventListener('mousemove', resize);
-      window.removeEventListener('mouseup', stopResizing);
-    };
-  }, [resize, stopResizing]);
 
   const menuItems = [
     { id: 'home', icon: <Home size={20} strokeWidth={2} />, label: t('sidebar.home') },

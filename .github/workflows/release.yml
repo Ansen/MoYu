@@ -46,6 +46,11 @@ jobs:
         with:
           targets: ${{ matrix.target }}
 
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: './src-tauri -> target'
+
       - name: install dependencies (ubuntu)
         if: startsWith(matrix.platform, 'ubuntu')
         run: |
@@ -57,6 +62,25 @@ jobs:
 
       - name: install frontend dependencies
         run: pnpm install
+
+      - name: Update version from tag
+        shell: bash
+        run: |
+          # Remove 'v' prefix if exists
+          RAW_VERSION=${GITHUB_REF_NAME#v}
+          export RAW_VERSION
+          node -e "
+            const fs = require('fs');
+            const version = process.env.RAW_VERSION;
+            const tauriConf = JSON.parse(fs.readFileSync('src-tauri/tauri.conf.json', 'utf8'));
+            tauriConf.version = version;
+            fs.writeFileSync('src-tauri/tauri.conf.json', JSON.stringify(tauriConf, null, 2));
+            const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+            pkg.version = version;
+            fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2));
+            const cargo = fs.readFileSync('src-tauri/Cargo.toml', 'utf8');
+            fs.writeFileSync('src-tauri/Cargo.toml', cargo.replace(/version = \".*\"/, 'version = \"' + version + '\"'));
+          "
 
       - uses: tauri-apps/tauri-action@v0
         env:

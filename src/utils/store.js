@@ -35,26 +35,3 @@ export async function loadReadingProgress(bookId) {
   }
 }
 
-/**
- * 保存全局设置（比如深色模式、莫尔斯播放速度等）
- */
-export async function saveGlobalSettings(settings) {
-  try {
-    await store.set('global_settings', settings);
-    await store.save();
-  } catch (err) {
-    console.error('Failed to save settings:', err);
-  }
-}
-
-/**
- * 读取全局设置
- */
-export async function loadGlobalSettings() {
-  try {
-    return await store.get('global_settings') || {};
-  } catch (err) {
-    console.error('Failed to load settings:', err);
-    return {};
-  }
-}

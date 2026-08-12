@@ -22,7 +22,7 @@ export default function Reader({ bookData, onClose, jumpToSibling }) {
   const [hideBodyTitle, setHideBodyTitle] = useState(localStorage.getItem('pref_hide_body_title') === 'true');
   const [numberMode, setNumberMode] = useState(localStorage.getItem('pref_number_mode') || 'long');
   const [useHarmonics, setUseHarmonics] = useState(localStorage.getItem('pref_use_harmonics') === 'true');
-  const [showMoreMenu, setShowMoreMenu] = useState(false);
+
 
   const [isMoreMenuOpen, setIsMoreMenuOpen] = useState(false);
   const [windowWidth, setWindowWidth] = useState(window.innerWidth);
