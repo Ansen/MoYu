@@ -3,7 +3,6 @@ import { X, Save } from 'lucide-react';
 import { useI18n } from '../i18n/index';
 
 export default function SettingsModal({ isOpen, onClose }) {
-  const [dictionary, setDictionary] = useState('1983_mainland');
   const [morseSpeed, setMorseSpeed] = useState(20);
   const [morseFreq, setMorseFreq] = useState(700);
   const [startupBehavior, setStartupBehavior] = useState('restore');
@@ -12,21 +11,21 @@ export default function SettingsModal({ isOpen, onClose }) {
 
   // 模拟读取保存的设置
   useEffect(() => {
-    const savedDict = localStorage.getItem('pref_dictionary');
     const savedSpeed = localStorage.getItem('pref_morse_speed');
     const savedFreq = localStorage.getItem('pref_morse_freq');
     const savedStartup = localStorage.getItem('pref_startup');
-    if (savedDict) setDictionary(savedDict);
     if (savedSpeed) setMorseSpeed(Number(savedSpeed));
     if (savedFreq) setMorseFreq(Number(savedFreq));
     if (savedStartup) setStartupBehavior(savedStartup);
   }, [isOpen]);
 
   const handleSave = () => {
-    localStorage.setItem('pref_dictionary', dictionary);
     localStorage.setItem('pref_morse_speed', morseSpeed);
     localStorage.setItem('pref_morse_freq', morseFreq);
     localStorage.setItem('pref_startup', startupBehavior);
+    
+    // 通知其他组件设置已更改
+    window.dispatchEvent(new Event('moyu_settings_changed'));
     onClose();
   };
 
@@ -57,22 +56,6 @@ export default function SettingsModal({ isOpen, onClose }) {
             >
               <option value="home">{t('settings.startup.home')}</option>
               <option value="restore">{t('settings.startup.restore')}</option>
-            </select>
-          </div>
-
-          <div className="h-px w-full bg-slate-200 dark:bg-[#333333]"></div>
-
-          {/* Dictionary Setting */}
-          <div className="space-y-2">
-            <label className="font-bold block">{t('settings.dict')}</label>
-            <select
-              value={dictionary}
-              onChange={(e) => setDictionary(e.target.value)}
-              className="w-full bg-slate-50 dark:bg-[#111111] border border-slate-300 dark:border-[#333333] rounded-md px-3 py-1.5 focus:outline-none focus:border-indigo-500"
-            >
-              <option value="1983_mainland">{t('settings.dict.1983m')}</option>
-              <option value="1983_taiwan">{t('settings.dict.1983t')}</option>
-              <option value="custom">{t('settings.dict.custom')}</option>
             </select>
           </div>
 

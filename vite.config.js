@@ -8,4 +8,15 @@ export default defineConfig({
     tailwindcss(),
     react()
   ],
+  // Prevent vite from obscuring rust errors
+  clearScreen: false,
+  server: {
+    port: 14200,
+    // Tauri expects a fixed port, fail if that port is not available
+    strictPort: true,
+    watch: {
+      // Tell vite to ignore watching `src-tauri`
+      ignored: ["**/src-tauri/**"],
+    },
+  },
 })
