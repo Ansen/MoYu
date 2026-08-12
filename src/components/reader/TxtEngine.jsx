@@ -81,9 +81,14 @@ const TxtEngine = forwardRef(({ bookData, fontSize, onTocLoaded, onChapterChange
         const lines = text.split('\n');
         let currentLength = 0;
         for (let i = 0; i < Math.min(5, lines.length); i++) {
-          if (lines[i].trim().length > 0 && lines[i].trim().length < 30) {
+          const line = lines[i].trim();
+          if (line.length > 0 && line.length < 30) {
+            // Check if it's raw data (pure digits, spaces, and morse symbols)
+            if (/^[\d\s.\-/]+$/.test(line)) {
+              break; // Don't skip raw telegraph lines
+            }
             startIndex = currentLength + lines[i].length + 1;
-          } else if (lines[i].trim().length >= 30) {
+          } else if (line.length >= 30) {
             break;
           }
           currentLength += lines[i].length + 1;
