@@ -21,11 +21,11 @@ export const translations = {
     // 侧边栏
     'sidebar.home': '首页导航',
     'sidebar.explorer': '功能导航',
-    'sidebar.translator': '摩言摩语',
+    'sidebar.translator': '摩言密语',
     'sidebar.library': '电码播放器',
     
-    // 摩言摩语
-    'translator.editor.title': '摩言摩语 (自动识别)',
+    // 摩言密语
+    'translator.editor.title': '摩言密语 (自动识别)',
     'translator.editor.placeholder': '在此输入需要转换的中文、摩尔斯码或标准电码...',
     'translator.loading': '加载字典...',
     'translator.chinese': '中文 (CHINESE)',
@@ -60,7 +60,7 @@ export const translations = {
     // 首页
     'home.welcome': '欢迎使用 摩语 MoYu',
     'home.subtitle': '专业的摩尔斯电码与标准电码训练终端',
-    'home.translator.title': '摩言摩语',
+    'home.translator.title': '摩言密语',
     'home.translator.desc': '支持中文、标准电码、摩尔斯码之间的双向互译与自动识别。',
     'home.player.title': '电码播放器',
     'home.player.desc': '导入 TXT 或 EPUB 电子书，支持原文章节解析与沉浸式摩尔斯电码跟读训练。',
