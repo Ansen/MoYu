@@ -121,7 +121,7 @@ const EpubEngine = forwardRef(({ bookData, fontSize, hideBodyTitle, onTocLoaded,
           ['box-sizing', 'border-box !important'], 
           ['line-height', '1.8 !important'], 
           ['word-wrap', 'break-word !important'],
-          ['font-family', '"Microsoft YaHei", "PingFang SC", "Segoe UI", Roboto, sans-serif !important'],
+          ['font-family', 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace, "Microsoft YaHei", "PingFang SC", "Segoe UI", Roboto, sans-serif !important'],
           ['font-weight', '500 !important'],
           ['text-rendering', 'optimizeLegibility !important']
         ],

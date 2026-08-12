@@ -113,7 +113,7 @@ const TxtEngine = forwardRef(({ bookData, fontSize, onTocLoaded, onChapterChange
       style={{ 
         fontSize: `${fontSize}px`, 
         lineHeight: 1.8,
-        fontFamily: '"Microsoft YaHei", "PingFang SC", "Segoe UI", Roboto, sans-serif',
+        fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace, "Microsoft YaHei", "PingFang SC", "Segoe UI", Roboto, sans-serif',
         scrollbarWidth: 'none',
         msOverflowStyle: 'none'
       }}

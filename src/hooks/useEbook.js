@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect } from 'react';
 import { open } from '@tauri-apps/plugin-dialog';
 import { readFile, readTextFile, readDir } from '@tauri-apps/plugin-fs';
+import { generatePracticeText } from '../utils/morse/structuredRandom';
 import ePub from 'epubjs';
 
 export function useEbook() {
@@ -169,6 +170,21 @@ export function useEbook() {
     setError(null);
   }, []);
 
+  const loadGeneratedContent = useCallback((mode) => {
+    const text = generatePracticeText(mode);
+    const name = mode === 'numbers' ? '随机数码报底' : '随机英语报底';
+    setBookData({
+      type: 'txt',
+      data: text,
+      name,
+      path: `virtual://${mode}`,
+      isGenerated: true,
+      generatorMode: mode,
+      siblings: [],
+      currentIndex: 0
+    });
+  }, []);
+
   const closeBook = useCallback(() => {
     if (bookData?.type === 'epub' && bookData.data) {
       bookData.data.destroy();
@@ -188,6 +204,7 @@ export function useEbook() {
     closeBook,
     clearRecentFiles,
     removeRecentFile,
-    loadTextDirectly
+    loadTextDirectly,
+    loadGeneratedContent
   };
 }

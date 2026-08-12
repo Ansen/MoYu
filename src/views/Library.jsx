@@ -1,6 +1,6 @@
 import React from 'react';
 import Reader from '../components/Reader';
-import { FileText, Folder, Clock, PlusCircle } from 'lucide-react';
+import { FileText, Folder, Clock, PlusCircle, Dices, Shuffle } from 'lucide-react';
 import { useI18n } from '../i18n/index';
 import RecentFileItem from '../components/common/RecentFileItem';
 
@@ -8,7 +8,7 @@ export default function LibraryView({ ebook }) {
   const { 
     bookData, loading, openBookDialog, openFolderDialog, 
     closeBook, recentFiles, openFileProgrammatically, jumpToSibling,
-    clearRecentFiles, removeRecentFile
+    clearRecentFiles, removeRecentFile, loadGeneratedContent
   } = ebook;
   const { t } = useI18n();
 
@@ -41,6 +41,22 @@ export default function LibraryView({ ebook }) {
                 <Folder size={18} />
                 {t('library.import.folder')}
               </button>
+              <button 
+                onClick={() => loadGeneratedContent('numbers')}
+                disabled={loading}
+                className="flex items-center gap-2 px-6 py-2.5 rounded-lg border border-orange-100 dark:border-orange-500/20 bg-orange-50/50 dark:bg-orange-500/10 text-orange-600 dark:text-orange-400 hover:bg-orange-100 dark:hover:bg-orange-500/20 transition-all font-medium text-[13px]"
+              >
+                <Dices size={18} />
+                生成数码报底
+              </button>
+              <button 
+                onClick={() => loadGeneratedContent('letters')}
+                disabled={loading}
+                className="flex items-center gap-2 px-6 py-2.5 rounded-lg border border-orange-100 dark:border-orange-500/20 bg-orange-50/50 dark:bg-orange-500/10 text-orange-600 dark:text-orange-400 hover:bg-orange-100 dark:hover:bg-orange-500/20 transition-all font-medium text-[13px]"
+              >
+                <Shuffle size={18} />
+                生成英文分组报底
+              </button>
             </div>
           </div>
         ) : (
@@ -63,6 +79,23 @@ export default function LibraryView({ ebook }) {
               >
                 <Folder size={16} />
                 {t('library.import.folder')}
+              </button>
+              <div className="w-px h-6 bg-slate-200 dark:bg-[#333333] mx-2"></div>
+              <button 
+                onClick={() => loadGeneratedContent('numbers')}
+                disabled={loading}
+                className="flex items-center gap-2 px-5 py-2 rounded-lg border border-orange-100 dark:border-orange-500/20 bg-orange-50/50 dark:bg-orange-500/10 text-orange-600 dark:text-orange-400 hover:bg-orange-100 dark:hover:bg-orange-500/20 transition-all font-medium text-[13px]"
+              >
+                <Dices size={16} />
+                生成数码报底
+              </button>
+              <button 
+                onClick={() => loadGeneratedContent('letters')}
+                disabled={loading}
+                className="flex items-center gap-2 px-5 py-2 rounded-lg border border-orange-100 dark:border-orange-500/20 bg-orange-50/50 dark:bg-orange-500/10 text-orange-600 dark:text-orange-400 hover:bg-orange-100 dark:hover:bg-orange-500/20 transition-all font-medium text-[13px]"
+              >
+                <Shuffle size={16} />
+                生成英文分组报底
               </button>
             </div>
 
@@ -104,6 +137,7 @@ export default function LibraryView({ ebook }) {
           bookData={bookData} 
           onClose={closeBook} 
           jumpToSibling={jumpToSibling}
+          onRegenerate={bookData.isGenerated ? () => loadGeneratedContent(bookData.generatorMode) : undefined}
         />
       )}
     </div>

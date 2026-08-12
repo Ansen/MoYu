@@ -6,7 +6,7 @@ import EpubEngine from './reader/EpubEngine';
 import TxtEngine from './reader/TxtEngine';
 import TocSidebar from './reader/TocSidebar';
 
-export default function Reader({ bookData, onClose, jumpToSibling }) {
+export default function Reader({ bookData, onClose, jumpToSibling, onRegenerate }) {
   const engineRef = useRef(null);
   
   const [isPlaying, setIsPlaying] = useState(false);
@@ -228,6 +228,7 @@ export default function Reader({ bookData, onClose, jumpToSibling }) {
         isPaused={isPaused}
         togglePlay={togglePlay}
         stopPlay={stopPlay}
+        onRegenerate={onRegenerate}
       />
 
       {/* Main Content Area */}

@@ -94,10 +94,20 @@ export default function useHighlighter(bookType, onScrollRequest) {
       }
       
       const rect = targetRange.getBoundingClientRect();
-      overlay.style.left = (rect.left + scrollX) + 'px';
-      overlay.style.top = (rect.top + scrollY) + 'px';
-      overlay.style.width = rect.width + 'px';
-      overlay.style.height = rect.height + 'px';
+      const char = targetNode.nodeValue[targetOffset];
+      
+      // Do not update dimensions/position or show overlay for newlines to prevent jumping
+      if (char === '\n' || char === '\r') {
+        overlay.style.opacity = '0';
+      } else {
+        overlay.style.opacity = '1';
+        if (rect.width > 0 && rect.height > 0) {
+          overlay.style.left = (rect.left + scrollX) + 'px';
+          overlay.style.top = (rect.top + scrollY) + 'px';
+          overlay.style.width = rect.width + 'px';
+          overlay.style.height = rect.height + 'px';
+        }
+      }
         
       // Request parent to handle scroll if needed
       if (onScrollRequest) {

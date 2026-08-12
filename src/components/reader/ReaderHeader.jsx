@@ -1,5 +1,5 @@
 import React from 'react';
-import { ArrowLeft, List, ChevronRight, Type, Activity, Music, Settings2, SkipForward, Check, Heading1, Radio, Hash, Pause, Play } from 'lucide-react';
+import { ArrowLeft, List, ChevronRight, Type, Activity, Music, Settings2, SkipForward, Check, Heading1, Radio, Hash, Pause, Play, RefreshCw } from 'lucide-react';
 
 export default function ReaderHeader({
   bookData,
@@ -28,7 +28,8 @@ export default function ReaderHeader({
   isPlaying,
   isPaused,
   togglePlay,
-  stopPlay
+  stopPlay,
+  onRegenerate
 }) {
   return (
     <div className="h-12 bg-slate-100 dark:bg-[#111111] border-b border-slate-300 dark:border-[#333333] flex items-center px-4 shrink-0 shadow-sm z-10 justify-between">
@@ -191,6 +192,15 @@ export default function ReaderHeader({
         </div>
 
         <div className="flex items-center gap-1">
+          {onRegenerate && (
+            <button 
+              onClick={() => { stopPlay(); onRegenerate(); }}
+              className="px-3 py-1.5 rounded font-medium flex items-center gap-1.5 shrink-0 transition-colors bg-slate-100 hover:bg-slate-200 text-slate-600 dark:bg-[#333333] dark:hover:bg-[#444444] dark:text-[#cccccc]"
+              title="重新生成"
+            >
+              <RefreshCw size={14} />
+            </button>
+          )}
           {isPlaying && (
             <button 
               onClick={stopPlay}
