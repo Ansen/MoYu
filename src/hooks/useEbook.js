@@ -84,11 +84,14 @@ export function useEbook() {
           throw new Error('文件夹中没有找到 txt 或 epub 文件');
         }
 
-        const siblings = validFiles.map(f => ({
-          name: f.name,
-          path: `${filePath}\\${f.name}`.replace(/\\\\/g, '\\'), // Handle path concat simply
-          type: f.name.toLowerCase().endsWith('.epub') ? 'epub' : 'txt'
-        }));
+        const siblings = validFiles.map(f => {
+          const sep = filePath.includes('\\') ? '\\' : '/';
+          return {
+            name: f.name,
+            path: `${filePath}${sep}${f.name}`.replace(/\\\\/g, '\\').replace(/\/\//g, '/'),
+            type: f.name.toLowerCase().endsWith('.epub') ? 'epub' : 'txt'
+          };
+        });
 
         await loadFileContent(siblings[0].path, siblings[0].name, siblings, 0);
         saveRecent({ type: 'folder', name: fileName || filePath.split(/[/\\]/).pop(), path: filePath });

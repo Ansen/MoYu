@@ -81,9 +81,9 @@ const TxtEngine = forwardRef(({ bookData, fontSize, onTocLoaded, onChapterChange
         const lines = text.split('\n');
         let currentLength = 0;
         for (let i = 0; i < Math.min(5, lines.length); i++) {
-          if (lines[i].trim().length > 0 && lines[i].trim().length < 50) {
+          if (lines[i].trim().length > 0 && lines[i].trim().length < 30) {
             startIndex = currentLength + lines[i].length + 1;
-          } else if (lines[i].trim().length >= 50) {
+          } else if (lines[i].trim().length >= 30) {
             break;
           }
           currentLength += lines[i].length + 1;
