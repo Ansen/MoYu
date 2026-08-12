@@ -2,8 +2,9 @@ import React, { useEffect, useRef, useCallback, forwardRef, useImperativeHandle 
 import useHighlighter from './useHighlighter';
 import { saveReadingProgress, loadReadingProgress } from '../../utils/store';
 
-const TxtEngine = forwardRef(({ bookData, fontSize, onTocLoaded, onChapterChange, jumpToSibling }, ref) => {
+const TxtEngine = forwardRef(({ bookData, fontSize, onTocLoaded, onChapterChange, jumpToSibling, onProgressChange }, ref) => {
   const viewerRef = useRef(null);
+  const lastProgressRef = useRef(0);
 
   const handleScrollRequest = useCallback((rect, targetRange, win, doc, scrollY, scrollX, overlay) => {
     const container = viewerRef.current;
@@ -56,6 +57,14 @@ const TxtEngine = forwardRef(({ bookData, fontSize, onTocLoaded, onChapterChange
 
   const handleTxtScroll = (e) => {
     saveReadingProgress(bookData.name, e.target.scrollTop);
+    if (onProgressChange) {
+      const scrollableHeight = e.target.scrollHeight - e.target.clientHeight;
+      const progress = scrollableHeight > 0 ? Math.round((e.target.scrollTop / scrollableHeight) * 100) : 0;
+      if (progress !== lastProgressRef.current) {
+        lastProgressRef.current = progress;
+        onProgressChange(progress);
+      }
+    }
   };
 
   useImperativeHandle(ref, () => ({
@@ -119,7 +128,12 @@ const TxtEngine = forwardRef(({ bookData, fontSize, onTocLoaded, onChapterChange
         jumpToSibling(bookData.currentIndex + 1);
       }
     },
-    getPaginationLabel: () => `File ${bookData.currentIndex + 1} / ${bookData.siblings?.length || 1}`
+    getPaginationLabel: () => {
+      if (bookData.siblings && bookData.siblings.length > 1) {
+        return `文件 ${bookData.currentIndex + 1} / ${bookData.siblings.length} - ${lastProgressRef.current}%`;
+      }
+      return `进度: ${lastProgressRef.current}%`;
+    }
   }));
 
   return (
