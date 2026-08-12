@@ -83,8 +83,10 @@ const TxtEngine = forwardRef(({ bookData, fontSize, onTocLoaded, onChapterChange
         for (let i = 0; i < Math.min(5, lines.length); i++) {
           const line = lines[i].trim();
           if (line.length > 0 && line.length < 30) {
+            // Remove BOM or zero-width spaces that might break the regex
+            const cleanLine = line.replace(/[\uFEFF\u200B\u200C\u200D]/g, '');
             // Check if it's raw data (pure digits, spaces, and morse symbols)
-            if (/^[\d\s.\-/]+$/.test(line)) {
+            if (/^[\d\s.\-/]+$/.test(cleanLine)) {
               break; // Don't skip raw telegraph lines
             }
             startIndex = currentLength + lines[i].length + 1;
