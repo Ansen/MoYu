@@ -2,9 +2,8 @@ import React, { useEffect, useRef, useCallback, forwardRef, useImperativeHandle 
 import useHighlighter from './useHighlighter';
 import { saveReadingProgress, loadReadingProgress } from '../../utils/store';
 
-const TxtEngine = forwardRef(({ bookData, fontSize, onTocLoaded, onChapterChange, jumpToSibling, onProgressChange }, ref) => {
+const TxtEngine = forwardRef(({ bookData, fontSize, onTocLoaded, onChapterChange, jumpToSibling }, ref) => {
   const viewerRef = useRef(null);
-  const lastProgressRef = useRef(0);
 
   const handleScrollRequest = useCallback((rect, targetRange, win, doc, scrollY, scrollX, overlay) => {
     const container = viewerRef.current;
@@ -57,14 +56,6 @@ const TxtEngine = forwardRef(({ bookData, fontSize, onTocLoaded, onChapterChange
 
   const handleTxtScroll = (e) => {
     saveReadingProgress(bookData.name, e.target.scrollTop);
-    if (onProgressChange) {
-      const scrollableHeight = e.target.scrollHeight - e.target.clientHeight;
-      const progress = scrollableHeight > 0 ? Math.round((e.target.scrollTop / scrollableHeight) * 100) : 0;
-      if (progress !== lastProgressRef.current) {
-        lastProgressRef.current = progress;
-        onProgressChange(progress);
-      }
-    }
   };
 
   useImperativeHandle(ref, () => ({
@@ -86,26 +77,6 @@ const TxtEngine = forwardRef(({ bookData, fontSize, onTocLoaded, onChapterChange
       resetHighlightState();
       
       let startIndex = 0;
-      if (skipTitle) {
-        const lines = text.split('\n');
-        let currentLength = 0;
-        for (let i = 0; i < Math.min(5, lines.length); i++) {
-          const line = lines[i].trim();
-          if (line.length > 0 && line.length < 30) {
-            // Remove BOM or zero-width spaces that might break the regex
-            const cleanLine = line.replace(/[\uFEFF\u200B\u200C\u200D]/g, '');
-            // Check if it's raw data (pure digits, spaces, and morse symbols)
-            if (/^[\d\s.\-/]+$/.test(cleanLine)) {
-              break; // Don't skip raw telegraph lines
-            }
-            startIndex = currentLength + lines[i].length + 1;
-          } else if (line.length >= 30) {
-            break;
-          }
-          currentLength += lines[i].length + 1;
-        }
-      }
-      
       return { text, startIndex };
     },
     highlightToken,
@@ -129,10 +100,8 @@ const TxtEngine = forwardRef(({ bookData, fontSize, onTocLoaded, onChapterChange
       }
     },
     getPaginationLabel: () => {
-      if (bookData.siblings && bookData.siblings.length > 1) {
-        return `文件 ${bookData.currentIndex + 1} / ${bookData.siblings.length} - ${lastProgressRef.current}%`;
-      }
-      return `进度: ${lastProgressRef.current}%`;
+      const total = bookData.siblings?.length || 1;
+      return total > 1 ? `文件 ${bookData.currentIndex + 1} / ${total}` : '';
     }
   }));
 
@@ -140,7 +109,7 @@ const TxtEngine = forwardRef(({ bookData, fontSize, onTocLoaded, onChapterChange
     <div 
       ref={viewerRef}
       onScroll={handleTxtScroll}
-      className="w-full h-full overflow-y-auto overflow-x-hidden py-8 text-slate-800 dark:text-[#cccccc] whitespace-pre-wrap font-medium [text-rendering:optimizeLegibility]"
+      className="w-full h-full overflow-y-auto overflow-x-hidden py-8 text-slate-800 dark:text-[#cccccc] whitespace-pre-wrap font-medium [text-rendering:optimizeLegibility] [&::-webkit-scrollbar]:hidden"
       style={{ 
         fontSize: `${fontSize}px`, 
         lineHeight: 1.8,
@@ -149,9 +118,6 @@ const TxtEngine = forwardRef(({ bookData, fontSize, onTocLoaded, onChapterChange
         msOverflowStyle: 'none'
       }}
     >
-      <style>{`
-        div::-webkit-scrollbar { display: none; }
-      `}</style>
       {bookData.data}
     </div>
   );

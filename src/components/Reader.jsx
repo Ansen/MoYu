@@ -14,7 +14,6 @@ export default function Reader({ bookData, onClose, jumpToSibling }) {
   const [toc, setToc] = useState([]);
   const [isTocOpen, setIsTocOpen] = useState(true);
   const [currentChapterTitle, setCurrentChapterTitle] = useState('');
-  const [txtProgress, setTxtProgress] = useState(0);
   
   // Settings
   const [baseFontSize, setBaseFontSize] = useState(() => Number(localStorage.getItem('pref_base_font_size') || 20)); // px (baseline at 800px width)
@@ -166,7 +165,7 @@ export default function Reader({ bookData, onClose, jumpToSibling }) {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [togglePlay, handlePrev, handleNext]);
 
-  const paginationLabel = engineRef.current ? engineRef.current.getPaginationLabel() : (bookData.type === 'epub' ? 'EPUB Navigation' : `进度: ${txtProgress}%`);
+  const paginationLabel = engineRef.current && typeof engineRef.current.getPaginationLabel === 'function' ? engineRef.current.getPaginationLabel() : '';
 
   return (
     <div className="fixed top-8 left-0 right-0 bottom-0 z-40 bg-white dark:bg-[#1e1e1e] flex flex-col transition-colors select-none text-slate-800 dark:text-slate-200">
@@ -264,7 +263,6 @@ export default function Reader({ bookData, onClose, jumpToSibling }) {
                   jumpToSibling={jumpToSibling}
                   onTocLoaded={setToc}
                   onChapterChange={setCurrentChapterTitle}
-                  onProgressChange={setTxtProgress}
                 />
               )}
             </div>
@@ -278,9 +276,11 @@ export default function Reader({ bookData, onClose, jumpToSibling }) {
             >
               <ChevronLeft size={16} /> 上一页
             </button>
-            <span className="text-[12px] text-slate-400 font-mono">
-              {paginationLabel}
-            </span>
+            {paginationLabel && (
+              <span className="text-[12px] text-slate-400 font-mono">
+                {paginationLabel}
+              </span>
+            )}
             <button 
               onClick={handleNext}
               className="px-4 py-1.5 rounded hover:bg-slate-200 dark:hover:bg-[#333333] text-slate-600 dark:text-[#cccccc] flex items-center gap-2 text-[13px] transition-colors"

@@ -264,7 +264,7 @@ const EpubEngine = forwardRef(({ bookData, fontSize, hideBodyTitle, onTocLoaded,
     nextPage: () => {
       if (renditionRef.current) renditionRef.current.next();
     },
-    getPaginationLabel: () => 'EPUB Navigation'
+    getPaginationLabel: () => ''
   }));
 
   return <div ref={viewerRef} className="w-full h-full overflow-hidden" />;
