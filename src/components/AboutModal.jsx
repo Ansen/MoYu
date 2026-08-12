@@ -1,7 +1,14 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { X, Mail, Globe, Info } from 'lucide-react';
+import { getVersion } from '@tauri-apps/api/app';
 
 export default function AboutModal({ isOpen, onClose }) {
+  const [version, setVersion] = useState('v...');
+
+  useEffect(() => {
+    getVersion().then(v => setVersion('v' + v)).catch(() => setVersion('v1.0.0'));
+  }, []);
+
   // ESC key to close
   useEffect(() => {
     const handleKeyDown = (e) => {
@@ -43,7 +50,7 @@ export default function AboutModal({ isOpen, onClose }) {
         {/* Body */}
         <div className="p-6 pt-5">
           <div className="text-center mb-6">
-            <h2 className="text-lg font-bold text-slate-800 dark:text-[#eeeeee]">v1.0.0</h2>
+            <h2 className="text-lg font-bold text-slate-800 dark:text-[#eeeeee]">{version}</h2>
             <p className="text-[13px] text-slate-500 dark:text-[#999999] mt-1">Professional Morse Code Training Terminal</p>
           </div>
 
