@@ -117,8 +117,8 @@ jobs:
           mkdir -p updater
           cd updater
           
-          # Download all signature files
-          gh release download "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --pattern "*.sig"
+          # Download all signature files (or continue if none found)
+          gh release download "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --pattern "*.sig" || true
           
           node -e "
             const fs = require('fs');
@@ -134,7 +134,12 @@ jobs:
             };
 
             const files = fs.readdirSync('.');
-            files.filter(f => f.endsWith('.sig')).forEach(sigFile => {
+            const sigFiles = files.filter(f => f.endsWith('.sig'));
+            if (sigFiles.length === 0) {
+              console.warn('WARNING: No .sig files found! Check if TAURI_PRIVATE_KEY is set in GitHub Repository Secrets.');
+            }
+
+            sigFiles.forEach(sigFile => {
               const signature = fs.readFileSync(sigFile, 'utf8').trim();
               const assetName = sigFile.slice(0, -4);
               const lower = assetName.toLowerCase();
