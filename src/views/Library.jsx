@@ -24,11 +24,11 @@ export default function LibraryView({ ebook }) {
               <p className="text-[15px] font-semibold text-slate-600 dark:text-[#cccccc] mb-2">{t('library.empty.title')}</p>
               <p className="text-[13px] text-slate-400 dark:text-[#777777]">{t('library.empty.desc')}</p>
             </div>
-            <div className="flex gap-4 mt-8">
+            <div className="flex flex-wrap items-center justify-center gap-3 mt-8">
               <button 
                 onClick={openBookDialog}
                 disabled={loading}
-                className="flex items-center gap-2 px-6 py-2.5 rounded-lg border border-indigo-100 dark:border-indigo-500/20 bg-indigo-50/50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100 dark:hover:bg-indigo-500/20 transition-all font-medium text-[13px]"
+                className="flex items-center gap-2 px-5 py-2.5 rounded-lg border border-indigo-100 dark:border-indigo-500/20 bg-indigo-50/50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100 dark:hover:bg-indigo-500/20 transition-all font-medium text-[13px] whitespace-nowrap shrink-0"
               >
                 <PlusCircle size={18} />
                 {loading ? t('library.opening') : t('library.import.file')}
@@ -36,7 +36,7 @@ export default function LibraryView({ ebook }) {
               <button 
                 onClick={openFolderDialog}
                 disabled={loading}
-                className="flex items-center gap-2 px-6 py-2.5 rounded-lg border border-indigo-100 dark:border-indigo-500/20 bg-indigo-50/50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100 dark:hover:bg-indigo-500/20 transition-all font-medium text-[13px]"
+                className="flex items-center gap-2 px-5 py-2.5 rounded-lg border border-indigo-100 dark:border-indigo-500/20 bg-indigo-50/50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100 dark:hover:bg-indigo-500/20 transition-all font-medium text-[13px] whitespace-nowrap shrink-0"
               >
                 <Folder size={18} />
                 {t('library.import.folder')}
@@ -44,18 +44,18 @@ export default function LibraryView({ ebook }) {
               <button 
                 onClick={() => loadGeneratedContent('numbers')}
                 disabled={loading}
-                className="flex items-center gap-2 px-6 py-2.5 rounded-lg border border-orange-100 dark:border-orange-500/20 bg-orange-50/50 dark:bg-orange-500/10 text-orange-600 dark:text-orange-400 hover:bg-orange-100 dark:hover:bg-orange-500/20 transition-all font-medium text-[13px]"
+                className="flex items-center gap-2 px-5 py-2.5 rounded-lg border border-orange-100 dark:border-orange-500/20 bg-orange-50/50 dark:bg-orange-500/10 text-orange-600 dark:text-orange-400 hover:bg-orange-100 dark:hover:bg-orange-500/20 transition-all font-medium text-[13px] whitespace-nowrap shrink-0"
               >
                 <Dices size={18} />
-                生成数码报底
+                {t('library.gen.numbers')}
               </button>
               <button 
                 onClick={() => loadGeneratedContent('letters')}
                 disabled={loading}
-                className="flex items-center gap-2 px-6 py-2.5 rounded-lg border border-orange-100 dark:border-orange-500/20 bg-orange-50/50 dark:bg-orange-500/10 text-orange-600 dark:text-orange-400 hover:bg-orange-100 dark:hover:bg-orange-500/20 transition-all font-medium text-[13px]"
+                className="flex items-center gap-2 px-5 py-2.5 rounded-lg border border-orange-100 dark:border-orange-500/20 bg-orange-50/50 dark:bg-orange-500/10 text-orange-600 dark:text-orange-400 hover:bg-orange-100 dark:hover:bg-orange-500/20 transition-all font-medium text-[13px] whitespace-nowrap shrink-0"
               >
                 <Shuffle size={18} />
-                生成英文分组报底
+                {t('library.gen.letters')}
               </button>
             </div>
           </div>
@@ -63,11 +63,11 @@ export default function LibraryView({ ebook }) {
           <div className="max-w-3xl mx-auto select-none space-y-8">
             
             {/* Primary Action Buttons */}
-            <div className="flex items-center gap-4 border-b border-slate-200 dark:border-[#333333] pb-6">
+            <div className="flex flex-wrap items-center gap-3 border-b border-slate-200 dark:border-[#333333] pb-6">
               <button 
                 onClick={openBookDialog}
                 disabled={loading}
-                className="flex items-center gap-2 px-5 py-2 rounded-lg border border-indigo-100 dark:border-indigo-500/20 bg-indigo-50/50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100 dark:hover:bg-indigo-500/20 transition-all font-medium text-[13px]"
+                className="flex items-center gap-2 px-4 py-2 rounded-lg border border-indigo-100 dark:border-indigo-500/20 bg-indigo-50/50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100 dark:hover:bg-indigo-500/20 transition-all font-medium text-[13px] whitespace-nowrap shrink-0"
               >
                 <PlusCircle size={16} />
                 {loading ? t('library.opening') : t('library.import.file')}
@@ -75,27 +75,27 @@ export default function LibraryView({ ebook }) {
               <button 
                 onClick={openFolderDialog}
                 disabled={loading}
-                className="flex items-center gap-2 px-5 py-2 rounded-lg border border-indigo-100 dark:border-indigo-500/20 bg-indigo-50/50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100 dark:hover:bg-indigo-500/20 transition-all font-medium text-[13px]"
+                className="flex items-center gap-2 px-4 py-2 rounded-lg border border-indigo-100 dark:border-indigo-500/20 bg-indigo-50/50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100 dark:hover:bg-indigo-500/20 transition-all font-medium text-[13px] whitespace-nowrap shrink-0"
               >
                 <Folder size={16} />
                 {t('library.import.folder')}
               </button>
-              <div className="w-px h-6 bg-slate-200 dark:bg-[#333333] mx-2"></div>
+              <div className="w-px h-6 bg-slate-200 dark:bg-[#333333] mx-1 shrink-0 hidden sm:block"></div>
               <button 
                 onClick={() => loadGeneratedContent('numbers')}
                 disabled={loading}
-                className="flex items-center gap-2 px-5 py-2 rounded-lg border border-orange-100 dark:border-orange-500/20 bg-orange-50/50 dark:bg-orange-500/10 text-orange-600 dark:text-orange-400 hover:bg-orange-100 dark:hover:bg-orange-500/20 transition-all font-medium text-[13px]"
+                className="flex items-center gap-2 px-4 py-2 rounded-lg border border-orange-100 dark:border-orange-500/20 bg-orange-50/50 dark:bg-orange-500/10 text-orange-600 dark:text-orange-400 hover:bg-orange-100 dark:hover:bg-orange-500/20 transition-all font-medium text-[13px] whitespace-nowrap shrink-0"
               >
                 <Dices size={16} />
-                生成数码报底
+                {t('library.gen.numbers')}
               </button>
               <button 
                 onClick={() => loadGeneratedContent('letters')}
                 disabled={loading}
-                className="flex items-center gap-2 px-5 py-2 rounded-lg border border-orange-100 dark:border-orange-500/20 bg-orange-50/50 dark:bg-orange-500/10 text-orange-600 dark:text-orange-400 hover:bg-orange-100 dark:hover:bg-orange-500/20 transition-all font-medium text-[13px]"
+                className="flex items-center gap-2 px-4 py-2 rounded-lg border border-orange-100 dark:border-orange-500/20 bg-orange-50/50 dark:bg-orange-500/10 text-orange-600 dark:text-orange-400 hover:bg-orange-100 dark:hover:bg-orange-500/20 transition-all font-medium text-[13px] whitespace-nowrap shrink-0"
               >
                 <Shuffle size={16} />
-                生成英文分组报底
+                {t('library.gen.letters')}
               </button>
             </div>
 
@@ -109,9 +109,9 @@ export default function LibraryView({ ebook }) {
                 {recentFiles.length > 0 && (
                   <button 
                     onClick={clearRecentFiles}
-                    className="text-[12px] text-slate-400 hover:text-red-500 transition-colors px-2 py-1"
+                    className="text-[12px] text-slate-400 hover:text-red-500 transition-colors px-2 py-1 whitespace-nowrap"
                   >
-                    全部清除
+                    {t('library.clear.all')}
                   </button>
                 )}
               </div>

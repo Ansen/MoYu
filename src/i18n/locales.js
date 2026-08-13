@@ -37,8 +37,11 @@ export const translations = {
     
     // 播放器 (Player)
     'library.title': '工作区 / 播放列表',
-    'library.import.file': '+ 打开文件',
-    'library.import.folder': '+ 打开文件夹',
+    'library.import.file': '打开文件',
+    'library.import.folder': '打开文件夹',
+    'library.gen.numbers': '生成数码报底',
+    'library.gen.letters': '生成英文分组报底',
+    'library.clear.all': '全部清除',
     'library.opening': '正在打开...',
     'library.empty.title': '没有打开的文档',
     'library.empty.desc': '打开一个 EPUB 或 TXT 文件以开始阅读和练习。',
@@ -114,8 +117,11 @@ export const translations = {
     
     // Player
     'library.title': 'WORKSPACE / PLAYLIST',
-    'library.import.file': '+ Open File',
-    'library.import.folder': '+ Open Folder',
+    'library.import.file': 'Open File',
+    'library.import.folder': 'Open Folder',
+    'library.gen.numbers': 'Generate Numbers',
+    'library.gen.letters': 'Generate Letter Groups',
+    'library.clear.all': 'Clear All',
     'library.opening': 'Opening...',
     'library.empty.title': 'No documents open.',
     'library.empty.desc': 'Open an EPUB or TXT file to start reading and practicing.',
