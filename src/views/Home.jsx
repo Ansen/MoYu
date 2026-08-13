@@ -5,17 +5,17 @@ import FeatureCard from '../components/common/FeatureCard';
 import RecentFileItem from '../components/common/RecentFileItem';
 
 export default function HomeView({ setView, recentFiles, openFileProgrammatically }) {
-  const { t } = useI18n();
+  const { t, langSetting } = useI18n();
   const [greeting, setGreeting] = useState('');
 
   useEffect(() => {
     const hour = new Date().getHours();
-    if (hour < 6) setGreeting('凌晨好');
-    else if (hour < 12) setGreeting('早上好');
-    else if (hour < 14) setGreeting('中午好');
-    else if (hour < 18) setGreeting('下午好');
-    else setGreeting('晚上好');
-  }, []);
+    if (hour < 6) setGreeting(t('greeting.earlyMorning'));
+    else if (hour < 12) setGreeting(t('greeting.morning'));
+    else if (hour < 14) setGreeting(t('greeting.noon'));
+    else if (hour < 18) setGreeting(t('greeting.afternoon'));
+    else setGreeting(t('greeting.evening'));
+  }, [t, langSetting]);
 
   return (
     <div className="h-full overflow-y-auto bg-slate-50 dark:bg-[#1a1a1a] p-8 md:p-12 custom-scrollbar select-none text-slate-800 dark:text-slate-200">
@@ -24,7 +24,7 @@ export default function HomeView({ setView, recentFiles, openFileProgrammaticall
         {/* Header */}
         <div className="space-y-3">
           <h1 className="text-3xl md:text-4xl font-bold tracking-tight text-slate-900 dark:text-white">
-            {greeting}，{t('home.welcome')}
+            {greeting}, {t('home.welcome')}
           </h1>
           <p className="text-slate-500 dark:text-slate-400 text-lg">
             {t('home.subtitle')}

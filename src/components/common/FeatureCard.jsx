@@ -1,7 +1,9 @@
 import React from 'react';
 import { ArrowRight } from 'lucide-react';
+import { useI18n } from '../../i18n/index';
 
 export default function FeatureCard({ icon: Icon, title, desc, onClick, colorClass }) {
+  const { t } = useI18n();
   // `colorClass` logic to apply proper styling
   const isIndigo = colorClass === 'indigo';
   
@@ -26,7 +28,7 @@ export default function FeatureCard({ icon: Icon, title, desc, onClick, colorCla
       <div className={`flex items-center font-medium text-sm gap-1 group-hover:gap-2 transition-all ${
         isIndigo ? 'text-indigo-600 dark:text-indigo-400' : 'text-emerald-600 dark:text-emerald-400'
       }`}>
-        进入工具 <ArrowRight size={16} />
+        {t('home.card.launch')} <ArrowRight size={16} />
       </div>
     </div>
   );

@@ -1,5 +1,7 @@
 export const translations = {
   zh: {
+    'app.name': '摩语',
+
     // 菜单栏
     'menu.view': '主题(T)',
     'menu.view.system': '跟随系统',
@@ -57,16 +59,26 @@ export const translations = {
     'settings.cancel': '取消',
     'settings.save': '保存设置',
     
+    // 问候语
+    'greeting.earlyMorning': '凌晨好',
+    'greeting.morning': '早上好',
+    'greeting.noon': '中午好',
+    'greeting.afternoon': '下午好',
+    'greeting.evening': '晚上好',
+
     // 首页
-    'home.welcome': '欢迎使用 摩语 MoYu',
+    'home.welcome': '欢迎使用 摩语',
     'home.subtitle': '专业的摩尔斯电码与标准电码训练终端',
     'home.translator.title': '摩言密语',
     'home.translator.desc': '支持中文、标准电码、摩尔斯码之间的双向互译与自动识别。',
     'home.player.title': '电码播放器',
     'home.player.desc': '导入 TXT 或 EPUB 电子书，支持原文章节解析与沉浸式摩尔斯电码跟读训练。',
-    'home.recent': '最近打开的文档'
+    'home.recent': '最近打开的文档',
+    'home.card.launch': '进入工具'
   },
   en: {
+    'app.name': 'MoYu',
+
     // Menubar
     'menu.view': 'Theme(T)',
     'menu.view.system': 'System Theme',
@@ -88,7 +100,7 @@ export const translations = {
     // Sidebar
     'sidebar.home': 'Home',
     'sidebar.explorer': 'NAVIGATION',
-    'sidebar.translator': 'MoYan MoYu',
+    'sidebar.translator': 'Smart Translator',
     'sidebar.library': 'Morse Player',
     
     // Translator
@@ -123,14 +135,23 @@ export const translations = {
     'settings.audio.freq': 'Tone Frequency (Hz)',
     'settings.cancel': 'Cancel',
     'settings.save': 'Save Settings',
+
+    // Greetings
+    'greeting.earlyMorning': 'Good early morning',
+    'greeting.morning': 'Good morning',
+    'greeting.noon': 'Good afternoon',
+    'greeting.afternoon': 'Good afternoon',
+    'greeting.evening': 'Good evening',
     
     // Home
-    'home.welcome': 'Welcome to 摩语 MoYu',
+    'home.welcome': 'Welcome to MoYu',
     'home.subtitle': 'Professional Morse Code & Telecode Training Terminal',
-    'home.translator.title': 'MoYan MoYu',
+    'home.translator.title': 'Smart Translator',
     'home.translator.desc': 'Bidirectional translation between Chinese, Telecodes, and Morse Code with auto-detection.',
     'home.player.title': 'Morse Player',
     'home.player.desc': 'Import TXT or EPUB files for immersive Morse code reading and listening practice.',
-    'home.recent': 'Recent Documents'
+    'home.recent': 'Recent Documents',
+    'home.card.launch': 'Open Tool'
   }
 };
+

@@ -64,7 +64,7 @@ export default function Titlebar({ theme, setTheme, setView, openSettings, openH
         {/* App Logo / Title */}
         <div className="flex items-center gap-2 mr-4 pointer-events-none" data-tauri-drag-region>
           <img src="/logo.png" className="w-4 h-4 object-contain" alt="MoYu" />
-          <span className="font-bold text-slate-900 dark:text-white tracking-wide">摩语</span>
+          <span className="font-bold text-slate-900 dark:text-white tracking-wide">{t('app.name')}</span>
         </div>
         
         {/* 1. 主题 (Theme) */}
