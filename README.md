@@ -37,10 +37,9 @@ Language: [English](README.md) | [简体中文](README_CN.md)
 | :---: | :---: |
 | ![Home Dashboard](docs/Screenshots/home.png) | ![Smart Translator](docs/Screenshots/translator.png) |
 
-<p align="center">
-  <b>Morse Player & CW Reader</b><br/>
-  <img src="docs/Screenshots/MorsePlayer.png" alt="Morse Player" width="100%" />
-</p>
+| Morse Player Workspace | Reading & CW Training Window |
+| :---: | :---: |
+| ![Morse Player Workspace](docs/Screenshots/MorsePlayer.png) | ![Reading & CW Training Window](docs/Screenshots/MorsePlayerWindow.png) |
 
 ---
 

@@ -34,10 +34,9 @@
 | :---: | :---: |
 | ![首页导航](docs/Screenshots/home.png) | ![摩言密语](docs/Screenshots/translator.png) |
 
-<p align="center">
-  <b>电码播放器与电子书跟读训练 (Morse Player)</b><br/>
-  <img src="docs/Screenshots/MorsePlayer.png" alt="电码播放器" width="100%" />
-</p>
+| 电码播放器工作区 (Morse Player) | 电子书阅读与听抄跟读窗口 (CW Reader) |
+| :---: | :---: |
+| ![电码播放器](docs/Screenshots/MorsePlayer.png) | ![阅读听抄窗口](docs/Screenshots/MorsePlayerWindow.png) |
 
 ---
 
