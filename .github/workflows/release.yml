@@ -148,12 +148,12 @@ jobs:
               const lower = assetName.toLowerCase();
               const url = \`\${downloadBase}/\${assetName}\`;
 
-              if (lower.includes('universal') || (lower.includes('darwin') && lower.endsWith('.tar.gz'))) {
+              if (lower.includes('universal') || lower.includes('darwin') || lower.includes('mac')) {
                 latest.platforms['darwin-x86_64'] = { signature, url };
                 latest.platforms['darwin-aarch64'] = { signature, url };
-              } else if (lower.endsWith('.zip') && (lower.includes('x64') || lower.includes('windows') || lower.includes('nsis'))) {
+              } else if (lower.includes('x64-setup') || lower.includes('windows') || lower.endsWith('.exe') || lower.endsWith('.zip')) {
                 latest.platforms['windows-x86_64'] = { signature, url };
-              } else if (lower.endsWith('.tar.gz') && (lower.includes('amd64') || lower.includes('x86_64') || lower.includes('linux'))) {
+              } else if (lower.includes('amd64') || lower.includes('linux') || lower.endsWith('.appimage')) {
                 latest.platforms['linux-x86_64'] = { signature, url };
               }
             });
