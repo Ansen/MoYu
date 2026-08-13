@@ -151,9 +151,9 @@ jobs:
               if (lower.includes('universal') || (lower.includes('darwin') && lower.endsWith('.tar.gz'))) {
                 latest.platforms['darwin-x86_64'] = { signature, url };
                 latest.platforms['darwin-aarch64'] = { signature, url };
-              } else if (lower.includes('x64') && (lower.includes('windows') || lower.endsWith('.zip') || lower.endsWith('.exe'))) {
+              } else if (lower.endsWith('.zip') && (lower.includes('x64') || lower.includes('windows') || lower.includes('nsis'))) {
                 latest.platforms['windows-x86_64'] = { signature, url };
-              } else if (lower.includes('amd64') || lower.includes('x86_64')) {
+              } else if (lower.endsWith('.tar.gz') && (lower.includes('amd64') || lower.includes('x86_64') || lower.includes('linux'))) {
                 latest.platforms['linux-x86_64'] = { signature, url };
               }
             });
