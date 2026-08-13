@@ -1,71 +1,77 @@
-# 📡 摩语 (MoYu) - 专业的摩尔斯电码与标准电码训练终端
+# 📡 MoYu (摩语) - Morse Code & Chinese Telecode Training Terminal
 
-> “在无声的电波中，传递我们的专属密语。”
+Language: [English](README.md) | [简体中文](README_CN.md)
 
-**摩语 (MoYu)** 是一款基于 **Tauri + React** 构建的轻量、极简且专业的摩尔斯密码训练与中文互译桌面应用。无论是业余无线电爱好者（HAM）进行抄报训练、查阅标准电码，还是加密发送专属暗号，摩语都能为你提供丝滑、沉浸的使用体验。
+> *"Transmitting our secret signals through silent radio waves."*
 
----
-
-## ✨ 核心特性 (Features)
-
-*   **🕵️‍♂️ 摩言密语 (智能互译)**：
-    *   **中文完美支持**：打破传统摩斯码只支持英文的限制，实现中文汉字与标准电码、摩斯电码的精准双向互译。
-    *   **自动识别**：无需手动切换模式，边输入边智能识别当前是中文、电码还是摩尔斯码，并极速转换。
-*   **📻 电码播放器 (沉浸式训练)**：
-    *   **TXT & EPUB 阅读**：直接导入本地 TXT 或 EPUB 电子书，自动解析章节目录。
-    *   **实时发报模拟**：将文字实时转化为发报声进行播放跟读，支持高亮追踪阅读进度。
-    *   **专业电台音效**：支持自定义发报速度 (WPM)、侧音频率 (Hz)，甚至提供**老式电台过载失真 (谐波)** 音色模拟，还原最真实的听抄体验。
-    *   **数字报底模式**：全面支持标准长码、短五码、短十码切换。
-*   **📚 灵活的字典系统**：
-    *   内置标准中文电码字典。
-    *   支持导入外部自定义字典（例如台湾地区电码标准），并支持可视化字典管理。
-*   **🚀 现代化跨平台架构**：
-    *   基于 **Tauri (Rust)** 构建，体积轻巧，启动极速。
-    *   完美适配 Windows、macOS (Intel/Apple Silicon) 与 Linux 平台。
-    *   支持高分屏自适应，并针对老年用户进行了界面算法优化，全屏无损缩放。
+**MoYu (摩语)** is a lightweight, minimalist, and professional Morse code training terminal and Chinese telecode translator built with **Tauri (Rust) + React**. Designed for Amateur Radio (HAM) operators, Morse code learners, and secret signal enthusiasts.
 
 ---
 
-## 💻 界面截图 (Screenshots)
+## ✨ Features
 
-*(提示：你可以在此放置软件界面的运行截图)*
+- **🕵️‍♂️ Smart Translation Terminal (Morse & Telecode)**:
+  - **Full Chinese Support**: Breaks the limitation of traditional Morse code by enabling seamless bi-directional translation between Chinese characters, Chinese Telecode (标准电码), and Morse code.
+  - **Auto Detection**: Automatically detects whether your input is Chinese, telecode numbers, or Morse code without requiring manual mode switching.
+
+- **📻 Audio Code Player (Immersive CW Training)**:
+  - **E-Book Reader**: Import local `.txt` or `.epub` files directly with automatic chapter parsing.
+  - **Real-Time CW Playback**: Converts text to authentic telegraph audio in real time with synchronized text highlighting.
+  - **Vintage Radio Audio Engine**: Customizable WPM (words per minute), side-tone frequency (Hz), and vintage radio harmonic distortion simulation for realistic copy practice.
+  - **Numeric Code Modes**: Full support for Standard Long Codes, Abbreviated 5-digit Codes, and Abbreviated 10-digit Codes.
+
+- **📚 Custom Dictionary System**:
+  - Built-in standard Chinese Telecode dictionary.
+  - Supports importing and managing custom external dictionaries.
+
+- **🚀 Modern Cross-Platform Architecture**:
+  - Powered by **Tauri (Rust)**: Ultra-small binary size, fast startup time, and low memory usage.
+  - Cross-platform support for **Windows**, **macOS** (Intel & Apple Silicon), and **Linux**.
+  - High-DPI screen adaptive layout.
 
 ---
 
-## 🛠 开发与构建 (Development)
+## 🛠 Development & Build
 
-本项目使用 `pnpm` 作为前端包管理器，后端基于 `Tauri` 与 `Rust`。
+This project uses `pnpm` as the package manager and `Tauri` with `Rust` for the desktop backend.
 
-### 环境准备
-1. 安装 [Node.js](https://nodejs.org/) (推荐使用 v18+)
-2. 安装 [pnpm](https://pnpm.io/installation) 
-3. 安装 [Rust](https://www.rust-lang.org/tools/install) 与 Tauri 相关的 [系统依赖](https://tauri.app/v1/guides/getting-started/prerequisites)
+### Prerequisites
 
-### 快速运行
+1. [Node.js](https://nodejs.org/) (v18+)
+2. [pnpm](https://pnpm.io/installation)
+3. [Rust](https://www.rust-lang.org/tools/install) & [Tauri Prerequisites](https://tauri.app/v1/guides/getting-started/prerequisites)
+
+### Quick Start
+
 ```bash
-# 克隆项目
+# Clone the repository
 git clone https://github.com/Ansen/MoYu.git
 cd MoYu
 
-# 安装前端依赖
+# Install dependencies
 pnpm install
 
-# 启动开发服务器与 Tauri 窗口
+# Run dev server & Tauri window
 pnpm tauri dev
 ```
 
-### 编译打包
+### Building for Release
+
 ```bash
-# 打包为当前系统平台的可执行文件 (Windows exe / macOS app / Linux deb)
+# Build binary installer for current platform (.exe / .dmg / .deb)
 pnpm tauri build
 ```
 
 ---
 
-## 🤝 贡献与反馈
+## 🤝 Contributing
 
-欢迎提交 Issue 反馈问题，或者发起 Pull Request 贡献代码！
+Issues and Pull Requests are welcome! Feel free to report bugs or submit feature requests.
 
-## 📄 版权与许可
+---
+
+## 📄 License
+
+This project is licensed under the **GNU General Public License v3.0 (GPL-3.0)**. See the [LICENSE](LICENSE) file for details.
 
 Copyright © 2024-2026 BA8BAK
