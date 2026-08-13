@@ -44,6 +44,11 @@ export default function Reader({ bookData, onClose, jumpToSibling, onRegenerate 
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
+  // 进入阅读器页面时提前预热 AudioContext，避免点击播放时声卡驱动冷启动导致开头卡顿/断续
+  useEffect(() => {
+    audioPlayer.init().catch(() => {});
+  }, []);
+
   const moreMenuRef = useRef(null);
 
   // Update localStorage when audio settings change in quick bar

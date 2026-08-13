@@ -29,23 +29,41 @@ class DesktopAudioPlayer {
             this.audioContext = new (window.AudioContext || window.webkitAudioContext)()
             this.masterGain = this.audioContext.createGain()
             this.masterGain.connect(this.audioContext.destination)
-            this.setOutputVolume(this.volume)
+            this.setOutputVolume(this.volume, true)
             console.log('Desktop Web Audio API 初始化成功')
         }
 
         if (this.audioContext.state === 'suspended') {
             await this.audioContext.resume()
         }
+
+        // 预热音频设备：播放极短静音，促使系统音频驱动 (WASAPI / CoreAudio) 完成硬件缓冲区初始化
+        if (!this.isWarmedUp && this.audioContext) {
+            try {
+                const dummyBuffer = this.audioContext.createBuffer(1, 1, this.audioContext.sampleRate)
+                const dummySource = this.audioContext.createBufferSource()
+                dummySource.buffer = dummyBuffer
+                dummySource.connect(this.audioContext.destination)
+                dummySource.start(0)
+                this.isWarmedUp = true
+            } catch (e) {
+                console.warn('Audio pre-warm error:', e)
+            }
+        }
     }
 
-    setOutputVolume(volumePercent) {
+    setOutputVolume(volumePercent, immediate = false) {
         this.volume = volumePercent
         if (!this.masterGain || !this.audioContext) return
         
         // 将 0-100 的百分比映射到合适的 gain 值
         const gain = Math.min((volumePercent / 100), 1)
         const now = this.audioContext.currentTime
-        this.masterGain.gain.setTargetAtTime(gain, now, 0.01)
+        if (immediate) {
+            this.masterGain.gain.setValueAtTime(gain, now)
+        } else {
+            this.masterGain.gain.setTargetAtTime(gain, now, 0.01)
+        }
     }
 
     async playTone(frequency, durationMs, startTime) {
@@ -120,7 +138,7 @@ class DesktopAudioPlayer {
         let tokens = textToMorseTokens(text, this.playbackConfig.numberMode)
         let dotSec = (1200 / this.playbackConfig.wpm) / 1000
 
-        let currentTime = this.audioContext.currentTime + 0.1 // 100ms padding to start
+        let currentTime = this.audioContext.currentTime + 0.25 // 250ms 充裕缓冲区，防止冷启动/音频设备初始化卡顿
 
         for (let i = 0; i < tokens.length; i++) {
             if (this.playbackState.stopRequested) break;
