@@ -9,7 +9,6 @@ import HelpModal from './components/HelpModal';
 import { useEbook } from './hooks/useEbook';
 import { checkForUpdates, installUpdate } from './utils/updater';
 import { useI18n } from './i18n';
-import { useI18n } from './i18n';
 function App() {
   const [currentView, setView] = useState('home');
   const [settingsOpen, setSettingsOpen] = useState(false);
