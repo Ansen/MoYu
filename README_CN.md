@@ -28,6 +28,19 @@
 
 ---
 
+## 💻 界面截图 (Screenshots)
+
+| 首页导航 (Home) | 摩言密语 (Smart Translator) |
+| :---: | :---: |
+| ![首页导航](docs/Screenshots/home.png) | ![摩言密语](docs/Screenshots/translator.png) |
+
+<p align="center">
+  <b>电码播放器与电子书跟读训练 (Morse Player)</b><br/>
+  <img src="docs/Screenshots/MorsePlayer.png" alt="电码播放器" width="100%" />
+</p>
+
+---
+
 ## 🛠 开发与构建 (Development)
 
 本项目使用 `pnpm` 作为前端包管理器，后端基于 `Tauri` 与 `Rust`。

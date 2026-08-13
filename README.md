@@ -31,6 +31,19 @@ Language: [English](README.md) | [简体中文](README_CN.md)
 
 ---
 
+## 💻 Screenshots
+
+| Home Dashboard | Smart Translator |
+| :---: | :---: |
+| ![Home Dashboard](docs/Screenshots/home.png) | ![Smart Translator](docs/Screenshots/translator.png) |
+
+<p align="center">
+  <b>Morse Player & CW Reader</b><br/>
+  <img src="docs/Screenshots/MorsePlayer.png" alt="Morse Player" width="100%" />
+</p>
+
+---
+
 ## 🛠 Development & Build
 
 This project uses `pnpm` as the package manager and `Tauri` with `Rust` for the desktop backend.
