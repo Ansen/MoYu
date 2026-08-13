@@ -149,17 +149,17 @@ function App() {
             <button 
               onClick={async () => {
                 const btn = document.getElementById('btn-silent-update');
-                if (btn) btn.innerText = '正在下载...';
+                if (btn) btn.innerText = t('update.downloading');
                 try {
                   await installUpdate(updateInfo);
                 } catch(e) {
-                  if (btn) btn.innerText = '更新失败';
+                  if (btn) btn.innerText = t('update.failed');
                 }
               }}
               id="btn-silent-update"
               className="flex-1 px-3 py-1.5 text-xs font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg transition-colors text-center"
             >
-              立刻更新并重启
+              {t('update.install.restart')}
             </button>
           </div>
         </div>

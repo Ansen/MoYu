@@ -156,14 +156,14 @@ export default function AboutModal({ isOpen, onClose }) {
                     onClick={handleInstall}
                     className="flex-1 px-3 py-1.5 text-xs font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg transition-colors text-center"
                   >
-                    立刻更新并重启
+                    {t('update.install.restart')}
                   </button>
                 </div>
               </div>
             ) : updateStatus === 'installing' ? (
               <div className="w-full flex flex-col items-center space-y-3 p-3 bg-indigo-50 dark:bg-indigo-900/20 rounded-xl border border-indigo-100 dark:border-indigo-800/30">
                 <p className="text-sm font-bold text-indigo-700 dark:text-indigo-400">
-                  正在下载更新...
+                  {t('update.downloading')}
                 </p>
                 {installProgress && installProgress.total > 0 && (
                   <div className="w-full">
@@ -185,7 +185,7 @@ export default function AboutModal({ isOpen, onClose }) {
               <p className="mt-2 text-xs text-green-600 dark:text-green-400 font-medium">{t('update.uptodate')}</p>
             )}
             {updateStatus === 'error' && (
-              <p className="mt-2 text-xs text-rose-500 font-medium">Failed to check updates</p>
+              <p className="mt-2 text-xs text-rose-500 font-medium">{t('update.failed')}</p>
             )}
           </div>
           

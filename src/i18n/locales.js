@@ -85,7 +85,40 @@ export const translations = {
     'update.available': '发现新版本！',
     'update.uptodate': '当前已是最新版本。',
     'update.download.github': 'GitHub 官方下载',
-    'update.download.proxy': '国内加速下载'
+    'update.download.proxy': '国内加速下载',
+    'update.install.restart': '立刻更新并重启',
+    'update.downloading': '正在下载更新...',
+    'update.failed': '更新失败',
+    
+    // 标题栏
+    'titlebar.restore': '向下还原',
+    'titlebar.maximize': '最大化',
+
+    // 帮助指南
+    'help.title': '使用帮助指南',
+    'help.core.title': '核心功能 (Core)',
+    'help.core.1': '听读文章：',
+    'help.core.1.desc': '点击顶部工具栏的“播放”按钮，软件会将当前高亮的单词转换为摩斯电码声音播报。',
+    'help.core.2': '指定起点：',
+    'help.core.2.desc': '在阅读界面，点击任意单词/段落，即可直接从该位置开始播放。',
+    'help.core.3': '导入书籍：',
+    'help.core.3.desc': '在“阅读器”界面，点击侧边栏下方的导入按钮，支持选择本地的 .txt 或 .epub 文件。也可直接将文件拖拽进窗口。',
+    
+    'help.settings.title': '发报参数 (Settings)',
+    'help.settings.1': 'WPM (词语速度)：',
+    'help.settings.1.desc': 'Words Per Minute。数值越大，发报速度越快。新手建议设置在 15~20 左右，熟练后可逐渐提高。',
+    'help.settings.2': 'Hz (音调频率)：',
+    'help.settings.2.desc': '控制摩斯电码的音高。通常在 600Hz ~ 800Hz 之间听感最佳。如果您觉得高频刺耳，可适当调低至 500Hz。',
+    'help.settings.3': '数字模式：',
+    'help.settings.3.desc': '短码（只发报单个点或划，适合专业比赛）；长码（标准全码发送，适合日常训练）。',
+    
+    'help.shortcuts.title': '快捷操作 (Shortcuts)',
+    'help.shortcuts.play': '播放 / 暂停',
+    'help.shortcuts.play.key': 'Space / 空格键',
+    'help.shortcuts.prev': '上一页 / 上一章',
+    'help.shortcuts.prev.key': '← 向左方向键',
+    'help.shortcuts.next': '下一页 / 下一章',
+    'help.shortcuts.next.key': '→ 向右方向键'
   },
   en: {
     'app.name': 'MoYu',
@@ -173,7 +206,40 @@ export const translations = {
     'update.available': 'New version available!',
     'update.uptodate': 'You are up to date.',
     'update.download.github': 'Download from GitHub',
-    'update.download.proxy': 'Download via Proxy (China)'
+    'update.download.proxy': 'Download via Proxy (China)',
+    'update.install.restart': 'Install Update and Restart',
+    'update.downloading': 'Downloading Update...',
+    'update.failed': 'Update Failed',
+    
+    // Titlebar
+    'titlebar.restore': 'Restore Down',
+    'titlebar.maximize': 'Maximize',
+
+    // Help Guide
+    'help.title': 'User Guide',
+    'help.core.title': 'Core Features',
+    'help.core.1': 'Listening:',
+    'help.core.1.desc': 'Click the "Play" button in the top toolbar to convert highlighted words into Morse code audio.',
+    'help.core.2': 'Start Point:',
+    'help.core.2.desc': 'In the reader view, click any word or paragraph to start playing directly from that position.',
+    'help.core.3': 'Import Books:',
+    'help.core.3.desc': 'In the "Library" view, click the import button in the sidebar to open local .txt or .epub files. You can also drag and drop files into the window.',
+    
+    'help.settings.title': 'Audio Settings',
+    'help.settings.1': 'WPM (Speed):',
+    'help.settings.1.desc': 'Words Per Minute. Higher values mean faster speed. Beginners are recommended to start around 15-20.',
+    'help.settings.2': 'Hz (Frequency):',
+    'help.settings.2.desc': 'Controls the pitch of the Morse code. 600Hz - 800Hz usually sounds best. If it is too harsh, lower it to 500Hz.',
+    'help.settings.3': 'Number Mode:',
+    'help.settings.3.desc': 'Short code (single dot/dash, suitable for competitions) vs Long code (standard full code, suitable for training).',
+    
+    'help.shortcuts.title': 'Shortcuts',
+    'help.shortcuts.play': 'Play / Pause',
+    'help.shortcuts.play.key': 'Space',
+    'help.shortcuts.prev': 'Previous Page / Chapter',
+    'help.shortcuts.prev.key': '← Left Arrow',
+    'help.shortcuts.next': 'Next Page / Chapter',
+    'help.shortcuts.next.key': '→ Right Arrow'
   }
 };
 
