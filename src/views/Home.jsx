@@ -19,7 +19,7 @@ export default function HomeView({ setView, recentFiles, openFileProgrammaticall
 
   return (
     <div className="h-full overflow-y-auto bg-slate-50 dark:bg-[#1a1a1a] p-8 md:p-12 custom-scrollbar select-none text-slate-800 dark:text-slate-200">
-      <div className="max-w-4xl mx-auto space-y-12">
+      <div className="w-full space-y-12">
         
         {/* Header */}
         <div className="space-y-3">
@@ -53,7 +53,7 @@ export default function HomeView({ setView, recentFiles, openFileProgrammaticall
         {recentFiles && recentFiles.length > 0 && (
           <div className="pt-6">
             <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-6">{t('home.recent')}</h3>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="grid gap-4" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))' }}>
               {recentFiles.slice(0, 6).map((item, idx) => (
                 <RecentFileItem
                   key={idx}

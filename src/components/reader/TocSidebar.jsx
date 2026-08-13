@@ -1,8 +1,10 @@
 import React from 'react';
 import { useResizable } from '../../hooks/useResizable';
+import { useI18n } from '../../i18n';
 
 export default function TocSidebar({ isOpen, toc, bookType, onTocClick }) {
   const { width, startResizing } = useResizable(120, 120, 400);
+  const { t } = useI18n();
 
   if (!isOpen || toc.length === 0) return null;
 
@@ -10,7 +12,7 @@ export default function TocSidebar({ isOpen, toc, bookType, onTocClick }) {
     <div className="flex shrink-0 relative h-full" style={{ width }}>
       <div className="w-full h-full bg-slate-50 dark:bg-[#1a1a1a] flex flex-col">
         <div className="p-3 text-[11px] font-bold text-slate-500 uppercase tracking-wider border-b border-slate-200 dark:border-[#333333]">
-          {bookType === 'epub' ? '目录' : '文件列表'}
+          {bookType === 'epub' ? t('reader.toc') : t('reader.filelist')}
         </div>
         <div className="flex-1 overflow-y-auto custom-scrollbar p-2">
           {toc.map((item, idx) => (

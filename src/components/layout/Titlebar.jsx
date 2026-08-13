@@ -1,13 +1,11 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useI18n } from '../../i18n/index';
-import AboutModal from '../AboutModal';
 import DropdownMenu from '../common/DropdownMenu';
 import { Sun, Moon, Monitor, Languages, Type, Settings, Info, Check, BookOpen, Minus, Square, Copy, X as CloseIcon } from 'lucide-react';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 
-export default function Titlebar({ theme, setTheme, setView, openSettings, openHelp }) {
+export default function Titlebar({ theme, setTheme, setView, openSettings, openHelp, openAbout }) {
   const [activeMenu, setActiveMenu] = useState(null);
-  const [isAboutOpen, setIsAboutOpen] = useState(false);
   const [isMaximized, setIsMaximized] = useState(false);
   const menubarRef = useRef(null);
   const { t, langSetting, setLangSetting } = useI18n();
@@ -47,6 +45,7 @@ export default function Titlebar({ theme, setTheme, setView, openSettings, openH
   };
 
   return (
+
     <div className="flex flex-col bg-white dark:bg-[#1e1e1e] border-b border-slate-200 dark:border-[#333333] shrink-0 select-none relative z-50">
       
       {/* 菜单栏 (Menubar) */}
@@ -54,11 +53,6 @@ export default function Titlebar({ theme, setTheme, setView, openSettings, openH
         className="h-8 flex items-center pl-2 text-[13px] font-medium text-slate-700 dark:text-[#cccccc] relative" 
         ref={menubarRef} 
         data-tauri-drag-region
-        onPointerDown={(e) => {
-          if (e.buttons === 1 && e.target.hasAttribute('data-tauri-drag-region')) {
-            getCurrentWindow().startDragging();
-          }
-        }}
       >
         
         {/* App Logo / Title */}
@@ -145,7 +139,7 @@ export default function Titlebar({ theme, setTheme, setView, openSettings, openH
               { id: 'guide', icon: BookOpen, label: t('menu.help.guide') },
               { id: 'about', icon: Info, label: t('menu.help.about') }
             ]}
-            onSelect={(id) => id === 'guide' ? openHelp() : setIsAboutOpen(true)}
+            onSelect={(id) => id === 'guide' ? openHelp() : openAbout()}
             onClose={() => setActiveMenu(null)}
           />
         </div>
@@ -154,11 +148,6 @@ export default function Titlebar({ theme, setTheme, setView, openSettings, openH
         <div 
           className="flex-1 h-full" 
           data-tauri-drag-region
-          onPointerDown={(e) => {
-            if (e.buttons === 1 && e.target.hasAttribute('data-tauri-drag-region')) {
-              getCurrentWindow().startDragging();
-            }
-          }}
         ></div>
 
         {/* Window Controls (Custom Native Titlebar) */}
@@ -184,8 +173,6 @@ export default function Titlebar({ theme, setTheme, setView, openSettings, openH
           </button>
         </div>
       </div>
-
-      <AboutModal isOpen={isAboutOpen} onClose={() => setIsAboutOpen(false)} />
     </div>
   );
 }

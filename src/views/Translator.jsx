@@ -119,6 +119,7 @@ export default function TranslatorView() {
 
   const handleImportFile = (file) => {
     const reader = new FileReader();
+    reader.onerror = () => alert(t('dict.import.error.read'));
     reader.onload = (event) => {
       try {
         const text = event.target.result;
@@ -161,7 +162,7 @@ export default function TranslatorView() {
         setIsImportModalOpen(false);
       } catch (err) {
         console.error("Failed to parse dict file", err);
-        alert("导入失败：文件格式无法识别");
+        alert(t('dict.import.error.format'));
       }
     };
     reader.readAsText(file);
@@ -169,7 +170,7 @@ export default function TranslatorView() {
 
   const handleDeleteDict = () => {
     if (!prefDictionaryId.startsWith('custom_')) return;
-    if (confirm('确定要删除此自定义字典吗？')) {
+    if (confirm(t('dict.delete.confirm'))) {
       localStorage.removeItem(`moyu_dict_${prefDictionaryId}`);
       const newDicts = customDicts.filter(d => d.id !== prefDictionaryId);
       setCustomDicts(newDicts);
@@ -214,7 +215,7 @@ export default function TranslatorView() {
                 >
                   <span className="font-medium text-slate-600 dark:text-[#ccc] select-none truncate" style={{ fontSize: `${11 * uiScale}px`, maxWidth: `${80 * uiScale}px` }}>
                     {prefDictionaryId === '1983_mainland' ? t('settings.dict.1983m') :
-                     customDicts.find(d => d.id === prefDictionaryId)?.name || '未找到字典'}
+                     customDicts.find(d => d.id === prefDictionaryId)?.name || t('dict.selector.notfound')}
                   </span>
                   <ChevronDown size={13 * uiScale} className="text-slate-400 shrink-0" />
                 </div>
@@ -222,7 +223,7 @@ export default function TranslatorView() {
                 {isDictDropdownOpen && (
                   <div className="absolute top-full right-0 md:left-0 mt-2 bg-white dark:bg-[#1e1e1e] border border-slate-200 dark:border-[#333] shadow-lg rounded-lg z-50 animate-in fade-in slide-in-from-top-1" style={{ width: `${192 * uiScale}px`, padding: `${4 * uiScale}px 0` }}>
                     <div style={{ padding: `${4 * uiScale}px ${8 * uiScale}px` }}>
-                      <div className="font-bold text-slate-400 dark:text-[#666] uppercase tracking-wider mb-1" style={{ fontSize: `${10 * uiScale}px`, padding: `0 ${8 * uiScale}px` }}>内置字典</div>
+                      <div className="font-bold text-slate-400 dark:text-[#666] uppercase tracking-wider mb-1" style={{ fontSize: `${10 * uiScale}px`, padding: `0 ${8 * uiScale}px` }}>{t('dict.selector.builtin')}</div>
                       <div 
                         className={`rounded cursor-pointer ${prefDictionaryId === '1983_mainland' ? 'bg-indigo-50 dark:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 font-medium' : 'text-slate-600 dark:text-[#ccc] hover:bg-slate-50 dark:hover:bg-[#252525]'}`}
                         style={{ padding: `${6 * uiScale}px ${8 * uiScale}px`, fontSize: `${12 * uiScale}px` }}
@@ -236,7 +237,7 @@ export default function TranslatorView() {
                       <>
                         <div className="bg-slate-100 dark:bg-[#333]" style={{ height: '1px', margin: `${4 * uiScale}px ${8 * uiScale}px` }}></div>
                         <div className="overflow-y-auto custom-scrollbar" style={{ padding: `${4 * uiScale}px ${8 * uiScale}px`, maxHeight: `${160 * uiScale}px` }}>
-                          <div className="font-bold text-slate-400 dark:text-[#666] uppercase tracking-wider mb-1" style={{ fontSize: `${10 * uiScale}px`, padding: `0 ${8 * uiScale}px` }}>自定义字典</div>
+                          <div className="font-bold text-slate-400 dark:text-[#666] uppercase tracking-wider mb-1" style={{ fontSize: `${10 * uiScale}px`, padding: `0 ${8 * uiScale}px` }}>{t('dict.selector.custom')}</div>
                           {customDicts.map(d => (
                             <div 
                               key={d.id}
@@ -256,7 +257,7 @@ export default function TranslatorView() {
               </div>
               
               {prefDictionaryId.startsWith('custom_') && (
-                <button onClick={handleDeleteDict} className="text-rose-400 hover:text-rose-500 transition-colors hover:bg-rose-50 dark:hover:bg-rose-500/10 rounded" style={{ padding: `${2 * uiScale}px`, marginLeft: `${4 * uiScale}px` }} title="删除当前字典">
+                <button onClick={handleDeleteDict} className="text-rose-400 hover:text-rose-500 transition-colors hover:bg-rose-50 dark:hover:bg-rose-500/10 rounded" style={{ padding: `${2 * uiScale}px`, marginLeft: `${4 * uiScale}px` }} title={t('dict.btn.delete')}>
                   <Trash2 size={12 * uiScale} />
                 </button>
               )}
@@ -267,10 +268,10 @@ export default function TranslatorView() {
                 onClick={() => setIsImportModalOpen(true)}
                 className="text-indigo-500 hover:text-indigo-600 dark:text-indigo-400 flex items-center transition-colors font-medium"
                 style={{ gap: `${4 * uiScale}px`, fontSize: `${11 * uiScale}px` }}
-                title="导入自定义字典"
+                title={t('dict.import.title')}
               >
                 <Upload size={12 * uiScale} />
-                <span className="hidden sm:inline">导入</span>
+                <span className="hidden sm:inline">{t('dict.btn.import')}</span>
               </button>
             </div>
 

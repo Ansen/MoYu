@@ -26,7 +26,7 @@ export default function Sidebar({ currentView, setView }) {
         <button 
           onClick={() => setIsCollapsed(!isCollapsed)}
           className={`p-1.5 rounded-md hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-500 transition-colors ${isCollapsed ? 'mx-auto' : ''}`}
-          title={isCollapsed ? "Expand" : "Collapse"}
+          title={isCollapsed ? t('sidebar.expand') : t('sidebar.collapse')}
         >
           {isCollapsed ? <PanelLeft size={18} /> : <PanelLeftClose size={18} />}
         </button>

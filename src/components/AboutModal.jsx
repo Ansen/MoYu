@@ -87,7 +87,7 @@ export default function AboutModal({ isOpen, onClose }) {
         <div className="p-6 pt-5">
           <div className="text-center mb-6">
             <h2 className="text-lg font-bold text-slate-800 dark:text-[#eeeeee]">{version}</h2>
-            <p className="text-[13px] text-slate-500 dark:text-[#999999] mt-1">Professional Morse Code Training Terminal</p>
+            <p className="text-[13px] text-slate-500 dark:text-[#999999] mt-1">{t('home.subtitle')}</p>
           </div>
 
           <div className="space-y-3">
@@ -96,7 +96,7 @@ export default function AboutModal({ isOpen, onClose }) {
                 <Info size={16} className="text-indigo-600 dark:text-indigo-400" />
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-[11px] text-slate-400 font-semibold uppercase tracking-wider">作者 (Author)</p>
+                <p className="text-[11px] text-slate-400 font-semibold uppercase tracking-wider">{t('about.author')}</p>
                 <p className="text-[14px] font-medium text-slate-700 dark:text-[#cccccc] truncate">BA8BAK</p>
               </div>
             </div>
@@ -106,7 +106,7 @@ export default function AboutModal({ isOpen, onClose }) {
                 <Globe size={16} className="text-sky-600 dark:text-sky-400" />
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-[11px] text-slate-400 font-semibold uppercase tracking-wider">网站 (Website)</p>
+                <p className="text-[11px] text-slate-400 font-semibold uppercase tracking-wider">{t('about.website')}</p>
                 <a 
                   href="https://ba8bak.de" 
                   target="_blank" rel="noopener noreferrer"
@@ -122,7 +122,7 @@ export default function AboutModal({ isOpen, onClose }) {
                 <Mail size={16} className="text-rose-600 dark:text-rose-400" />
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-[11px] text-slate-400 font-semibold uppercase tracking-wider">联系邮箱 (Email)</p>
+                <p className="text-[11px] text-slate-400 font-semibold uppercase tracking-wider">{t('about.email')}</p>
                 <a 
                   href="mailto:cq.ba8bak@gmail.com" 
                   className="text-[14px] font-medium text-rose-600 dark:text-rose-400 hover:underline truncate block"

@@ -1,7 +1,9 @@
 import React from 'react';
 import { Folder, FileText } from 'lucide-react';
+import { useI18n } from '../../i18n';
 
 export default function RecentFileItem({ item, onClick, onRemove, styleVariant = 'home' }) {
+  const { t } = useI18n();
   const isFolder = item.type === 'folder';
   
   if (styleVariant === 'home') {
@@ -41,7 +43,7 @@ export default function RecentFileItem({ item, onClick, onRemove, styleVariant =
             onRemove(e, item.path);
           }}
           className="absolute right-3 opacity-0 group-hover:opacity-100 p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-md transition-all"
-          title="清除此记录"
+          title={t('home.recent.clear')}
         >
           <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
         </button>

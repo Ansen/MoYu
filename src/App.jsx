@@ -6,6 +6,7 @@ import LibraryView from './views/Library';
 import HomeView from './views/Home';
 import SettingsModal from './components/SettingsModal';
 import HelpModal from './components/HelpModal';
+import AboutModal from './components/AboutModal';
 import { useEbook } from './hooks/useEbook';
 import { checkForUpdates, installUpdate } from './utils/updater';
 import { useI18n } from './i18n';
@@ -13,6 +14,7 @@ function App() {
   const [currentView, setView] = useState('home');
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [isHelpModalOpen, setIsHelpModalOpen] = useState(false);
+  const [isAboutOpen, setIsAboutOpen] = useState(false);
   const [theme, setTheme] = useState('system');
   const [isReady, setIsReady] = useState(false);
   const [updateInfo, setUpdateInfo] = useState(null);
@@ -103,6 +105,7 @@ function App() {
         setView={setView} 
         openSettings={() => setSettingsOpen(true)}
         openHelp={() => setIsHelpModalOpen(true)}
+        openAbout={() => setIsAboutOpen(true)}
       />
       
       <div className="flex flex-1 min-h-0">
@@ -128,6 +131,10 @@ function App() {
       <HelpModal 
         isOpen={isHelpModalOpen} 
         onClose={() => setIsHelpModalOpen(false)} 
+      />
+      <AboutModal 
+        isOpen={isAboutOpen} 
+        onClose={() => setIsAboutOpen(false)} 
       />
       
       {/* Update Banner */}

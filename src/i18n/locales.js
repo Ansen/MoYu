@@ -20,11 +20,18 @@ export const translations = {
     'menu.help.guide': '使用帮助指南',
     'menu.help.about': '关于 摩语',
     
+    // 关于
+    'about.author': '作者',
+    'about.website': '网站',
+    'about.email': '联系邮箱',
+    
     // 侧边栏
     'sidebar.home': '首页导航',
     'sidebar.explorer': '功能导航',
     'sidebar.translator': '摩言密语',
     'sidebar.library': '电码播放器',
+    'sidebar.expand': '展开侧边栏',
+    'sidebar.collapse': '折叠侧边栏',
     
     // 摩言密语
     'translator.editor.title': '摩言密语 (自动识别)',
@@ -62,6 +69,44 @@ export const translations = {
     'settings.cancel': '取消',
     'settings.save': '保存设置',
     
+    // 阅读器 (Reader)
+    'reader.back': '返回书库',
+    'reader.sidebar': '侧边栏',
+    'reader.font.size': '字号 (px)',
+    'reader.speed': '发报速度 (WPM)',
+    'reader.freq': '侧音频率 (Hz)',
+    'reader.more': '更多设置',
+    'reader.skip.title': '跳过标题播放',
+    'reader.hide.title': '隐藏正文大标题',
+    'reader.harmonics': '电台失真音色 (谐波)',
+    'reader.harmonics.desc': '开启后模拟真实老式电台的过载失真音色',
+    'reader.number.mode': '数字报底模式',
+    'reader.number.long': '长码',
+    'reader.number.short5': '短五',
+    'reader.number.short10': '短十',
+    'reader.regenerate': '重新生成',
+    'reader.play': '播放',
+    'reader.pause': '暂停',
+    'reader.resume': '继续',
+    'reader.toc': '目录',
+    'reader.filelist': '文件列表',
+    
+    // 字典导入 & 翻译器
+    'dict.import.title': '导入自定义字典',
+    'dict.import.desc': '支持导入 .txt 纯文本文件或 .json 格式的映射文件。请参考以下示例格式：',
+    'dict.import.format.txt': 'TXT 格式',
+    'dict.import.format.json': 'JSON 格式',
+    'dict.import.btn': '选择文件并导入',
+    'dict.import.success': '导入成功！',
+    'dict.import.error.format': '导入失败：文件格式无法识别',
+    'dict.import.error.read': '读取文件失败',
+    'dict.selector.builtin': '内置字典',
+    'dict.selector.custom': '自定义字典',
+    'dict.selector.notfound': '未找到字典',
+    'dict.btn.delete': '删除当前字典',
+    'dict.btn.import': '导入',
+    'dict.delete.confirm': '确定要删除此自定义字典吗？',
+    
     // 问候语
     'greeting.earlyMorning': '凌晨好',
     'greeting.morning': '早上好',
@@ -77,6 +122,7 @@ export const translations = {
     'home.player.title': '电码播放器',
     'home.player.desc': '导入 TXT 或 EPUB 电子书，支持原文章节解析与沉浸式摩尔斯电码跟读训练。',
     'home.recent': '最近打开的文档',
+    'home.recent.clear': '清除此记录',
     'home.card.launch': '进入工具',
     
     // 更新
@@ -141,11 +187,18 @@ export const translations = {
     'menu.help.guide': 'User Guide',
     'menu.help.about': 'About MoYu',
     
+    // About
+    'about.author': 'Author',
+    'about.website': 'Website',
+    'about.email': 'Email',
+    
     // Sidebar
     'sidebar.home': 'Home',
     'sidebar.explorer': 'NAVIGATION',
     'sidebar.translator': 'Smart Translator',
     'sidebar.library': 'Morse Player',
+    'sidebar.expand': 'Expand',
+    'sidebar.collapse': 'Collapse',
     
     // Translator
     'translator.editor.title': 'EDITOR (AUTO-DETECT)',
@@ -161,7 +214,7 @@ export const translations = {
     'library.import.file': 'Open File',
     'library.import.folder': 'Open Folder',
     'library.gen.numbers': 'Generate Numbers',
-    'library.gen.letters': 'Generate Letter Groups',
+    'library.gen.letters': 'Generate Letters',
     'library.clear.all': 'Clear All',
     'library.opening': 'Opening...',
     'library.empty.title': 'No documents open.',
@@ -183,6 +236,44 @@ export const translations = {
     'settings.cancel': 'Cancel',
     'settings.save': 'Save Settings',
 
+    // Reader
+    'reader.back': 'Back to Library',
+    'reader.sidebar': 'Sidebar',
+    'reader.font.size': 'Font Size (px)',
+    'reader.speed': 'Speed (WPM)',
+    'reader.freq': 'Tone Frequency (Hz)',
+    'reader.more': 'More Settings',
+    'reader.skip.title': 'Skip Title Playback',
+    'reader.hide.title': 'Hide Main Title',
+    'reader.harmonics': 'Radio Distortion (Harmonics)',
+    'reader.harmonics.desc': 'Simulate the overload distortion tone of real vintage radios when enabled',
+    'reader.number.mode': 'Number Mode',
+    'reader.number.long': 'Long',
+    'reader.number.short5': 'Short 5',
+    'reader.number.short10': 'Short 10',
+    'reader.regenerate': 'Regenerate',
+    'reader.play': 'Play',
+    'reader.pause': 'Pause',
+    'reader.resume': 'Resume',
+    'reader.toc': 'Table of Contents',
+    'reader.filelist': 'File List',
+
+    // Dictionary Import & Translator
+    'dict.import.title': 'Import Custom Dictionary',
+    'dict.import.desc': 'Supports importing .txt plain text files or .json mapping files. Please refer to the examples below:',
+    'dict.import.format.txt': 'TXT Format',
+    'dict.import.format.json': 'JSON Format',
+    'dict.import.btn': 'Select File to Import',
+    'dict.import.success': 'Import successful!',
+    'dict.import.error.format': 'Import failed: Unrecognized file format',
+    'dict.import.error.read': 'Failed to read file',
+    'dict.selector.builtin': 'Built-in Dictionaries',
+    'dict.selector.custom': 'Custom Dictionaries',
+    'dict.selector.notfound': 'Dictionary not found',
+    'dict.btn.delete': 'Delete Current Dictionary',
+    'dict.btn.import': 'Import',
+    'dict.delete.confirm': 'Are you sure you want to delete this custom dictionary?',
+
     // Greetings
     'greeting.earlyMorning': 'Good early morning',
     'greeting.morning': 'Good morning',
@@ -198,6 +289,7 @@ export const translations = {
     'home.player.title': 'Morse Player',
     'home.player.desc': 'Import TXT or EPUB files for immersive Morse code reading and listening practice.',
     'home.recent': 'Recent Documents',
+    'home.recent.clear': 'Clear this record',
     'home.card.launch': 'Open Tool',
     
     // Updater
