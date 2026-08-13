@@ -10,39 +10,33 @@ jobs:
     permissions:
       contents: write
     strategy:
-      fail-fast: true
+      fail-fast: false
       matrix:
         include:
           - platform: 'macos-latest'
             args: '--target universal-apple-darwin'
-            target: 'aarch64-apple-darwin, x86_64-apple-darwin'
+            target: 'aarch64-apple-darwin,x86_64-apple-darwin'
           - platform: 'ubuntu-22.04'
             args: '--target x86_64-unknown-linux-gnu'
             target: 'x86_64-unknown-linux-gnu'
-          - platform: 'ubuntu-24.04-arm'
-            args: '--target aarch64-unknown-linux-gnu'
-            target: 'aarch64-unknown-linux-gnu'
           - platform: 'windows-latest'
             args: '--target x86_64-pc-windows-msvc'
             target: 'x86_64-pc-windows-msvc'
-          - platform: 'windows-latest'
-            args: '--target aarch64-pc-windows-msvc'
-            target: 'aarch64-pc-windows-msvc'
 
     runs-on: ${{ matrix.platform }}
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install pnpm
-        uses: pnpm/action-setup@v3
-        with:
-          version: 9
-
       - name: setup node
         uses: actions/setup-node@v4
         with:
           node-version: lts/*
-          cache: 'pnpm'
+
+      - name: install pnpm
+        run: npm install -g pnpm
+
+      - name: install frontend dependencies
+        run: pnpm install
 
       - name: install Rust stable
         uses: dtolnay/rust-toolchain@stable
@@ -60,14 +54,9 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev build-essential libssl-dev libayatana-appindicator3-dev librsvg2-dev patchelf
 
-
-      - name: install frontend dependencies
-        run: pnpm install
-
       - name: Update version from tag
         shell: bash
         run: |
-          # Remove 'v' prefix if exists
           RAW_VERSION=${GITHUB_REF_NAME#v}
           export RAW_VERSION
           node -e "
@@ -105,12 +94,7 @@ jobs:
         run: |
           echo "$ARTIFACT_PATHS" | jq -r '.[]' | while read -r raw_filepath; do
             filepath=$(echo "$raw_filepath" | tr -d '\r')
-            if [ -d "$filepath" ]; then
-              echo "Skipping directory: $filepath"
-              continue
-            fi
-            if [ ! -f "$filepath" ]; then
-              echo "File not found: $filepath"
+            if [ -d "$filepath" ] || [ ! -f "$filepath" ]; then
               continue
             fi
             filename=$(basename "$filepath")
@@ -127,73 +111,47 @@ jobs:
       - name: Generate and Upload latest.json
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_REF_NAME: ${{ github.ref_name }}
         run: |
-          VERSION=${GITHUB_REF_NAME#v}
-          PUB_DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-          
           mkdir -p updater
           cd updater
           
-          # Download all sig files from this release
-          gh release download ${{ github.ref_name }} --repo ${{ github.repository }} --pattern "*.sig"
-          
-          cat <<EOF > latest.json
-          {
-            "version": "$VERSION",
-            "notes": "Update to $VERSION",
-            "pub_date": "$PUB_DATE",
-            "platforms": {}
-          }
-          EOF
+          # Download all signature files
+          gh release download "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --pattern "*.sig"
           
           node -e "
             const fs = require('fs');
-            const repo = '${{ github.repository }}';
-            const version = '${{ github.ref_name }}';
+            const repo = process.env.GITHUB_REPOSITORY;
+            const version = process.env.GITHUB_REF_NAME;
             const downloadBase = \`https://github.com/\${repo}/releases/download/\${version}\`;
-            
-            let latest = JSON.parse(fs.readFileSync('latest.json', 'utf8'));
-            
+
+            let latest = {
+              version: version.replace(/^v/, ''),
+              notes: \`Release \${version}\`,
+              pub_date: new Date().toISOString(),
+              platforms: {}
+            };
+
             const files = fs.readdirSync('.');
             files.filter(f => f.endsWith('.sig')).forEach(sigFile => {
               const signature = fs.readFileSync(sigFile, 'utf8').trim();
-              const assetName = sigFile.replace('.sig', '');
-              const lowerName = assetName.toLowerCase();
-              
-              if (!lowerName.endsWith('.zip') && !lowerName.endsWith('.tar.gz')) {
-                return;
-              }
-              
+              const assetName = sigFile.slice(0, -4);
+              const lower = assetName.toLowerCase();
               const url = \`\${downloadBase}/\${assetName}\`;
-              let platform = '';
-              
-              if (lowerName.includes('windows') || lowerName.includes('setup') || lowerName.includes('msi')) {
-                if (lowerName.includes('arm64') || lowerName.includes('aarch64')) platform = 'windows-aarch64';
-                else platform = 'windows-x86_64';
-              } else if (lowerName.includes('darwin') || lowerName.includes('mac') || lowerName.includes('.app.tar.gz') || lowerName.includes('universal')) {
-                // If it is a universal binary, we must add BOTH platforms for the updater
-                if (lowerName.includes('universal')) {
-                  latest.platforms['darwin-x86_64'] = { signature, url };
-                  latest.platforms['darwin-aarch64'] = { signature, url };
-                  return;
-                } else if (lowerName.includes('aarch64') || lowerName.includes('arm64')) {
-                  platform = 'darwin-aarch64';
-                } else {
-                  platform = 'darwin-x86_64';
-                }
-              } else if (lowerName.includes('linux') || lowerName.includes('appimage')) {
-                if (lowerName.includes('aarch64') || lowerName.includes('arm64')) platform = 'linux-aarch64';
-                else platform = 'linux-x86_64';
-              }
-              
-              if (platform) {
-                latest.platforms[platform] = { signature, url };
+
+              if (lower.includes('universal') || (lower.includes('darwin') && lower.endsWith('.tar.gz'))) {
+                latest.platforms['darwin-x86_64'] = { signature, url };
+                latest.platforms['darwin-aarch64'] = { signature, url };
+              } else if (lower.includes('x64') && (lower.includes('windows') || lower.endsWith('.zip') || lower.endsWith('.exe'))) {
+                latest.platforms['windows-x86_64'] = { signature, url };
+              } else if (lower.includes('amd64') || lower.includes('x86_64')) {
+                latest.platforms['linux-x86_64'] = { signature, url };
               }
             });
-            
+
             fs.writeFileSync('latest.json', JSON.stringify(latest, null, 2));
-            console.log('Generated latest.json:');
-            console.log(JSON.stringify(latest, null, 2));
+            console.log('Generated latest.json:\n', JSON.stringify(latest, null, 2));
           "
-          
-          gh release upload ${{ github.ref_name }} latest.json --repo ${{ github.repository }} --clobber
+
+          gh release upload "$GITHUB_REF_NAME" latest.json --repo "$GITHUB_REPOSITORY" --clobber
