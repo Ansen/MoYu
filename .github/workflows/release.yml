@@ -116,3 +116,75 @@ jobs:
             sha256sum "$filepath" | awk '{print $1 "  " "'"$filename"'"}' > "$filename.sha256"
             gh release upload ${{ github.ref_name }} "$filename.sha256" --clobber
           done
+
+  publish-updater:
+    needs: publish-tauri
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Generate and Upload latest.json
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION=${GITHUB_REF_NAME#v}
+          PUB_DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+          
+          mkdir -p updater
+          cd updater
+          
+          # Download all sig files from this release
+          gh release download ${{ github.ref_name }} --repo ${{ github.repository }} --pattern "*.sig"
+          
+          cat <<EOF > latest.json
+          {
+            "version": "$VERSION",
+            "notes": "Update to $VERSION",
+            "pub_date": "$PUB_DATE",
+            "platforms": {}
+          }
+          EOF
+          
+          node -e "
+            const fs = require('fs');
+            const repo = '${{ github.repository }}';
+            const version = '${{ github.ref_name }}';
+            const downloadBase = \`https://github.com/\${repo}/releases/download/\${version}\`;
+            
+            let latest = JSON.parse(fs.readFileSync('latest.json', 'utf8'));
+            
+            const files = fs.readdirSync('.');
+            files.filter(f => f.endsWith('.sig')).forEach(sigFile => {
+              const signature = fs.readFileSync(sigFile, 'utf8').trim();
+              const assetName = sigFile.replace('.sig', '');
+              const lowerName = assetName.toLowerCase();
+              
+              if (!lowerName.endsWith('.zip') && !lowerName.endsWith('.tar.gz')) {
+                return;
+              }
+              
+              const url = \`\${downloadBase}/\${assetName}\`;
+              let platform = '';
+              
+              if (lowerName.includes('windows') || lowerName.includes('setup') || lowerName.includes('msi')) {
+                if (lowerName.includes('arm64') || lowerName.includes('aarch64')) platform = 'windows-aarch64';
+                else platform = 'windows-x86_64';
+              } else if (lowerName.includes('darwin') || lowerName.includes('mac') || lowerName.includes('.app.tar.gz')) {
+                if (lowerName.includes('aarch64') || lowerName.includes('arm64')) platform = 'darwin-aarch64';
+                else platform = 'darwin-x86_64';
+              } else if (lowerName.includes('linux') || lowerName.includes('appimage')) {
+                if (lowerName.includes('aarch64') || lowerName.includes('arm64')) platform = 'linux-aarch64';
+                else platform = 'linux-x86_64';
+              }
+              
+              if (platform) {
+                latest.platforms[platform] = { signature, url };
+              }
+            });
+            
+            fs.writeFileSync('latest.json', JSON.stringify(latest, null, 2));
+            console.log('Generated latest.json:');
+            console.log(JSON.stringify(latest, null, 2));
+          "
+          
+          gh release upload ${{ github.ref_name }} latest.json --repo ${{ github.repository }} --clobber
