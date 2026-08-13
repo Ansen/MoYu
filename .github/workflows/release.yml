@@ -83,8 +83,11 @@ jobs:
           "
 
       - uses: tauri-apps/tauri-action@v0
+        id: tauri_build
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_PRIVATE_KEY: ${{ secrets.TAURI_PRIVATE_KEY }}
+          TAURI_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
         with:
           tagName: ${{ github.ref_name }}
           releaseName: 'MoYu ${{ github.ref_name }}'
@@ -92,3 +95,15 @@ jobs:
           releaseDraft: false
           prerelease: false
           args: ${{ matrix.args }}
+
+      - name: Generate and Upload SHA256
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ARTIFACT_PATHS: ${{ steps.tauri_build.outputs.artifactPaths }}
+        run: |
+          echo "$ARTIFACT_PATHS" | jq -r '.[]' | while read -r filepath; do
+            filename=$(basename "$filepath")
+            sha256sum "$filepath" | awk '{print $1 "  " "'"$filename"'"}' > "$filename.sha256"
+            gh release upload ${{ github.ref_name }} "$filename.sha256" --clobber
+          done

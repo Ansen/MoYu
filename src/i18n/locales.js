@@ -77,7 +77,15 @@ export const translations = {
     'home.player.title': '电码播放器',
     'home.player.desc': '导入 TXT 或 EPUB 电子书，支持原文章节解析与沉浸式摩尔斯电码跟读训练。',
     'home.recent': '最近打开的文档',
-    'home.card.launch': '进入工具'
+    'home.card.launch': '进入工具',
+    
+    // 更新
+    'update.check': '检查更新',
+    'update.checking': '正在检查更新...',
+    'update.available': '发现新版本！',
+    'update.uptodate': '当前已是最新版本。',
+    'update.download.github': 'GitHub 官方下载',
+    'update.download.proxy': '国内加速下载'
   },
   en: {
     'app.name': 'MoYu',
@@ -157,7 +165,15 @@ export const translations = {
     'home.player.title': 'Morse Player',
     'home.player.desc': 'Import TXT or EPUB files for immersive Morse code reading and listening practice.',
     'home.recent': 'Recent Documents',
-    'home.card.launch': 'Open Tool'
+    'home.card.launch': 'Open Tool',
+    
+    // Updater
+    'update.check': 'Check for Updates',
+    'update.checking': 'Checking for updates...',
+    'update.available': 'New version available!',
+    'update.uptodate': 'You are up to date.',
+    'update.download.github': 'Download from GitHub',
+    'update.download.proxy': 'Download via Proxy (China)'
   }
 };
 

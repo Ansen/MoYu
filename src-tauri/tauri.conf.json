@@ -51,5 +51,13 @@
     "android": {
       "debugApplicationIdSuffix": ".debug"
     }
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEU4QzVBMkJGOUUyMjJDQTQKUldTa0xDS2V2NkxGNkFqaVpOTHhmd1NXOHdRT1NvNVVNSjJLVW0rWUpYMVorbzQ3aVJXdlRuNWwK",
+      "endpoints": [
+        "https://github.com/Ansen/MoYu/releases/latest/download/latest.json"
+      ]
+    }
   }
 }

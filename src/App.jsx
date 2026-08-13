@@ -7,13 +7,17 @@ import HomeView from './views/Home';
 import SettingsModal from './components/SettingsModal';
 import HelpModal from './components/HelpModal';
 import { useEbook } from './hooks/useEbook';
-
+import { checkForUpdates, installUpdate } from './utils/updater';
+import { useI18n } from './i18n';
+import { useI18n } from './i18n';
 function App() {
   const [currentView, setView] = useState('home');
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [isHelpModalOpen, setIsHelpModalOpen] = useState(false);
   const [theme, setTheme] = useState('system');
   const [isReady, setIsReady] = useState(false);
+  const [updateInfo, setUpdateInfo] = useState(null);
+  const { t } = useI18n();
 
   // Lift ebook state up to share between Home and Library
   const ebook = useEbook();
@@ -40,6 +44,16 @@ function App() {
       }
     }
     setIsReady(true);
+
+    // Silent update check
+    // Silent update check
+    setTimeout(() => {
+      checkForUpdates().then(({ hasUpdate, updateInfo }) => {
+        if (hasUpdate) {
+          setUpdateInfo(updateInfo);
+        }
+      }).catch(() => {});
+    }, 2000); // Wait 2s to not block startup
   }, []);
 
   // Save current view on change
@@ -116,6 +130,41 @@ function App() {
         isOpen={isHelpModalOpen} 
         onClose={() => setIsHelpModalOpen(false)} 
       />
+      
+      {/* Update Banner */}
+      {updateInfo && (
+        <div className="fixed bottom-6 right-6 z-50 bg-white dark:bg-[#252525] shadow-2xl rounded-xl border border-indigo-100 dark:border-indigo-900/50 p-4 animate-in slide-in-from-bottom-5 fade-in duration-300 w-80">
+          <div className="flex justify-between items-start mb-2">
+            <h3 className="font-bold text-indigo-600 dark:text-indigo-400 text-sm flex items-center gap-2">
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-indigo-500"></span>
+              </span>
+              {t('update.available')} (v{updateInfo.version})
+            </h3>
+            <button onClick={() => setUpdateInfo(null)} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+            </button>
+          </div>
+          <div className="flex mt-3">
+            <button 
+              onClick={async () => {
+                const btn = document.getElementById('btn-silent-update');
+                if (btn) btn.innerText = '正在下载...';
+                try {
+                  await installUpdate(updateInfo);
+                } catch(e) {
+                  if (btn) btn.innerText = '更新失败';
+                }
+              }}
+              id="btn-silent-update"
+              className="flex-1 px-3 py-1.5 text-xs font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg transition-colors text-center"
+            >
+              立刻更新并重启
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
