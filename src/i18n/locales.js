@@ -24,6 +24,7 @@ export const translations = {
     'about.author': '作者',
     'about.website': '网站',
     'about.email': '联系邮箱',
+    'about.repo': '开源仓库',
     
     // 侧边栏
     'sidebar.home': '首页导航',
@@ -191,6 +192,7 @@ export const translations = {
     'about.author': 'Author',
     'about.website': 'Website',
     'about.email': 'Email',
+    'about.repo': 'Repository',
     
     // Sidebar
     'sidebar.home': 'Home',
