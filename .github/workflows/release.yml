@@ -102,7 +102,16 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           ARTIFACT_PATHS: ${{ steps.tauri_build.outputs.artifactPaths }}
         run: |
-          echo "$ARTIFACT_PATHS" | jq -r '.[]' | while read -r filepath; do
+          echo "$ARTIFACT_PATHS" | jq -r '.[]' | while read -r raw_filepath; do
+            filepath=$(echo "$raw_filepath" | tr -d '\r')
+            if [ -d "$filepath" ]; then
+              echo "Skipping directory: $filepath"
+              continue
+            fi
+            if [ ! -f "$filepath" ]; then
+              echo "File not found: $filepath"
+              continue
+            fi
             filename=$(basename "$filepath")
             sha256sum "$filepath" | awk '{print $1 "  " "'"$filename"'"}' > "$filename.sha256"
             gh release upload ${{ github.ref_name }} "$filename.sha256" --clobber
