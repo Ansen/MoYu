@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { chineseToCodes, codesToMorse, morseToCodes, codesToChinese, isMainlyMorse, isMainlyCodes } from '../utils/translator';
+import { chineseToCodes, morseToCodes, codesToChinese, isMainlyMorse, isMainlyCodes } from '../utils/translator';
 import { useI18n } from '../i18n/index';
 import { Edit3, MessageSquare, Hash, Wand2, Upload, Trash2, ChevronDown } from 'lucide-react';
 import ImportDictModal from '../components/ImportDictModal';
@@ -11,7 +11,6 @@ export default function TranslatorView() {
   const [inputType, setInputType] = useState('none');
   const [chineseOutput, setChineseOutput] = useState('');
   const [codesOutput, setCodesOutput] = useState('');
-  const [morseOutput, setMorseOutput] = useState('');
   const [dictionary, setDictionary] = useState(null);
   const [prefDictionaryId, setPrefDictionaryId] = useState(() => localStorage.getItem('pref_dictionary') || '1983_mainland');
   const [customDicts, setCustomDicts] = useState(() => {
@@ -89,7 +88,6 @@ export default function TranslatorView() {
       setInputType('none');
       setChineseOutput('');
       setCodesOutput('');
-      setMorseOutput('');
       return;
     }
 
@@ -98,17 +96,14 @@ export default function TranslatorView() {
       const codes = morseToCodes(text);
       setCodesOutput(codes);
       setChineseOutput(codesToChinese(codes, dictionary.codeToChar));
-      setMorseOutput(text);
     } else if (isMainlyCodes(text)) {
       setInputType('codes');
-      setMorseOutput(codesToMorse(text));
-      setChineseOutput(codesToChinese(text, dictionary.codeToChar));
       setCodesOutput(text);
+      setChineseOutput(codesToChinese(text, dictionary.codeToChar));
     } else {
       setInputType('chinese');
       const codes = chineseToCodes(text, dictionary.charToCode);
       setCodesOutput(codes);
-      setMorseOutput(codesToMorse(codes));
       setChineseOutput(text);
     }
   }, [inputText, dictionary]);

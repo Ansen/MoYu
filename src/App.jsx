@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import Titlebar from './components/layout/Titlebar';
 import Sidebar from './components/layout/Sidebar';
 import TranslatorView from './views/Translator';
@@ -64,30 +64,56 @@ function App() {
     }
   }, [currentView, isReady]);
 
-  useEffect(() => {
-    const root = window.document.documentElement;
-    root.classList.remove('light', 'dark');
+  const themeRef = useRef(theme);
+  themeRef.current = theme;
 
-    let resolvedTheme = theme;
-    if (theme === 'system') {
-      resolvedTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  // Apply theme to document root element
+  const applyDocumentTheme = (targetTheme) => {
+    const root = window.document.documentElement;
+    let isDark = false;
+    if (targetTheme === 'system') {
+      isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    } else {
+      isDark = targetTheme === 'dark';
     }
-    
-    root.classList.add(resolvedTheme);
-    
-    // Update native Tauri window theme so the titlebar matches
-    try {
-      import('@tauri-apps/api/window').then(({ getCurrentWindow }) => {
-        getCurrentWindow().setTheme(theme === 'system' ? null : theme).catch(() => {});
-      }).catch(() => {});
-    } catch (e) {}
-    
+
+    if (isDark) {
+      root.classList.remove('light');
+      root.classList.add('dark');
+    } else {
+      root.classList.remove('dark');
+      root.classList.add('light');
+    }
+  };
+
+  // 1. Sync theme changes to DOM and persistence
+  useEffect(() => {
+    applyDocumentTheme(theme);
+
     if (theme !== 'system') {
       localStorage.setItem('theme', theme);
     } else {
       localStorage.removeItem('theme');
     }
   }, [theme]);
+
+  // 2. Listen for OS theme changes (only active when current setting is 'system')
+  useEffect(() => {
+    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+    const handleSystemThemeChange = () => {
+      if (themeRef.current === 'system') {
+        applyDocumentTheme('system');
+      }
+    };
+
+    if (mediaQuery.addEventListener) {
+      mediaQuery.addEventListener('change', handleSystemThemeChange);
+      return () => mediaQuery.removeEventListener('change', handleSystemThemeChange);
+    } else {
+      mediaQuery.addListener(handleSystemThemeChange);
+      return () => mediaQuery.removeListener(handleSystemThemeChange);
+    }
+  }, []);
 
   // Disable default document scrolling to make it feel like an app
   useEffect(() => {
@@ -109,7 +135,7 @@ function App() {
       />
       
       <div className="flex flex-1 min-h-0">
-        <Sidebar currentView={currentView} setView={setView} />
+        <Sidebar currentView={currentView} setView={setView} openAbout={() => setIsAboutOpen(true)} />
         
         <main className="flex-1 relative overflow-hidden bg-white dark:bg-[#1e1e1e]">
           {isReady && currentView === 'home' && (
@@ -139,7 +165,7 @@ function App() {
       
       {/* Update Banner */}
       {updateInfo && (
-        <div className="fixed bottom-6 right-6 z-50 bg-white dark:bg-[#252525] shadow-2xl rounded-xl border border-indigo-100 dark:border-indigo-900/50 p-4 animate-in slide-in-from-bottom-5 fade-in duration-300 w-80">
+        <div className="fixed bottom-6 right-6 z-50 bg-white dark:bg-[#252525] shadow-2xl rounded-2xl border border-indigo-100 dark:border-indigo-900/50 p-4 animate-in slide-in-from-bottom-5 fade-in duration-300 w-84 max-w-[90vw]">
           <div className="flex justify-between items-start mb-2">
             <h3 className="font-bold text-indigo-600 dark:text-indigo-400 text-sm flex items-center gap-2">
               <span className="relative flex h-2 w-2">
@@ -148,10 +174,18 @@ function App() {
               </span>
               {t('update.available')} (v{updateInfo.version})
             </h3>
-            <button onClick={() => setUpdateInfo(null)} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+            <button onClick={() => setUpdateInfo(null)} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
             </button>
           </div>
+          
+          {/* Release Notes Preview */}
+          {(updateInfo.body || updateInfo.notes) && (
+            <div className="my-2 p-2.5 bg-slate-50 dark:bg-[#1a1a1a] rounded-lg border border-slate-100 dark:border-[#333333] max-h-32 overflow-y-auto custom-scrollbar text-[12px] text-slate-600 dark:text-slate-300 whitespace-pre-wrap leading-relaxed">
+              {updateInfo.body || updateInfo.notes}
+            </div>
+          )}
+
           <div className="flex mt-3">
             <button 
               onClick={async () => {
@@ -159,12 +193,12 @@ function App() {
                 if (btn) btn.innerText = t('update.downloading');
                 try {
                   await installUpdate(updateInfo);
-                } catch(e) {
+                } catch {
                   if (btn) btn.innerText = t('update.failed');
                 }
               }}
               id="btn-silent-update"
-              className="flex-1 px-3 py-1.5 text-xs font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg transition-colors text-center"
+              className="flex-1 px-3 py-2 text-xs font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg transition-colors text-center shadow-xs"
             >
               {t('update.install.restart')}
             </button>

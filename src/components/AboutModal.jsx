@@ -45,7 +45,7 @@ export default function AboutModal({ isOpen, onClose }) {
       } else {
         setUpdateStatus('uptodate');
       }
-    } catch (err) {
+    } catch {
       setUpdateStatus('error');
     }
   };
@@ -57,8 +57,7 @@ export default function AboutModal({ isOpen, onClose }) {
       await installUpdate(updateObj, (downloaded, total) => {
         setInstallProgress({ downloaded, total });
       });
-    } catch (e) {
-      console.error(e);
+    } catch {
       setUpdateStatus('error');
     }
   };
@@ -181,14 +180,24 @@ export default function AboutModal({ isOpen, onClose }) {
                 {t('update.checking')}
               </div>
             ) : updateStatus === 'available' ? (
-              <div className="w-full flex flex-col items-center space-y-3 p-3 bg-indigo-50 dark:bg-indigo-900/20 rounded-xl border border-indigo-100 dark:border-indigo-800/30">
-                <p className="text-sm font-bold text-indigo-700 dark:text-indigo-400">
-                  {t('update.available')} (v{latestVer})
-                </p>
+              <div className="w-full flex flex-col space-y-3 p-3.5 bg-indigo-50/70 dark:bg-indigo-900/20 rounded-xl border border-indigo-100 dark:border-indigo-800/30">
+                <div className="text-center">
+                  <p className="text-sm font-bold text-indigo-700 dark:text-indigo-400">
+                    {t('update.available')} (v{latestVer})
+                  </p>
+                </div>
+
+                {/* Release Notes */}
+                {(updateObj?.body || updateObj?.notes) && (
+                  <div className="p-2.5 bg-white/90 dark:bg-[#1e1e1e]/90 rounded-lg border border-indigo-100 dark:border-[#333333] max-h-28 overflow-y-auto custom-scrollbar text-[11px] text-slate-600 dark:text-slate-300 whitespace-pre-wrap text-left leading-relaxed">
+                    {updateObj.body || updateObj.notes}
+                  </div>
+                )}
+
                 <div className="flex gap-2 w-full">
                   <button 
                     onClick={handleInstall}
-                    className="flex-1 px-3 py-1.5 text-xs font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg transition-colors text-center"
+                    className="flex-1 px-3 py-2 text-xs font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg transition-colors text-center shadow-xs"
                   >
                     {t('update.install.restart')}
                   </button>

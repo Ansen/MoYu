@@ -4,9 +4,53 @@ import { readFile, readTextFile, readDir } from '@tauri-apps/plugin-fs';
 import { generatePracticeText } from '../utils/morse/structuredRandom';
 import ePub from 'epubjs';
 
+function extractTextFromEpubDoc(doc, chapterLabel = '') {
+  if (!doc) return '';
+  const body = doc.body || (doc.querySelector && doc.querySelector('body')) || doc.documentElement;
+  if (!body) return '';
+
+  const clone = body.cloneNode(true);
+  const scripts = clone.querySelectorAll('script, style, noscript, svg');
+  scripts.forEach(s => s.remove());
+
+  // 移除所有标题与章节名元素
+  const titleElements = clone.querySelectorAll('h1, h2, h3, h4, h5, h6, .title, .chapter-title, .chaptertitle, .chapter_title, .chap-title, .heading, [class*="title"], [class*="chapter-name"], [id*="title"]');
+  titleElements.forEach(el => el.remove());
+
+  const blockTags = clone.querySelectorAll('p, div, li, tr, blockquote, dt, dd, section, article, header, footer');
+  blockTags.forEach(el => {
+    el.insertAdjacentText('afterend', '\n');
+  });
+
+  const brs = clone.querySelectorAll('br');
+  brs.forEach(br => br.replaceWith('\n'));
+
+  const text = clone.textContent || clone.innerText || '';
+  const lines = text
+    .split('\n')
+    .map(line => line.trim())
+    .filter(line => line.length > 0);
+
+  // 如果首行依然带有章节名或与 chapterLabel 一致，则剔除首行
+  if (lines.length > 0) {
+    const firstLine = lines[0].toLowerCase();
+    const cleanLabel = chapterLabel.trim().toLowerCase();
+    if (
+      (cleanLabel && (firstLine === cleanLabel || firstLine.includes(cleanLabel) || cleanLabel.includes(firstLine))) ||
+      /^第\s*[\d一二三四五六七八九十百千万]+\s*[章节回卷集篇部]/.test(lines[0]) ||
+      /^chapter\s*\d+/i.test(lines[0]) ||
+      /^p\d+$/i.test(lines[0])
+    ) {
+      lines.shift();
+    }
+  }
+
+  return lines.join('\n\n');
+}
+
 export function useEbook() {
   const [bookData, setBookData] = useState(null); 
-  // bookData: { type: 'epub'|'txt', data: Book|string, name: string, path: string, siblings: Array<{name, path, type}>, currentIndex: number }
+  // bookData: { type: 'epub'|'txt', data: string, name: string, path: string, siblings: Array<{name, path, type}>, currentIndex: number, toc: Array<{id, label, href, index}>, currentChapterIndex: number, currentChapterLabel: string }
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [recentFiles, setRecentFiles] = useState([]);
@@ -16,7 +60,7 @@ export function useEbook() {
     if (saved) {
       try {
         setRecentFiles(JSON.parse(saved));
-      } catch (e) {}
+      } catch {}
     }
   }, []);
 
@@ -43,18 +87,77 @@ export function useEbook() {
     });
   }, []);
 
-  const loadFileContent = async (filePath, fileName, siblings = [], currentIndex = 0) => {
+  const loadFileContent = async (filePath, fileName, siblings = [], currentIndex = 0, folderName = '') => {
     const isEpub = filePath.toLowerCase().endsWith('.epub');
+    const isFolder = Boolean(folderName || (siblings && siblings.length > 0));
+    const effectiveFolderName = folderName || (isFolder ? filePath.split(/[/\\]/).filter(Boolean).slice(-2, -1)[0] : '');
+
     if (isEpub) {
       const fileData = await readFile(filePath);
       const book = ePub(fileData.buffer);
+      await book.ready;
+
+      const nav = await book.loaded.navigation;
+      const spine = await book.loaded.spine;
+      const spineItems = spine?.items || [];
+
+      const toc = (nav?.toc || []).map((t, idx) => ({
+        id: t.id || idx,
+        label: t.label ? t.label.trim() : `第 ${idx + 1} 章`,
+        href: t.href,
+        index: idx
+      }));
+
+      const finalToc = toc.length > 0 ? toc : spineItems.map((item, idx) => ({
+        id: idx,
+        label: `第 ${idx + 1} 节`,
+        href: item.href,
+        index: idx
+      }));
+
+      const loadEpubChapter = async (targetIndexOrHref) => {
+        let section = null;
+        let chapterIndex = 0;
+        if (typeof targetIndexOrHref === 'number') {
+          chapterIndex = Math.max(0, Math.min(spineItems.length - 1, targetIndexOrHref));
+          section = spine.get(chapterIndex);
+        } else if (typeof targetIndexOrHref === 'string') {
+          const cleanHref = targetIndexOrHref.split('#')[0];
+          section = spine.get(targetIndexOrHref) || spine.get(cleanHref);
+          chapterIndex = section ? section.index : 0;
+        }
+        if (!section) {
+          section = spine.get(0);
+          chapterIndex = 0;
+        }
+        if (!section) return { text: '', chapterIndex: 0, label: '' };
+
+        const navItem = finalToc.find(t => t.href?.includes(section.href) || section.href?.includes(t.href?.split('#')[0])) || finalToc[chapterIndex];
+        const label = navItem ? navItem.label : `第 ${chapterIndex + 1} 章`;
+
+        const doc = await section.load(book.load.bind(book));
+        const text = extractTextFromEpubDoc(doc, label);
+
+        return { text, chapterIndex, label, href: section.href };
+      };
+
+      const initial = await loadEpubChapter(0);
+
       setBookData({
         type: 'epub',
-        data: book,
+        data: initial.text,
         name: fileName,
         path: filePath,
+        bookInstance: book,
+        spineItems,
+        toc: finalToc,
+        currentChapterIndex: initial.chapterIndex,
+        currentChapterLabel: initial.label,
+        loadEpubChapter,
         siblings,
-        currentIndex
+        currentIndex,
+        isFolder,
+        folderName: effectiveFolderName
       });
     } else {
       const textData = await readTextFile(filePath);
@@ -64,7 +167,9 @@ export function useEbook() {
         name: fileName,
         path: filePath,
         siblings,
-        currentIndex
+        currentIndex,
+        isFolder,
+        folderName: effectiveFolderName
       });
     }
   };
@@ -85,6 +190,8 @@ export function useEbook() {
           throw new Error('文件夹中没有找到 txt 或 epub 文件');
         }
 
+        const folderName = fileName || filePath.split(/[/\\]/).filter(Boolean).pop();
+
         const siblings = validFiles.map(f => {
           const sep = filePath.includes('\\') ? '\\' : '/';
           return {
@@ -94,10 +201,10 @@ export function useEbook() {
           };
         });
 
-        await loadFileContent(siblings[0].path, siblings[0].name, siblings, 0);
-        saveRecent({ type: 'folder', name: fileName || filePath.split(/[/\\]/).pop(), path: filePath });
+        await loadFileContent(siblings[0].path, siblings[0].name, siblings, 0, folderName);
+        saveRecent({ type: 'folder', name: folderName, path: filePath });
       } else {
-        await loadFileContent(filePath, fileName, [], 0);
+        await loadFileContent(filePath, fileName, [], 0, '');
         saveRecent({ type: 'file', name: fileName, path: filePath });
       }
     } catch (err) {
@@ -145,11 +252,11 @@ export function useEbook() {
     try {
       setLoading(true);
       const target = bookData.siblings[index];
-      // Close current book if epub
-      if (bookData.type === 'epub' && bookData.data) {
-        bookData.data.destroy();
+      // Close current book instance if epub
+      if (bookData.type === 'epub' && bookData.bookInstance && typeof bookData.bookInstance.destroy === 'function') {
+        try { bookData.bookInstance.destroy(); } catch {}
       }
-      await loadFileContent(target.path, target.name, bookData.siblings, index);
+      await loadFileContent(target.path, target.name, bookData.siblings, index, bookData.folderName);
     } catch (err) {
       console.error(err);
     } finally {
@@ -185,9 +292,27 @@ export function useEbook() {
     });
   }, []);
 
+  const jumpToChapter = useCallback(async (target) => {
+    if (!bookData || bookData.type !== 'epub' || !bookData.loadEpubChapter) return;
+    try {
+      setLoading(true);
+      const result = await bookData.loadEpubChapter(target);
+      setBookData(prev => ({
+        ...prev,
+        data: result.text,
+        currentChapterIndex: result.chapterIndex,
+        currentChapterLabel: result.label
+      }));
+    } catch (err) {
+      console.error('Failed to jump to chapter:', err);
+    } finally {
+      setLoading(false);
+    }
+  }, [bookData]);
+
   const closeBook = useCallback(() => {
-    if (bookData?.type === 'epub' && bookData.data) {
-      bookData.data.destroy();
+    if (bookData?.type === 'epub' && bookData.bookInstance && typeof bookData.bookInstance.destroy === 'function') {
+      try { bookData.bookInstance.destroy(); } catch {}
     }
     setBookData(null);
   }, [bookData]);
@@ -201,6 +326,7 @@ export function useEbook() {
     openFolderDialog,
     openFileProgrammatically,
     jumpToSibling,
+    jumpToChapter,
     closeBook,
     clearRecentFiles,
     removeRecentFile,

@@ -17,6 +17,7 @@ class DesktopAudioPlayer {
         this.volume = MORSE_AUDIO_CONFIG.VOLUME.DEFAULT
         this.currentNodes = []
         this.cleanupTimers = new Set()
+        this.idleTimer = null
         this.playbackState = {
             isPlaying: false,
             isPaused: false,
@@ -24,7 +25,24 @@ class DesktopAudioPlayer {
         }
     }
 
+    resetIdleTimer() {
+        if (this.idleTimer) {
+            clearTimeout(this.idleTimer);
+            this.idleTimer = null;
+        }
+    }
+
+    scheduleIdleSuspend() {
+        this.resetIdleTimer();
+        this.idleTimer = setTimeout(() => {
+            if (!this.playbackState.isPlaying && this.audioContext && this.audioContext.state === 'running') {
+                this.audioContext.suspend().catch(() => {});
+            }
+        }, 30000); // Suspend after 30s of inactivity to save battery
+    }
+
     async init() {
+        this.resetIdleTimer();
         if (!this.audioContext) {
             this.audioContext = new (window.AudioContext || window.webkitAudioContext)()
             this.masterGain = this.audioContext.createGain()
@@ -218,6 +236,7 @@ class DesktopAudioPlayer {
         }
 
         this.playbackState.isPlaying = false;
+        this.scheduleIdleSuspend();
         if (onComplete && !this.playbackState.stopRequested) {
             onComplete();
         }
@@ -229,6 +248,7 @@ class DesktopAudioPlayer {
     }
 
     resume() {
+        this.resetIdleTimer();
         this.playbackState.isPaused = false;
     }
 
@@ -263,6 +283,7 @@ class DesktopAudioPlayer {
         this.playbackState.stopRequested = true;
         this.playbackState.isPlaying = false;
         this.playbackState.isPaused = false;
+        this.scheduleIdleSuspend();
         return this.stopScheduledNodes();
     }
 

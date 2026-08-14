@@ -1,6 +1,6 @@
 import { useRef, useCallback } from 'react';
 
-export default function useHighlighter(bookType, onScrollRequest) {
+export default function useHighlighter(onScrollRequest) {
   const textRootRef = useRef(null);
   const textNodesRef = useRef([]);
   const lastNodeIdxRef = useRef(0);
@@ -13,7 +13,6 @@ export default function useHighlighter(bookType, onScrollRequest) {
         if (doc.defaultView && doc.defaultView.CSS && doc.defaultView.CSS.highlights) {
           doc.defaultView.CSS.highlights.delete('morse-active');
           doc.defaultView.CSS.highlights.delete('morse-played');
-          doc.defaultView.CSS.highlights.delete('morse-played-txt');
         }
         const overlay = doc.getElementById('morse-active-overlay');
         if (overlay) overlay.remove();
@@ -74,9 +73,8 @@ export default function useHighlighter(bookType, onScrollRequest) {
           const playedRange = doc.createRange();
           playedRange.setStart(nodes[0].node, 0);
           playedRange.setEnd(targetNode, targetOffset);
-          const highlightName = bookType === 'epub' ? 'morse-played' : 'morse-played-txt';
-          win.CSS.highlights.set(highlightName, new win.Highlight(playedRange));
-        } catch(e) {}
+          win.CSS.highlights.set('morse-played', new win.Highlight(playedRange));
+        } catch {}
       }
 
       // ALWAYS use DOM overlay because CSS.highlights silently fails in some WebView2 versions for background color
@@ -114,7 +112,7 @@ export default function useHighlighter(bookType, onScrollRequest) {
         onScrollRequest(rect, targetRange, win, doc, scrollY, scrollX, overlay);
       }
     }
-  }, [bookType, onScrollRequest]);
+  }, [onScrollRequest]);
 
   return {
     textRootRef,

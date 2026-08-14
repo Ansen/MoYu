@@ -1,10 +1,10 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useI18n } from '../../i18n/index';
 import DropdownMenu from '../common/DropdownMenu';
-import { Sun, Moon, Monitor, Languages, Type, Settings, Info, Check, BookOpen, Minus, Square, Copy, X as CloseIcon } from 'lucide-react';
+import { Sun, Moon, Monitor, Languages, Type, Settings, Info, Check, BookOpen, Minus, Square, Copy, X as CloseIcon, ChevronDown } from 'lucide-react';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 
-export default function Titlebar({ theme, setTheme, setView, openSettings, openHelp, openAbout }) {
+export default function Titlebar({ theme, setTheme, openSettings, openHelp, openAbout }) {
   const [activeMenu, setActiveMenu] = useState(null);
   const [isMaximized, setIsMaximized] = useState(false);
   const menubarRef = useRef(null);
@@ -36,16 +36,49 @@ export default function Titlebar({ theme, setTheme, setView, openSettings, openH
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const handleMenuClick = (menuId) => {
-    setActiveMenu(activeMenu === menuId ? null : menuId);
+  const handleSelect = (id) => {
+    if (id === 'settings') openSettings();
+    else if (id === 'theme-system') setTheme('system');
+    else if (id === 'theme-light') setTheme('light');
+    else if (id === 'theme-dark') setTheme('dark');
+    else if (id === 'lang-system') setLangSetting('system');
+    else if (id === 'lang-zh') setLangSetting('zh');
+    else if (id === 'lang-en') setLangSetting('en');
+    else if (id === 'guide') openHelp();
+    else if (id === 'about') openAbout();
   };
 
-  const handleMenuHover = (menuId) => {
-    if (activeMenu) setActiveMenu(menuId);
-  };
+  const appMenuItems = [
+    { id: 'settings', icon: Settings, label: t('menu.settings.prefs') },
+    { type: 'divider' },
+    { 
+      id: 'theme', 
+      icon: Sun, 
+      label: t('menu.view'), 
+      submenuItems: [
+        { id: 'theme-system', icon: Monitor, label: t('menu.view.system'), checked: theme === 'system', checkIcon: Check },
+        { type: 'divider' },
+        { id: 'theme-light', icon: Sun, label: t('menu.view.light'), checked: theme === 'light', checkIcon: Check },
+        { id: 'theme-dark', icon: Moon, label: t('menu.view.dark'), checked: theme === 'dark', checkIcon: Check },
+      ]
+    },
+    { 
+      id: 'lang', 
+      icon: Languages, 
+      label: t('menu.language'), 
+      submenuItems: [
+        { id: 'lang-system', icon: Monitor, label: t('menu.language.system'), checked: langSetting === 'system', checkIcon: Check },
+        { type: 'divider' },
+        { id: 'lang-zh', icon: Type, label: t('menu.language.zh'), checked: langSetting === 'zh', checkIcon: Check },
+        { id: 'lang-en', icon: Languages, label: t('menu.language.en'), checked: langSetting === 'en', checkIcon: Check },
+      ]
+    },
+    { type: 'divider' },
+    { id: 'guide', icon: BookOpen, label: t('menu.help.guide') },
+    { id: 'about', icon: Info, label: t('menu.help.about') }
+  ];
 
   return (
-
     <div className="flex flex-col bg-white dark:bg-[#1e1e1e] border-b border-slate-200 dark:border-[#333333] shrink-0 select-none relative z-50">
       
       {/* 菜单栏 (Menubar) */}
@@ -55,91 +88,21 @@ export default function Titlebar({ theme, setTheme, setView, openSettings, openH
         data-tauri-drag-region
       >
         
-        {/* App Logo / Title */}
-        <div className="flex items-center gap-2 mr-4 pointer-events-none" data-tauri-drag-region>
-          <img src="/logo.png" className="w-4 h-4 object-contain" alt="MoYu" />
-          <span className="font-bold text-slate-900 dark:text-white tracking-wide">{t('app.name')}</span>
-        </div>
-        
-        {/* 1. 主题 (Theme) */}
+        {/* App Brand Menu: [logo] 摩语 ▾ */}
         <div className="relative">
           <button 
-            onClick={() => handleMenuClick('view')} 
-            onMouseEnter={() => handleMenuHover('view')}
-            className={`px-3 py-1 rounded-sm transition-colors ${activeMenu === 'view' ? 'bg-slate-300/50 dark:bg-white/10 text-black dark:text-white' : 'hover:bg-slate-200 dark:hover:bg-white/5'}`}
+            onClick={() => setActiveMenu(activeMenu === 'app' ? null : 'app')} 
+            className={`px-2 py-1 rounded flex items-center gap-1.5 transition-colors ${activeMenu === 'app' ? 'bg-slate-200 dark:bg-white/10 text-black dark:text-white' : 'hover:bg-slate-100 dark:hover:bg-white/5'}`}
           >
-            {t('menu.view')}
+            <img src="/logo.png" className="w-4 h-4 object-contain" alt="MoYu" />
+            <span className="font-bold text-slate-900 dark:text-white tracking-wide">{t('app.name')}</span>
+            <ChevronDown size={13} className="text-slate-400 dark:text-slate-500" />
           </button>
-          <DropdownMenu 
-            isOpen={activeMenu === 'view'}
-            items={[
-              { id: 'system', icon: Monitor, label: t('menu.view.system'), checked: theme === 'system', checkIcon: Check },
-              { type: 'divider' },
-              { id: 'light', icon: Sun, label: t('menu.view.light'), checked: theme === 'light', checkIcon: Check },
-              { id: 'dark', icon: Moon, label: t('menu.view.dark'), checked: theme === 'dark', checkIcon: Check },
-            ]}
-            onSelect={(id) => setTheme(id)}
-            onClose={() => setActiveMenu(null)}
-          />
-        </div>
 
-        {/* 3. 语言 (Language) */}
-        <div className="relative">
-          <button 
-            onClick={() => handleMenuClick('lang')} 
-            onMouseEnter={() => handleMenuHover('lang')}
-            className={`px-3 py-1 rounded-sm transition-colors ${activeMenu === 'lang' ? 'bg-slate-300/50 dark:bg-white/10 text-black dark:text-white' : 'hover:bg-slate-200 dark:hover:bg-white/5'}`}
-          >
-            {t('menu.language')}
-          </button>
           <DropdownMenu 
-            isOpen={activeMenu === 'lang'}
-            items={[
-              { id: 'system', icon: Monitor, label: t('menu.language.system'), checked: langSetting === 'system', checkIcon: Check },
-              { type: 'divider' },
-              { id: 'zh', icon: Type, label: t('menu.language.zh'), checked: langSetting === 'zh', checkIcon: Check },
-              { id: 'en', icon: Languages, label: t('menu.language.en'), checked: langSetting === 'en', checkIcon: Check },
-            ]}
-            onSelect={(id) => setLangSetting(id)}
-            onClose={() => setActiveMenu(null)}
-          />
-        </div>
-
-        {/* 4. 设置 (Settings) */}
-        <div className="relative">
-          <button 
-            onClick={() => handleMenuClick('settings')} 
-            onMouseEnter={() => handleMenuHover('settings')}
-            className={`px-3 py-1 rounded-sm transition-colors ${activeMenu === 'settings' ? 'bg-slate-300/50 dark:bg-white/10 text-black dark:text-white' : 'hover:bg-slate-200 dark:hover:bg-white/5'}`}
-          >
-            {t('menu.settings')}
-          </button>
-          <DropdownMenu 
-            isOpen={activeMenu === 'settings'}
-            items={[
-              { id: 'settings', icon: Settings, label: t('menu.settings.prefs') }
-            ]}
-            onSelect={() => openSettings()}
-            onClose={() => setActiveMenu(null)}
-          />
-        </div>
-        
-        {/* 5. 帮助 (Help) */}
-        <div className="relative">
-          <button 
-            onClick={() => handleMenuClick('help')} 
-            onMouseEnter={() => handleMenuHover('help')}
-            className={`px-3 py-1 rounded-sm transition-colors ${activeMenu === 'help' ? 'bg-slate-300/50 dark:bg-white/10 text-black dark:text-white' : 'hover:bg-slate-200 dark:hover:bg-white/5'}`}
-          >
-            {t('menu.help')}
-          </button>
-          <DropdownMenu 
-            isOpen={activeMenu === 'help'}
-            items={[
-              { id: 'guide', icon: BookOpen, label: t('menu.help.guide') },
-              { id: 'about', icon: Info, label: t('menu.help.about') }
-            ]}
-            onSelect={(id) => id === 'guide' ? openHelp() : openAbout()}
+            isOpen={activeMenu === 'app'}
+            items={appMenuItems}
+            onSelect={handleSelect}
             onClose={() => setActiveMenu(null)}
           />
         </div>

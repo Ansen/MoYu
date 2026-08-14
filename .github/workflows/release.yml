@@ -14,8 +14,11 @@ jobs:
       matrix:
         include:
           - platform: 'macos-latest'
-            args: '--target universal-apple-darwin'
-            target: 'aarch64-apple-darwin,x86_64-apple-darwin'
+            args: '--target aarch64-apple-darwin'
+            target: 'aarch64-apple-darwin'
+          - platform: 'macos-latest'
+            args: '--target x86_64-apple-darwin'
+            target: 'x86_64-apple-darwin'
           - platform: 'ubuntu-22.04'
             args: '--target x86_64-unknown-linux-gnu'
             target: 'x86_64-unknown-linux-gnu'
@@ -26,6 +29,34 @@ jobs:
     runs-on: ${{ matrix.platform }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Generate Release Notes
+        id: release_notes
+        shell: bash
+        run: |
+          BODY=$(git log -1 --pretty=format:"%b")
+          CLEAN_BODY=$(echo "$BODY" | tr -d '[:space:]')
+
+          if [ -n "$CLEAN_BODY" ]; then
+            NOTES="$BODY"
+          else
+            PREV_TAG=$(git describe --tags --abbrev=0 ${{ github.ref_name }}^ 2>/dev/null || true)
+            if [ -n "$PREV_TAG" ]; then
+              NOTES=$(git log ${PREV_TAG}..${{ github.ref_name }} --pretty=format:"- %s" --no-merges)
+            else
+              NOTES=$(git log -1 --pretty=format:"%s")
+            fi
+          fi
+
+          if [ -z "$NOTES" ]; then
+            NOTES="Release ${{ github.ref_name }}"
+          fi
+
+          echo "notes<<__MOYU_CHANGELOG_EOF__" >> $GITHUB_OUTPUT
+          echo "$NOTES" >> $GITHUB_OUTPUT
+          echo "__MOYU_CHANGELOG_EOF__" >> $GITHUB_OUTPUT
 
       - name: setup node
         uses: actions/setup-node@v4
@@ -83,7 +114,7 @@ jobs:
         with:
           tagName: ${{ github.ref_name }}
           releaseName: 'MoYu ${{ github.ref_name }}'
-          releaseBody: 'See the assets to download this version and install.'
+          releaseBody: ${{ steps.release_notes.outputs.notes }}
           releaseDraft: false
           prerelease: false
           includeUpdaterJson: true
@@ -111,6 +142,10 @@ jobs:
     permissions:
       contents: write
     steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
       - name: Generate and Upload latest.json
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -120,6 +155,19 @@ jobs:
           mkdir -p updater
           cd updater
           
+          # Extract commit notes
+          BODY=$(git log -1 --pretty=format:"%b")
+          CLEAN_BODY=$(echo "$BODY" | tr -d '[:space:]')
+          if [ -n "$CLEAN_BODY" ]; then
+            NOTES="$BODY"
+          else
+            NOTES=$(git log -1 --pretty=format:"%s")
+          fi
+          export NOTES
+
+          # Explicitly update GitHub Release description
+          gh release edit "$GITHUB_REF_NAME" --notes "$NOTES" --repo "$GITHUB_REPOSITORY" || true
+
           # Download all signature files (or continue if none found)
           gh release download "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --pattern "*.sig" || true
           
@@ -131,7 +179,7 @@ jobs:
 
             let latest = {
               version: version.replace(/^v/, ''),
-              notes: \`Release \${version}\`,
+              notes: process.env.NOTES || \`Release \${version}\`,
               pub_date: new Date().toISOString(),
               platforms: {}
             };
@@ -148,10 +196,18 @@ jobs:
               const lower = assetName.toLowerCase();
               const url = \`\${downloadBase}/\${assetName}\`;
 
-              if (lower.includes('universal') || lower.includes('darwin') || lower.includes('mac')) {
+              if (lower.includes('aarch64') || lower.includes('arm64')) {
+                latest.platforms['darwin-aarch64'] = { signature, url };
+              } else if (lower.includes('x86_64') || lower.includes('x64')) {
+                if (lower.includes('darwin') || lower.includes('mac') || lower.endsWith('.app.tar.gz')) {
+                  latest.platforms['darwin-x86_64'] = { signature, url };
+                } else if (lower.includes('windows') || lower.includes('setup') || lower.endsWith('.exe') || lower.endsWith('.zip')) {
+                  latest.platforms['windows-x86_64'] = { signature, url };
+                }
+              } else if (lower.includes('universal')) {
                 latest.platforms['darwin-x86_64'] = { signature, url };
                 latest.platforms['darwin-aarch64'] = { signature, url };
-              } else if (lower.includes('x64-setup') || lower.includes('windows') || lower.endsWith('.exe') || lower.endsWith('.zip')) {
+              } else if (lower.includes('windows') || lower.endsWith('.exe') || lower.endsWith('.zip')) {
                 latest.platforms['windows-x86_64'] = { signature, url };
               } else if (lower.includes('amd64') || lower.includes('linux') || lower.endsWith('.appimage')) {
                 latest.platforms['linux-x86_64'] = { signature, url };

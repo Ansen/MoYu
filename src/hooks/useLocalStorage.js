@@ -9,7 +9,7 @@ export function useLocalStorage(key, initialValue) {
       // We assume non-JSON values might just be strings (like 'true', 'false', 'home', etc.)
       try {
         return JSON.parse(item);
-      } catch (e) {
+      } catch {
         return item; // Fallback to raw string
       }
     } catch (error) {

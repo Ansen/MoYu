@@ -107,7 +107,7 @@ export function codesToChinese(codesStr, codeToCharDict) {
 // Auto detection helpers
 export function isMainlyMorse(text) {
   // If string contains mostly dots, dashes, spaces and slashes
-  const filtered = text.replace(/[\.\-\s\/]/g, '');
+  const filtered = text.replace(/[.\-\s/]/g, '');
   return filtered.length < text.length * 0.2;
 }
 

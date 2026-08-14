@@ -8,14 +8,6 @@ export default function ImportDictModal({ isOpen, onClose, onImport }) {
 
   if (!isOpen) return null;
 
-  const txtExample = `中=0001\n国=0002`;
-  const jsonExample = JSON.stringify({
-    charToCode: {
-      "中": "0001",
-      "国": "0002"
-    }
-  }, null, 2);
-
   const handleFileChange = (e) => {
     const file = e.target.files[0];
     if (file) {
@@ -46,7 +38,7 @@ export default function ImportDictModal({ isOpen, onClose, onImport }) {
         {/* Body */}
         <div className="p-6 space-y-5 text-[13px] text-slate-600 dark:text-[#bbbbbb]">
           <p>
-            {t('dict.import.desc').split('.txt').map((part, i, arr) => 
+            {t('dict.import.desc').split('.txt').map((part, i) => 
               i === 0 ? part : 
               i === 1 ? <><span className="font-bold text-slate-700 dark:text-[#ddd]">.txt</span>{part.split('.json')[0]}<span className="font-bold text-slate-700 dark:text-[#ddd]">.json</span>{part.split('.json')[1]}</> : part
             )}

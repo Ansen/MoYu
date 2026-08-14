@@ -1,12 +1,11 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import ReaderHeader from './reader/ReaderHeader';
 import audioPlayer from '../utils/audioPlayer';
-import EpubEngine from './reader/EpubEngine';
 import TxtEngine from './reader/TxtEngine';
 import TocSidebar from './reader/TocSidebar';
 
-export default function Reader({ bookData, onClose, jumpToSibling, onRegenerate }) {
+export default function Reader({ bookData, onClose, jumpToSibling, jumpToChapter, onRegenerate }) {
   const engineRef = useRef(null);
   
   const [isPlaying, setIsPlaying] = useState(false);
@@ -19,11 +18,8 @@ export default function Reader({ bookData, onClose, jumpToSibling, onRegenerate 
   const [baseFontSize, setBaseFontSize] = useState(() => Number(localStorage.getItem('pref_base_font_size') || 20)); // px (baseline at 800px width)
   const [morseSpeed, setMorseSpeed] = useState(() => Number(localStorage.getItem('pref_morse_speed') || 20));
   const [morseFreq, setMorseFreq] = useState(() => Number(localStorage.getItem('pref_morse_freq')) || 380);
-  const [skipTitle, setSkipTitle] = useState(localStorage.getItem('pref_skip_title') !== 'false');
-  const [hideBodyTitle, setHideBodyTitle] = useState(localStorage.getItem('pref_hide_body_title') !== 'false');
   const [numberMode, setNumberMode] = useState(localStorage.getItem('pref_number_mode') || 'long');
   const [useHarmonics, setUseHarmonics] = useState(localStorage.getItem('pref_use_harmonics') === 'true');
-
 
   const [isMoreMenuOpen, setIsMoreMenuOpen] = useState(false);
   const [windowWidth, setWindowWidth] = useState(window.innerWidth);
@@ -56,8 +52,6 @@ export default function Reader({ bookData, onClose, jumpToSibling, onRegenerate 
     localStorage.setItem('pref_base_font_size', baseFontSize.toString());
     localStorage.setItem('pref_morse_speed', morseSpeed);
     localStorage.setItem('pref_morse_freq', morseFreq);
-    localStorage.setItem('pref_skip_title', skipTitle);
-    localStorage.setItem('pref_hide_body_title', hideBodyTitle);
     localStorage.setItem('pref_number_mode', numberMode);
     localStorage.setItem('pref_use_harmonics', useHarmonics);
 
@@ -67,7 +61,7 @@ export default function Reader({ bookData, onClose, jumpToSibling, onRegenerate 
       numberMode: numberMode,
       useHarmonics: useHarmonics
     });
-  }, [baseFontSize, morseSpeed, morseFreq, skipTitle, hideBodyTitle, numberMode, useHarmonics]);
+  }, [baseFontSize, morseSpeed, morseFreq, numberMode, useHarmonics]);
 
   // Click outside to close more menu
   useEffect(() => {
@@ -80,7 +74,7 @@ export default function Reader({ bookData, onClose, jumpToSibling, onRegenerate 
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const togglePlay = async () => {
+  const togglePlay = useCallback(async () => {
     if (isPlaying && !isPaused) {
       audioPlayer.pause();
       setIsPaused(true);
@@ -90,7 +84,7 @@ export default function Reader({ bookData, onClose, jumpToSibling, onRegenerate 
       setIsPaused(false);
     } else {
       if (!engineRef.current) return;
-      const { text, startIndex } = await engineRef.current.getChapterText(skipTitle);
+      const { text, startIndex } = await engineRef.current.getChapterText();
       if (!text.trim()) return;
 
       setIsPlaying(true);
@@ -101,7 +95,7 @@ export default function Reader({ bookData, onClose, jumpToSibling, onRegenerate 
         freq: morseFreq,
         numberMode: numberMode,
         startIndex: startIndex,
-        onCharPlay: (token, idx) => {
+        onCharPlay: (token) => {
           if (engineRef.current) engineRef.current.highlightToken(token);
         },
         onComplete: () => {
@@ -111,9 +105,9 @@ export default function Reader({ bookData, onClose, jumpToSibling, onRegenerate 
         }
       });
     }
-  };
+  }, [isPlaying, isPaused, morseSpeed, morseFreq, numberMode]);
 
-  const stopPlay = () => {
+  const stopPlay = useCallback(() => {
     audioPlayer.stop();
     setIsPlaying(false);
     setIsPaused(false);
@@ -121,34 +115,38 @@ export default function Reader({ bookData, onClose, jumpToSibling, onRegenerate 
       engineRef.current.clearHighlight();
       engineRef.current.saveProgress();
     }
-  };
+  }, []);
 
-  const handleClose = () => {
+  const handleClose = useCallback(() => {
     stopPlay();
     if (engineRef.current) {
       engineRef.current.saveProgress();
     }
     onClose();
-  };
+  }, [stopPlay, onClose]);
 
-  const handleTocClick = (item) => {
+  const handleTocClick = useCallback((item) => {
     stopPlay();
     if (engineRef.current) {
       engineRef.current.jumpTo(item);
     }
-  };
+  }, [stopPlay]);
 
-  const handlePrev = () => {
+  const handlePrev = useCallback(() => {
     stopPlay();
     if (engineRef.current) engineRef.current.prevPage();
-  };
+  }, [stopPlay]);
 
-  const handleNext = () => {
+  const handleNext = useCallback(() => {
     stopPlay();
     if (engineRef.current) engineRef.current.nextPage();
-  };
+  }, [stopPlay]);
 
-  // Keyboard Shortcuts (Space, ArrowLeft, ArrowRight)
+  // Keep latest actions in ref for stable keyboard shortcut listener
+  const actionsRef = useRef({ togglePlay, handlePrev, handleNext });
+  actionsRef.current = { togglePlay, handlePrev, handleNext };
+
+  // Keyboard Shortcuts (Space, ArrowLeft, ArrowRight) - mounted once
   useEffect(() => {
     const handleKeyDown = (e) => {
       // Ignore shortcuts if the user is typing in an input or textarea
@@ -156,19 +154,19 @@ export default function Reader({ bookData, onClose, jumpToSibling, onRegenerate 
 
       if (e.key === ' ' || e.code === 'Space') {
         e.preventDefault();
-        togglePlay();
+        actionsRef.current.togglePlay();
       } else if (e.key === 'ArrowLeft') {
         e.preventDefault();
-        handlePrev();
+        actionsRef.current.handlePrev();
       } else if (e.key === 'ArrowRight') {
         e.preventDefault();
-        handleNext();
+        actionsRef.current.handleNext();
       }
     };
     
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [togglePlay, handlePrev, handleNext]);
+  }, []);
 
   const paginationLabel = engineRef.current && typeof engineRef.current.getPaginationLabel === 'function' ? engineRef.current.getPaginationLabel() : '';
 
@@ -177,8 +175,6 @@ export default function Reader({ bookData, onClose, jumpToSibling, onRegenerate 
       
       {/* 注入滚动条等样式 */}
       <style>{`
-        .epub-container { overflow-x: hidden !important; }
-        
         .custom-scrollbar::-webkit-scrollbar {
           width: 8px;
           height: 8px;
@@ -221,10 +217,6 @@ export default function Reader({ bookData, onClose, jumpToSibling, onRegenerate 
         moreMenuRef={moreMenuRef}
         isMoreMenuOpen={isMoreMenuOpen}
         setIsMoreMenuOpen={setIsMoreMenuOpen}
-        skipTitle={skipTitle}
-        setSkipTitle={setSkipTitle}
-        hideBodyTitle={hideBodyTitle}
-        setHideBodyTitle={setHideBodyTitle}
         useHarmonics={useHarmonics}
         setUseHarmonics={setUseHarmonics}
         numberMode={numberMode}
@@ -251,26 +243,15 @@ export default function Reader({ bookData, onClose, jumpToSibling, onRegenerate 
         <div className="flex-1 flex flex-col relative bg-white dark:bg-[#1e1e1e] border-l border-slate-300 dark:border-[#333333] min-w-0">
           <div className="flex-1 relative">
             <div className="absolute inset-0 px-4 md:px-8">
-              {bookData.type === 'epub' ? (
-                <EpubEngine 
-                  ref={engineRef}
-                  bookData={bookData} 
-                  fontSize={displayFontSize}
-                  hideBodyTitle={hideBodyTitle} 
- 
-                  onTocLoaded={setToc}
-                  onChapterChange={setCurrentChapterTitle}
-                />
-              ) : (
-                <TxtEngine 
-                  ref={engineRef}
-                  bookData={bookData}
-                  fontSize={displayFontSize}
-                  jumpToSibling={jumpToSibling}
-                  onTocLoaded={setToc}
-                  onChapterChange={setCurrentChapterTitle}
-                />
-              )}
+              <TxtEngine 
+                ref={engineRef}
+                bookData={bookData}
+                fontSize={displayFontSize}
+                jumpToSibling={jumpToSibling}
+                jumpToChapter={jumpToChapter}
+                onTocLoaded={setToc}
+                onChapterChange={setCurrentChapterTitle}
+              />
             </div>
           </div>
           

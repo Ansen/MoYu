@@ -7,7 +7,7 @@ import RecentFileItem from '../components/common/RecentFileItem';
 export default function LibraryView({ ebook }) {
   const { 
     bookData, loading, openBookDialog, openFolderDialog, 
-    closeBook, recentFiles, openFileProgrammatically, jumpToSibling,
+    closeBook, recentFiles, openFileProgrammatically, jumpToSibling, jumpToChapter,
     clearRecentFiles, removeRecentFile, loadGeneratedContent
   } = ebook;
   const { t } = useI18n();
@@ -144,6 +144,7 @@ export default function LibraryView({ ebook }) {
           bookData={bookData} 
           onClose={closeBook} 
           jumpToSibling={jumpToSibling}
+          jumpToChapter={jumpToChapter}
           onRegenerate={bookData.isGenerated ? () => loadGeneratedContent(bookData.generatorMode) : undefined}
         />
       )}

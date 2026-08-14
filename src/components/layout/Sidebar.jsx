@@ -1,12 +1,18 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Languages, Library, PanelLeftClose, PanelLeft, Home } from 'lucide-react';
 import { useI18n } from '../../i18n/index';
 import { useResizable } from '../../hooks/useResizable';
+import { getVersion } from '@tauri-apps/api/app';
 
-export default function Sidebar({ currentView, setView }) {
+export default function Sidebar({ currentView, setView, openAbout }) {
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const [version, setVersion] = useState('');
   const { width: sidebarWidth, startResizing } = useResizable(224, 140, 400);
   const { t } = useI18n();
+
+  useEffect(() => {
+    getVersion().then(v => setVersion('v' + v)).catch(() => setVersion('v0.1.4'));
+  }, []);
 
   const menuItems = [
     { id: 'home', icon: <Home size={20} strokeWidth={2} />, label: t('sidebar.home') },
@@ -53,6 +59,28 @@ export default function Sidebar({ currentView, setView }) {
           );
         })}
       </nav>
+
+      {/* Sidebar Footer: Version Badge */}
+      <div className="p-2 border-t border-slate-200/80 dark:border-[#222222] flex items-center justify-center shrink-0">
+        {isCollapsed ? (
+          <button 
+            onClick={openAbout}
+            className="text-[10px] font-mono text-slate-400 dark:text-slate-500 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors"
+            title={t('menu.help.about')}
+          >
+            {version ? version.replace(/\.\d+$/, '') : ''}
+          </button>
+        ) : (
+          <button 
+            onClick={openAbout}
+            className="w-full py-1 rounded-md hover:bg-slate-200/60 dark:hover:bg-[#222222] transition-colors flex items-center justify-between px-2 text-[11px] font-mono text-slate-400 dark:text-slate-500 hover:text-indigo-600 dark:hover:text-indigo-400 group"
+            title={t('menu.help.about')}
+          >
+            <span>MoYu</span>
+            <span className="font-semibold">{version}</span>
+          </button>
+        )}
+      </div>
 
       {/* Resizer Handle */}
       {!isCollapsed && (
