@@ -4,8 +4,10 @@ import ReaderHeader from './reader/ReaderHeader';
 import audioPlayer from '../utils/audioPlayer';
 import TxtEngine from './reader/TxtEngine';
 import TocSidebar from './reader/TocSidebar';
+import { useI18n } from '../i18n';
 
 export default function Reader({ bookData, onClose, jumpToSibling, jumpToChapter, onRegenerate }) {
+  const { t } = useI18n();
   const engineRef = useRef(null);
   
   const [isPlaying, setIsPlaying] = useState(false);
@@ -262,12 +264,12 @@ export default function Reader({ bookData, onClose, jumpToSibling, jumpToChapter
                     {bookData.type === 'epub' ? (
                       <>
                         <BookOpen size={12} className="text-indigo-500" />
-                        <span>EPUB 电子书</span>
+                        <span>{t('reader.doc.epub')}</span>
                       </>
                     ) : (
                       <>
                         <Folder size={12} className="text-amber-500" />
-                        <span>文件夹文档</span>
+                        <span>{t('reader.doc.folder')}</span>
                       </>
                     )}
                   </span>
@@ -284,7 +286,7 @@ export default function Reader({ bookData, onClose, jumpToSibling, jumpToChapter
                         : 'opacity-30 cursor-not-allowed text-slate-400 dark:text-slate-600'
                     }`}
                   >
-                    <ChevronLeft size={13} /> 上一页
+                    <ChevronLeft size={13} /> {t('reader.prev')}
                   </button>
 
                   {paginationLabel && (
@@ -308,19 +310,19 @@ export default function Reader({ bookData, onClose, jumpToSibling, jumpToChapter
                         : 'opacity-30 cursor-not-allowed text-slate-400 dark:text-slate-600'
                     }`}
                   >
-                    下一页 <ChevronRight size={13} />
+                    {t('reader.next')} <ChevronRight size={13} />
                   </button>
                 </div>
 
                 <div className="flex items-center gap-2 text-slate-400 dark:text-[#666666] text-[11px]">
                   <span className="flex items-center gap-1">
                     <kbd className="px-1 py-0.5 rounded bg-slate-200/80 dark:bg-[#252525] text-[10px] font-mono text-slate-600 dark:text-slate-300 border border-slate-300/60 dark:border-[#383838]">← / →</kbd>
-                    <span>翻页</span>
+                    <span>{t('reader.shortcut.flip')}</span>
                   </span>
                   <span className="text-slate-300 dark:text-slate-700">·</span>
                   <span className="flex items-center gap-1">
                     <kbd className="px-1 py-0.5 rounded bg-slate-200/80 dark:bg-[#252525] text-[10px] font-mono text-slate-600 dark:text-slate-300 border border-slate-300/60 dark:border-[#383838]">Space</kbd>
-                    <span>播放</span>
+                    <span>{t('reader.shortcut.play')}</span>
                   </span>
                 </div>
               </>
@@ -330,19 +332,19 @@ export default function Reader({ bookData, onClose, jumpToSibling, jumpToChapter
                 <div className="flex items-center gap-2 text-[11px]">
                   <span className="flex items-center gap-1.5 font-medium text-orange-600 dark:text-orange-400">
                     <Sparkles size={12} />
-                    <span>随机练习报底</span>
+                    <span>{t('reader.doc.generated')}</span>
                   </span>
                   <span className="text-slate-300 dark:text-slate-700">|</span>
-                  <span>{bookData.generatorConfig ? `${bookData.generatorConfig.charsPerGroup || 4} 字/组 · ${bookData.generatorConfig.groupCount || 100} 组` : '100 组'}</span>
+                  <span>{bookData.generatorConfig ? `${bookData.generatorConfig.charsPerGroup || 4} ${t('reader.chars.unit')} · ${bookData.generatorConfig.groupCount || 100} ${t('reader.groups.unit')}` : `100 ${t('reader.groups.unit')}`}</span>
                 </div>
 
                 <div className="font-mono text-slate-500 dark:text-slate-400 text-[11px]">
-                  共 {bookData.data ? bookData.data.replace(/\s+/g, '').length : 0} 字符
+                  {t('reader.stats.totalChars', '共 {count} 字符').replace('{count}', (bookData.data ? bookData.data.replace(/\s+/g, '').length : 0).toLocaleString())}
                 </div>
 
                 <div className="flex items-center gap-1.5 text-slate-400 dark:text-[#666666] text-[11px]">
                   <kbd className="px-1 py-0.5 rounded bg-slate-200/80 dark:bg-[#252525] text-[10px] font-mono text-slate-600 dark:text-slate-300 border border-slate-300/60 dark:border-[#383838]">Space</kbd>
-                  <span>播放 / 暂停</span>
+                  <span>{t('reader.shortcut.playPause')}</span>
                 </div>
               </>
             ) : (
@@ -351,19 +353,19 @@ export default function Reader({ bookData, onClose, jumpToSibling, jumpToChapter
                 <div className="flex items-center gap-2 text-[11px]">
                   <span className="flex items-center gap-1.5 font-medium text-slate-600 dark:text-slate-300">
                     <FileText size={12} className="text-blue-500" />
-                    <span>纯文本文档</span>
+                    <span>{t('reader.doc.txt')}</span>
                   </span>
                   <span className="text-slate-300 dark:text-slate-700">|</span>
                   <span>UTF-8</span>
                 </div>
 
                 <div className="font-mono text-slate-500 dark:text-slate-400 text-[11px]">
-                  共 {bookData.data ? bookData.data.length.toLocaleString() : 0} 字符
+                  {t('reader.stats.totalChars', '共 {count} 字符').replace('{count}', (bookData.data ? bookData.data.length : 0).toLocaleString())}
                 </div>
 
                 <div className="flex items-center gap-1.5 text-slate-400 dark:text-[#666666] text-[11px]">
                   <kbd className="px-1 py-0.5 rounded bg-slate-200/80 dark:bg-[#252525] text-[10px] font-mono text-slate-600 dark:text-slate-300 border border-slate-300/60 dark:border-[#383838]">Space</kbd>
-                  <span>播放 / 暂停</span>
+                  <span>{t('reader.shortcut.playPause')}</span>
                 </div>
               </>
             )}

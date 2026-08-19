@@ -14,6 +14,7 @@ export default function GeneratorModal({ isOpen, onClose, onGenerate }) {
   const [customLengthInput, setCustomLengthInput] = useState('4');
   const [groupCount, setGroupCount] = useState(100);
   const [noAdjacentDup, setNoAdjacentDup] = useState(true);
+  const [previewSeed, setPreviewSeed] = useState(0);
 
   // Recommended length: Letters -> 5 chars, Numbers / Mixed -> 4 chars
   const recommendedLength = useMemo(() => {
@@ -34,7 +35,7 @@ export default function GeneratorModal({ isOpen, onClose, onGenerate }) {
 
   // Derive pool based on preset mode + optional punctuation
   const pool = useMemo(() => {
-    let p = [];
+    const p = [];
     if (presetMode === 'numbers') {
       p.push(...'0123456789'.split(''));
     } else if (presetMode === 'letters') {
@@ -58,6 +59,7 @@ export default function GeneratorModal({ isOpen, onClose, onGenerate }) {
 
   // Live preview snippet
   const previewText = useMemo(() => {
+    if (previewSeed < 0) return '';
     try {
       const sample = generateStructuredRandomContent({
         mode: 'custom',
@@ -72,16 +74,16 @@ export default function GeneratorModal({ isOpen, onClose, onGenerate }) {
       }
     } catch {}
     return '=== 48AK 9B2Z 01XP M7D3 ... iii';
-  }, [pool, effectiveLength, noAdjacentDup]);
+  }, [pool, effectiveLength, noAdjacentDup, previewSeed]);
 
   if (!isOpen) return null;
 
   const handleStart = () => {
-    let typeDesc = '数英混合';
-    if (presetMode === 'numbers') typeDesc = '数码';
-    else if (presetMode === 'letters') typeDesc = '英文';
+    let typeDesc = t('generator.title.mixed');
+    if (presetMode === 'numbers') typeDesc = t('generator.title.numbers');
+    else if (presetMode === 'letters') typeDesc = t('generator.title.letters');
 
-    const suffix = includeSymbols ? '·含标点' : '';
+    const suffix = includeSymbols ? ` ${t('generator.title.withSymbols')}` : '';
     const config = {
       mode: 'custom',
       pool,
@@ -89,7 +91,7 @@ export default function GeneratorModal({ isOpen, onClose, onGenerate }) {
       groupCount,
       allowAdjacentDuplicate: !noAdjacentDup,
       customProfile: true,
-      title: `${typeDesc}报底 (${effectiveLength}字组 · ${groupCount}组${suffix})`
+      title: `${typeDesc} (${effectiveLength} ${t('generator.title.chars')} · ${groupCount} ${t('generator.title.groups')}${suffix})`
     };
 
     onGenerate(config);
@@ -275,7 +277,7 @@ export default function GeneratorModal({ isOpen, onClose, onGenerate }) {
                       : 'border-slate-200 dark:border-[#333333] hover:bg-slate-50 dark:hover:bg-[#252525] text-slate-600 dark:text-slate-400'
                   }`}
                 >
-                  <span>{cnt} 组</span>
+                  <span>{t(`generator.groupCount.${cnt}`)}</span>
                 </button>
               ))}
             </div>
@@ -327,7 +329,7 @@ export default function GeneratorModal({ isOpen, onClose, onGenerate }) {
                 className="flex items-center gap-1 text-[11px] text-orange-600 dark:text-orange-400 hover:underline cursor-pointer"
               >
                 <RefreshCw size={11} />
-                换一组示例
+                <span>{t('generator.preview.refresh')}</span>
               </button>
             </div>
             <div className="p-3 rounded-xl bg-slate-100/90 dark:bg-[#141414] border border-slate-200 dark:border-[#2d2d2d] font-mono text-[13px] text-slate-800 dark:text-slate-200 tracking-wider text-center select-text min-h-[44px] flex items-center justify-center">

@@ -208,7 +208,7 @@ export default function ReaderHeader({
               ? 'border-rose-200 dark:border-rose-900/60 bg-rose-50/80 hover:bg-rose-100 dark:bg-rose-950/30 dark:hover:bg-rose-900/50 text-rose-600 dark:text-rose-400 shadow-2xs active:scale-95 cursor-pointer' 
               : 'border-slate-200 dark:border-[#2d2d2d] bg-slate-100/50 dark:bg-[#181818] text-slate-300 dark:text-[#444444] opacity-60 cursor-not-allowed pointer-events-none'
           }`}
-          title="停止"
+          title={t('reader.stop')}
         >
           <Square size={14} className="fill-current" />
         </button>
