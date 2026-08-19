@@ -296,7 +296,7 @@ export const translations = {
     'generator.groupLength.4': '4 Chars',
     'generator.groupLength.5': '5 Chars',
     'generator.groupLength.custom': 'Custom',
-    'generator.recommended': 'Rec.',
+    'generator.recommended': 'REC',
     'generator.groupCount': 'Practice Group Count',
     'generator.groupCount.50': '50 Groups',
     'generator.groupCount.100': '100 Groups',

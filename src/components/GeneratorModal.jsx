@@ -193,7 +193,7 @@ export default function GeneratorModal({ isOpen, onClose, onGenerate }) {
               <button
                 type="button"
                 onClick={() => { setGroupLength(4); setIsCustomLength(false); }}
-                className={`h-10 px-3 rounded-xl border flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                className={`relative h-10 px-3 rounded-xl border flex items-center justify-center transition-all cursor-pointer ${
                   !isCustomLength && groupLength === 4
                     ? 'border-orange-400 dark:border-orange-500/60 bg-orange-50/70 dark:bg-orange-500/15 text-orange-600 dark:text-orange-400 font-semibold shadow-xs'
                     : 'border-slate-200 dark:border-[#333333] hover:bg-slate-50 dark:hover:bg-[#252525] text-slate-600 dark:text-slate-400'
@@ -201,11 +201,7 @@ export default function GeneratorModal({ isOpen, onClose, onGenerate }) {
               >
                 <span>{t('generator.groupLength.4')}</span>
                 {recommendedLength === 4 && (
-                  <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${
-                    !isCustomLength && groupLength === 4 
-                      ? 'bg-orange-500 text-white' 
-                      : 'bg-orange-100 dark:bg-orange-500/20 text-orange-600 dark:text-orange-400'
-                  }`}>
+                  <span className="absolute -top-2 right-2 px-1.5 py-0.5 rounded-full bg-orange-500 text-white text-[9px] font-bold tracking-tight shadow-xs leading-none">
                     {t('generator.recommended')}
                   </span>
                 )}
@@ -215,7 +211,7 @@ export default function GeneratorModal({ isOpen, onClose, onGenerate }) {
               <button
                 type="button"
                 onClick={() => { setGroupLength(5); setIsCustomLength(false); }}
-                className={`h-10 px-3 rounded-xl border flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                className={`relative h-10 px-3 rounded-xl border flex items-center justify-center transition-all cursor-pointer ${
                   !isCustomLength && groupLength === 5
                     ? 'border-orange-400 dark:border-orange-500/60 bg-orange-50/70 dark:bg-orange-500/15 text-orange-600 dark:text-orange-400 font-semibold shadow-xs'
                     : 'border-slate-200 dark:border-[#333333] hover:bg-slate-50 dark:hover:bg-[#252525] text-slate-600 dark:text-slate-400'
@@ -223,11 +219,7 @@ export default function GeneratorModal({ isOpen, onClose, onGenerate }) {
               >
                 <span>{t('generator.groupLength.5')}</span>
                 {recommendedLength === 5 && (
-                  <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${
-                    !isCustomLength && groupLength === 5 
-                      ? 'bg-orange-500 text-white' 
-                      : 'bg-orange-100 dark:bg-orange-500/20 text-orange-600 dark:text-orange-400'
-                  }`}>
+                  <span className="absolute -top-2 right-2 px-1.5 py-0.5 rounded-full bg-orange-500 text-white text-[9px] font-bold tracking-tight shadow-xs leading-none">
                     {t('generator.recommended')}
                   </span>
                 )}
