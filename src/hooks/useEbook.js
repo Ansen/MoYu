@@ -277,9 +277,30 @@ export function useEbook() {
     setError(null);
   }, []);
 
-  const loadGeneratedContent = useCallback((mode) => {
-    const text = generatePracticeText(mode);
-    const name = mode === 'numbers' ? '随机数码报底' : '随机英语报底';
+  const loadGeneratedContent = useCallback((modeOrConfig) => {
+    let mode = 'numbers';
+    let config = null;
+    let name = '随机数码报底';
+
+    if (typeof modeOrConfig === 'string') {
+      mode = modeOrConfig;
+      if (mode === 'numbers') name = '随机数码报底 (4字组)';
+      else if (mode === 'letters') name = '随机英文报底 (5字组)';
+      else if (mode === 'mixed') name = '随机数英混合报底 (4字组)';
+      else name = '随机报底';
+    } else if (modeOrConfig && typeof modeOrConfig === 'object') {
+      mode = modeOrConfig.mode || 'custom';
+      config = modeOrConfig;
+      if (config.title) {
+        name = config.title;
+      } else if (mode === 'mixed') {
+        name = `随机数英混合报底 (${config.charsPerGroup || 4}字组)`;
+      } else {
+        name = `自定义报底 (${config.charsPerGroup || 4}字组)`;
+      }
+    }
+
+    const text = generatePracticeText(config || mode);
     setBookData({
       type: 'txt',
       data: text,
@@ -287,6 +308,7 @@ export function useEbook() {
       path: `virtual://${mode}`,
       isGenerated: true,
       generatorMode: mode,
+      generatorConfig: config,
       siblings: [],
       currentIndex: 0
     });

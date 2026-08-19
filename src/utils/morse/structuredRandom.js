@@ -1,9 +1,15 @@
-export const GENERATOR_MODE = { NUMBERS: 'numbers', LETTERS: 'letters' };
-import { charToMorse } from './morse'
+export const GENERATOR_MODE = { 
+    NUMBERS: 'numbers', 
+    LETTERS: 'letters',
+    MIXED: 'mixed',
+    CUSTOM: 'custom'
+};
+import { charToMorse } from './morse.js'
 
 export const STRUCTURED_RANDOM_GROUP_LENGTH = {
     [GENERATOR_MODE.NUMBERS]: 4,
     [GENERATOR_MODE.LETTERS]: 5,
+    [GENERATOR_MODE.MIXED]: 4,
 }
 
 const DIGIT_BASE_WEIGHTS = Object.freeze({
@@ -48,6 +54,11 @@ const LETTER_BASE_WEIGHTS = Object.freeze({
     z: 0.915,
 })
 
+const MIXED_BASE_WEIGHTS = Object.freeze({
+    ...DIGIT_BASE_WEIGHTS,
+    ...LETTER_BASE_WEIGHTS
+})
+
 const STRUCTURED_RANDOM_PROFILES = Object.freeze({
     [GENERATOR_MODE.NUMBERS]: {
         pool: '0123456789'.split(''),
@@ -71,12 +82,23 @@ const STRUCTURED_RANDOM_PROFILES = Object.freeze({
         targetDotCountPerGroup: 8.5,
         temperature: 1.05,
     },
+    [GENERATOR_MODE.MIXED]: {
+        pool: '0123456789abcdefghijklmnopqrstuvwxyz'.split(''),
+        baseWeights: MIXED_BASE_WEIGHTS,
+        charsPerGroup: 4,
+        allowAdjacentDuplicate: false,
+        repeatPenalty: 1.6,
+        samePrefixPenalty: 0.45,
+        targetDurationPerGroup: 48.0,
+        targetDotCountPerGroup: 9.2,
+        temperature: 0.95,
+    },
 })
 
 const MORSE_METADATA_CACHE = new Map()
 
 export function isStructuredRandomMode(mode) {
-    return mode === GENERATOR_MODE.NUMBERS || mode === GENERATOR_MODE.LETTERS
+    return mode === GENERATOR_MODE.NUMBERS || mode === GENERATOR_MODE.LETTERS || mode === GENERATOR_MODE.MIXED || mode === GENERATOR_MODE.CUSTOM
 }
 
 export function getStructuredGroupLength(mode, fallback = 4) {
@@ -94,7 +116,26 @@ function shuffle(items, random = Math.random) {
     return out
 }
 
-function getProfile(mode) {
+function getProfile(mode, config = {}) {
+    if (mode === GENERATOR_MODE.CUSTOM || config.customProfile) {
+        const pool = config.pool && config.pool.length > 0 ? config.pool : '0123456789abcdefghijklmnopqrstuvwxyz'.split('');
+        const charsPerGroup = Number(config.charsPerGroup) || 4;
+        const baseWeights = {};
+        pool.forEach(ch => {
+            baseWeights[ch] = DIGIT_BASE_WEIGHTS[ch] || LETTER_BASE_WEIGHTS[ch] || 1;
+        });
+        return {
+            pool,
+            baseWeights,
+            charsPerGroup,
+            allowAdjacentDuplicate: config.allowAdjacentDuplicate ?? false,
+            repeatPenalty: 1.4,
+            samePrefixPenalty: 0.45,
+            targetDurationPerGroup: charsPerGroup * 11.5,
+            targetDotCountPerGroup: charsPerGroup * 2.3,
+            temperature: 0.95,
+        };
+    }
     return STRUCTURED_RANDOM_PROFILES[mode] || null
 }
 
@@ -547,10 +588,56 @@ function scoreLetterCandidate(context) {
     return score
 }
 
+function scoreMixedCandidate(context) {
+    const {
+        profile,
+        candidate,
+        candidateMeta,
+        groupChars,
+        groupMetas,
+        previousMeta,
+        position,
+        charsPerGroup,
+        previousGroup,
+    } = context
+
+    let score = context.score
+
+    if (previousMeta) {
+        const dotDelta = Math.abs(candidateMeta.dotCount - previousMeta.dotCount)
+        const durationDelta = Math.abs(candidateMeta.durationUnits - previousMeta.durationUnits)
+
+        score += dotDelta * 0.6
+        score += Math.min(durationDelta, 8) * 0.08
+
+        if (candidateMeta.startsWith === previousMeta.startsWith) score -= 0.35
+        if (candidateMeta.endsWith === previousMeta.endsWith) score -= 0.15
+        if (candidate === groupChars[groupChars.length - 1]) score -= 1.0
+    }
+
+    if (groupMetas.some(meta => meta.dotCount === candidateMeta.dotCount)) score -= 0.3
+    if (wouldCreateMonotoneDurationRun(groupMetas, candidateMeta)) score -= 0.6
+
+    if (position === charsPerGroup - 1) {
+        const finalMetas = [...groupMetas, candidateMeta]
+        const totalDuration = finalMetas.reduce((sum, meta) => sum + meta.durationUnits, 0)
+        score -= Math.abs(totalDuration - profile.targetDurationPerGroup) * 0.04
+
+        if (previousGroup && previousGroup === [...groupChars, candidate].join('')) {
+            score -= 100
+        }
+    }
+
+    return score
+}
+
 function scoreCandidate(context) {
     const shared = scoreSharedCandidate(context)
     if (context.profile === STRUCTURED_RANDOM_PROFILES[GENERATOR_MODE.NUMBERS]) {
         return scoreNumberCandidate({ ...context, ...shared })
+    }
+    if (context.profile === STRUCTURED_RANDOM_PROFILES[GENERATOR_MODE.MIXED] || context.profile?.charsPerGroup === 4) {
+        return scoreMixedCandidate({ ...context, ...shared })
     }
     return scoreLetterCandidate({ ...context, ...shared })
 }
@@ -668,29 +755,16 @@ function repairRepeatedGroup(group, previousGroup, counts, profile, random = Mat
 
 /**
  * Generate book-style Morse practice groups.
- *
- * The sample books in this repository show two distinct patterns:
- * - number copy: 4-digit groups, no adjacent duplicate digits, and strong
- *   alternation in Morse dot/dash weight to keep the rhythm readable.
- * - letter copy: 5-letter groups with near-uniform letter frequencies and
- *   natural repeated letters still allowed.
- *
- * This generator keeps those two regimes separate:
- * - exact total counts are quota-balanced from sample-informed weights;
- * - digits get Morse-aware scoring so nearby symbols vary in dot count,
- *   duration, and leading sign;
- * - letters stay much closer to plain random while still avoiding pathological
- *   same-group repetition.
  */
 export function generateStructuredRandomContent(config, options = {}) {
-    const { mode, groupCount = 0 } = config
+    const { mode = GENERATOR_MODE.NUMBERS, groupCount = 100 } = config
     if (!isStructuredRandomMode(mode)) return null
 
-    const profile = getProfile(mode)
+    const profile = getProfile(mode, config)
     if (!profile) return null
 
     const random = options.random || Math.random
-    const charsPerGroup = getStructuredGroupLength(mode, config.charsPerGroup || profile.charsPerGroup)
+    const charsPerGroup = Number(config.charsPerGroup) || getStructuredGroupLength(mode, profile.charsPerGroup)
     const totalChars = Math.max(0, groupCount) * charsPerGroup
     const counts = buildQuotaCounts(profile.pool, totalChars, buildWeights(profile, config), random)
     const groups = []
@@ -718,9 +792,15 @@ export function generateStructuredRandomContent(config, options = {}) {
     }
 }
 
-
-export function generatePracticeText(mode) {
-  const config = { mode, groupCount: 100 };
+export function generatePracticeText(modeOrConfig) {
+  let config = {};
+  if (typeof modeOrConfig === 'string') {
+    config = { mode: modeOrConfig, groupCount: 100 };
+  } else if (modeOrConfig && typeof modeOrConfig === 'object') {
+    config = { ...modeOrConfig, groupCount: modeOrConfig.groupCount || 100 };
+  } else {
+    config = { mode: GENERATOR_MODE.NUMBERS, groupCount: 100 };
+  }
   const result = generateStructuredRandomContent(config);
   if (!result || !result.groups) return '';
   const text = result.groups.map(g => g.join('')).join(' ');

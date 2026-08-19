@@ -132,6 +132,7 @@ function App() {
         openSettings={() => setSettingsOpen(true)}
         openHelp={() => setIsHelpModalOpen(true)}
         openAbout={() => setIsAboutOpen(true)}
+        activeDoc={ebook.bookData}
       />
       
       <div className="flex flex-1 min-h-0">

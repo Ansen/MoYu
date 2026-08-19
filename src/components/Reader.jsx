@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Sparkles, FileText, BookOpen, Folder } from 'lucide-react';
 import ReaderHeader from './reader/ReaderHeader';
 import audioPlayer from '../utils/audioPlayer';
 import TxtEngine from './reader/TxtEngine';
@@ -21,7 +21,6 @@ export default function Reader({ bookData, onClose, jumpToSibling, jumpToChapter
   const [numberMode, setNumberMode] = useState(localStorage.getItem('pref_number_mode') || 'long');
   const [useHarmonics, setUseHarmonics] = useState(localStorage.getItem('pref_use_harmonics') === 'true');
 
-  const [isMoreMenuOpen, setIsMoreMenuOpen] = useState(false);
   const [windowWidth, setWindowWidth] = useState(window.innerWidth);
 
   // 纯算法驱动的响应式字号计算：以 800px 宽度为基准 1.0x
@@ -214,9 +213,6 @@ export default function Reader({ bookData, onClose, jumpToSibling, jumpToChapter
         setMorseSpeed={setMorseSpeed}
         morseFreq={morseFreq}
         setMorseFreq={setMorseFreq}
-        moreMenuRef={moreMenuRef}
-        isMoreMenuOpen={isMoreMenuOpen}
-        setIsMoreMenuOpen={setIsMoreMenuOpen}
         useHarmonics={useHarmonics}
         setUseHarmonics={setUseHarmonics}
         numberMode={numberMode}
@@ -255,25 +251,122 @@ export default function Reader({ bookData, onClose, jumpToSibling, jumpToChapter
             </div>
           </div>
           
-          {/* Bottom Paginator */}
-          <div className="h-12 border-t border-slate-200 dark:border-[#333333] bg-slate-50/80 dark:bg-[#252526]/80 backdrop-blur flex items-center justify-center gap-6 shrink-0">
-            <button 
-              onClick={handlePrev}
-              className="px-4 py-1.5 rounded hover:bg-slate-200 dark:hover:bg-[#333333] text-slate-600 dark:text-[#cccccc] flex items-center gap-2 text-[13px] transition-colors"
-            >
-              <ChevronLeft size={16} /> 上一页
-            </button>
-            {paginationLabel && (
-              <span className="text-[12px] text-slate-400 font-mono">
-                {paginationLabel}
-              </span>
+          {/* Bottom Unified Status Bar */}
+          <div className="h-9 border-t border-slate-200 dark:border-[#2d2d2d] bg-slate-50/90 dark:bg-[#181818]/90 backdrop-blur px-4 flex items-center justify-between shrink-0 select-none text-[12px] text-slate-500 dark:text-[#888888]">
+            {((bookData.type === 'epub' && bookData.toc && bookData.toc.length > 1) ||
+              (bookData.siblings && bookData.siblings.length > 1)) ? (
+              /* Multi-Page Pagination Mode */
+              <>
+                <div className="flex items-center gap-2 text-[11px]">
+                  <span className="flex items-center gap-1.5 font-medium text-slate-600 dark:text-slate-300">
+                    {bookData.type === 'epub' ? (
+                      <>
+                        <BookOpen size={12} className="text-indigo-500" />
+                        <span>EPUB 电子书</span>
+                      </>
+                    ) : (
+                      <>
+                        <Folder size={12} className="text-amber-500" />
+                        <span>文件夹文档</span>
+                      </>
+                    )}
+                  </span>
+                </div>
+
+                {/* Classic Centered Pagination Group: [ < 上一页 ] [ 章节 2 / 29 ] [ 下一页 > ] */}
+                <div className="flex items-center gap-3">
+                  <button 
+                    onClick={handlePrev}
+                    disabled={bookData.type === 'epub' ? (bookData.currentChapterIndex <= 0) : (bookData.currentIndex <= 0)}
+                    className={`px-2.5 py-0.5 rounded flex items-center gap-1 transition-colors text-[11px] font-medium ${
+                      (bookData.type === 'epub' ? (bookData.currentChapterIndex > 0) : (bookData.currentIndex > 0))
+                        ? 'hover:bg-slate-200 dark:hover:bg-[#282828] text-slate-700 dark:text-[#cccccc] cursor-pointer'
+                        : 'opacity-30 cursor-not-allowed text-slate-400 dark:text-slate-600'
+                    }`}
+                  >
+                    <ChevronLeft size={13} /> 上一页
+                  </button>
+
+                  {paginationLabel && (
+                    <span className="font-mono text-slate-700 dark:text-[#cccccc] font-medium text-[11px] px-2 py-0.5 rounded bg-slate-200/60 dark:bg-[#252525] border border-slate-300/40 dark:border-[#333333]">
+                      {paginationLabel}
+                    </span>
+                  )}
+
+                  <button 
+                    onClick={handleNext}
+                    disabled={
+                      bookData.type === 'epub'
+                        ? ((bookData.currentChapterIndex || 0) >= (bookData.toc?.length || 1) - 1)
+                        : (bookData.currentIndex >= (bookData.siblings?.length || 1) - 1)
+                    }
+                    className={`px-2.5 py-0.5 rounded flex items-center gap-1 transition-colors text-[11px] font-medium ${
+                      (bookData.type === 'epub'
+                        ? ((bookData.currentChapterIndex || 0) < (bookData.toc?.length || 1) - 1)
+                        : (bookData.currentIndex < (bookData.siblings?.length || 1) - 1))
+                        ? 'hover:bg-slate-200 dark:hover:bg-[#282828] text-slate-700 dark:text-[#cccccc] cursor-pointer'
+                        : 'opacity-30 cursor-not-allowed text-slate-400 dark:text-slate-600'
+                    }`}
+                  >
+                    下一页 <ChevronRight size={13} />
+                  </button>
+                </div>
+
+                <div className="flex items-center gap-2 text-slate-400 dark:text-[#666666] text-[11px]">
+                  <span className="flex items-center gap-1">
+                    <kbd className="px-1 py-0.5 rounded bg-slate-200/80 dark:bg-[#252525] text-[10px] font-mono text-slate-600 dark:text-slate-300 border border-slate-300/60 dark:border-[#383838]">← / →</kbd>
+                    <span>翻页</span>
+                  </span>
+                  <span className="text-slate-300 dark:text-slate-700">·</span>
+                  <span className="flex items-center gap-1">
+                    <kbd className="px-1 py-0.5 rounded bg-slate-200/80 dark:bg-[#252525] text-[10px] font-mono text-slate-600 dark:text-slate-300 border border-slate-300/60 dark:border-[#383838]">Space</kbd>
+                    <span>播放</span>
+                  </span>
+                </div>
+              </>
+            ) : bookData.isGenerated ? (
+              /* Random Generated Morse Practice Mode */
+              <>
+                <div className="flex items-center gap-2 text-[11px]">
+                  <span className="flex items-center gap-1.5 font-medium text-orange-600 dark:text-orange-400">
+                    <Sparkles size={12} />
+                    <span>随机练习报底</span>
+                  </span>
+                  <span className="text-slate-300 dark:text-slate-700">|</span>
+                  <span>{bookData.generatorConfig ? `${bookData.generatorConfig.charsPerGroup || 4} 字/组 · ${bookData.generatorConfig.groupCount || 100} 组` : '100 组'}</span>
+                </div>
+
+                <div className="font-mono text-slate-500 dark:text-slate-400 text-[11px]">
+                  共 {bookData.data ? bookData.data.replace(/\s+/g, '').length : 0} 字符
+                </div>
+
+                <div className="flex items-center gap-1.5 text-slate-400 dark:text-[#666666] text-[11px]">
+                  <kbd className="px-1 py-0.5 rounded bg-slate-200/80 dark:bg-[#252525] text-[10px] font-mono text-slate-600 dark:text-slate-300 border border-slate-300/60 dark:border-[#383838]">Space</kbd>
+                  <span>播放 / 暂停</span>
+                </div>
+              </>
+            ) : (
+              /* Single File TXT Mode */
+              <>
+                <div className="flex items-center gap-2 text-[11px]">
+                  <span className="flex items-center gap-1.5 font-medium text-slate-600 dark:text-slate-300">
+                    <FileText size={12} className="text-blue-500" />
+                    <span>纯文本文档</span>
+                  </span>
+                  <span className="text-slate-300 dark:text-slate-700">|</span>
+                  <span>UTF-8</span>
+                </div>
+
+                <div className="font-mono text-slate-500 dark:text-slate-400 text-[11px]">
+                  共 {bookData.data ? bookData.data.length.toLocaleString() : 0} 字符
+                </div>
+
+                <div className="flex items-center gap-1.5 text-slate-400 dark:text-[#666666] text-[11px]">
+                  <kbd className="px-1 py-0.5 rounded bg-slate-200/80 dark:bg-[#252525] text-[10px] font-mono text-slate-600 dark:text-slate-300 border border-slate-300/60 dark:border-[#383838]">Space</kbd>
+                  <span>播放 / 暂停</span>
+                </div>
+              </>
             )}
-            <button 
-              onClick={handleNext}
-              className="px-4 py-1.5 rounded hover:bg-slate-200 dark:hover:bg-[#333333] text-slate-600 dark:text-[#cccccc] flex items-center gap-2 text-[13px] transition-colors"
-            >
-              下一页 <ChevronRight size={16} />
-            </button>
           </div>
         </div>
 

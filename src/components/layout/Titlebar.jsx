@@ -1,10 +1,10 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useI18n } from '../../i18n/index';
 import DropdownMenu from '../common/DropdownMenu';
-import { Sun, Moon, Monitor, Languages, Type, Settings, Info, Check, BookOpen, Minus, Square, Copy, X as CloseIcon, ChevronDown } from 'lucide-react';
+import { Sun, Moon, Monitor, Languages, Type, Settings, Info, Check, BookOpen, Minus, Square, Copy, X as CloseIcon, ChevronDown, Sparkles, Folder, FileText } from 'lucide-react';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 
-export default function Titlebar({ theme, setTheme, openSettings, openHelp, openAbout }) {
+export default function Titlebar({ theme, setTheme, openSettings, openHelp, openAbout, activeDoc }) {
   const [activeMenu, setActiveMenu] = useState(null);
   const [isMaximized, setIsMaximized] = useState(false);
   const menubarRef = useRef(null);
@@ -41,9 +41,9 @@ export default function Titlebar({ theme, setTheme, openSettings, openHelp, open
     else if (id === 'theme-system') setTheme('system');
     else if (id === 'theme-light') setTheme('light');
     else if (id === 'theme-dark') setTheme('dark');
-    else if (id === 'lang-system') setLangSetting('system');
-    else if (id === 'lang-zh') setLangSetting('zh');
-    else if (id === 'lang-en') setLangSetting('en');
+    else if (langSetting && id === 'lang-system') setLangSetting('system');
+    else if (langSetting && id === 'lang-zh') setLangSetting('zh');
+    else if (langSetting && id === 'lang-en') setLangSetting('en');
     else if (id === 'guide') openHelp();
     else if (id === 'about') openAbout();
   };
@@ -89,7 +89,7 @@ export default function Titlebar({ theme, setTheme, openSettings, openHelp, open
       >
         
         {/* App Brand Menu: [logo] 摩语 ▾ */}
-        <div className="relative">
+        <div className="relative shrink-0">
           <button 
             onClick={() => setActiveMenu(activeMenu === 'app' ? null : 'app')} 
             className={`px-2 py-1 rounded flex items-center gap-1.5 transition-colors ${activeMenu === 'app' ? 'bg-slate-200 dark:bg-white/10 text-black dark:text-white' : 'hover:bg-slate-100 dark:hover:bg-white/5'}`}
@@ -107,14 +107,59 @@ export default function Titlebar({ theme, setTheme, openSettings, openHelp, open
           />
         </div>
         
-        {/* Spacer for drag region */}
+        {/* Center Document Title / Drag Region with Strict Overflow Protection */}
         <div 
-          className="flex-1 h-full" 
+          className="flex-1 h-full flex items-center justify-center min-w-0 px-2 sm:px-4 overflow-hidden" 
           data-tauri-drag-region
-        ></div>
+        >
+          {activeDoc && (
+            <div 
+              className="flex items-center gap-1.5 text-[12px] text-slate-500 dark:text-slate-400 font-medium min-w-0 max-w-full select-none pointer-events-none animate-in fade-in duration-150"
+              title={
+                [
+                  activeDoc.folderName ? `${activeDoc.folderName} /` : '',
+                  activeDoc.name,
+                  activeDoc.currentChapterLabel ? `· ${activeDoc.currentChapterLabel}` : ''
+                ].filter(Boolean).join(' ')
+              }
+            >
+              {activeDoc.isGenerated ? (
+                <Sparkles size={13} className="text-orange-500 shrink-0" />
+              ) : activeDoc.type === 'epub' ? (
+                <BookOpen size={13} className="text-indigo-500 shrink-0" />
+              ) : activeDoc.isFolder ? (
+                <Folder size={13} className="text-amber-500 shrink-0" />
+              ) : (
+                <FileText size={13} className="text-blue-500 shrink-0" />
+              )}
+              
+              {activeDoc.isFolder && activeDoc.folderName && (
+                <>
+                  <span className="truncate max-w-[120px] shrink min-w-0 opacity-75">
+                    {activeDoc.folderName}
+                  </span>
+                  <span className="text-slate-400 dark:text-slate-600 shrink-0">/</span>
+                </>
+              )}
+              
+              <span className="text-slate-800 dark:text-[#e0e0e0] truncate font-semibold shrink min-w-0">
+                {activeDoc.name}
+              </span>
 
-        {/* Window Controls (Custom Native Titlebar) */}
-        <div className="flex h-full items-center">
+              {activeDoc.currentChapterLabel && activeDoc.type === 'epub' && (
+                <>
+                  <span className="text-slate-400 dark:text-slate-600 shrink-0">·</span>
+                  <span className="truncate max-w-[140px] text-slate-600 dark:text-slate-400 font-normal shrink min-w-0">
+                    {activeDoc.currentChapterLabel}
+                  </span>
+                </>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Window Controls (Custom Native Titlebar): Protected with shrink-0 */}
+        <div className="flex h-full items-center shrink-0">
           <button 
             onClick={() => getCurrentWindow().minimize()}
             className="h-full px-3.5 hover:bg-slate-200 dark:hover:bg-[#333] transition-colors flex items-center justify-center text-slate-600 dark:text-slate-400"
