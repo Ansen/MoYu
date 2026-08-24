@@ -813,48 +813,186 @@ function repairRepeatedGroup(group, previousGroup, counts, profile, random = Mat
     return repaired
 }
 
-const CALLSIGN_PREFIX_POOL = [
-    // China
-    'BG', 'BG', 'BG', 'BH', 'BH', 'BH', 'BD', 'BA', 'BY', 'VR2', 'XX9',
-    // USA
-    'W', 'W', 'K', 'K', 'N', 'AA', 'AB', 'AC', 'AE', 'AF', 'WA', 'WB', 'WC', 'WD', 'KA', 'KB', 'KC', 'KD', 'KE', 'KF', 'KG', 'KI', 'KJ', 'KK', 'KL', 'KM', 'KN', 'KO', 'KP', 'KQ', 'KR', 'KS', 'KT', 'KU', 'KV', 'KW', 'KX', 'KY', 'KZ', 'NA',
-    // Japan
-    'JA', 'JA', 'JH', 'JR', 'JE', 'JF', 'JG', 'JI', 'JJ', 'JK', 'JL', 'JM', 'JN', 'JO', 'JP', 'JQ', 'JS', '7K', '7L', '7M', '7N',
-    // Europe
-    'DL', 'DK', 'DF', 'DG', 'DH', 'G', 'M', '2E', 'F', 'I', 'IK', 'IZ', 'EA', 'EB', 'EC', 'S5', '9A', 'OH', 'SM', 'SP', 'OK', 'OM', 'HA', 'YO', 'LZ', 'SV', 'OE', 'HB9',
-    // Asia/Americas/DX
-    'VK', 'ZL', 'PY', 'LU', 'VE', 'VA', '9V1', '9M2', '4X', '4Z', '3A2', 'HL', 'DS', 'BV', 'RA', 'RU', 'RX', 'UA'
-];
+// ITU RR Art 19.68 Forbidden Suffixes (Q-codes QRA-QUZ & Distress signals SOS, XXX, TTT)
+const FORBIDDEN_SUFFIXES = new Set([
+    'SOS', 'XXX', 'TTT',
+    'QRA', 'QRB', 'QRC', 'QRD', 'QRE', 'QRF', 'QRG', 'QRH', 'QRI', 'QRJ', 'QRK', 'QRL', 'QRM', 'QRN', 'QRO', 'QRP', 'QRQ', 'QRR', 'QRS', 'QRT', 'QRU', 'QRV', 'QRW', 'QRX', 'QRY', 'QRZ',
+    'QSA', 'QSB', 'QSC', 'QSD', 'QSE', 'QSF', 'QSG', 'QSH', 'QSI', 'QSJ', 'QSK', 'QSL', 'QSM', 'QSN', 'QSO', 'QSP', 'QSQ', 'QSR', 'QSS', 'QST', 'QSU', 'QSV', 'QSW', 'QSX', 'QSY', 'QSZ',
+    'QTA', 'QTB', 'QTC', 'QTD', 'QTE', 'QTF', 'QTG', 'QTH', 'QTI', 'QTJ', 'QTK', 'QTL', 'QTM', 'QTN', 'QTO', 'QTP', 'QTQ', 'QTR', 'QTS', 'QTT', 'QTU', 'QTV', 'QTW', 'QTX', 'QTY', 'QTZ',
+    'QUA', 'QUB', 'QUC', 'QUD', 'QUE', 'QUF', 'QUG', 'QUH', 'QUI', 'QUJ', 'QUK', 'QUL', 'QUM', 'QUN', 'QUO', 'QUP', 'QUQ', 'QUR', 'QUS', 'QUT', 'QUU', 'QUV', 'QUW', 'QUX', 'QUY', 'QUZ'
+])
+
+const CALLSIGN_PREFIX_WEIGHTED = [
+    // China (CRAC Allocations) ~35%
+    { prefix: 'BG', weight: 12, needDigit: true },
+    { prefix: 'BH', weight: 10, needDigit: true },
+    { prefix: 'BD', weight: 5,  needDigit: true },
+    { prefix: 'BA', weight: 3,  needDigit: true },
+    { prefix: 'BY', weight: 3,  needDigit: true },
+    { prefix: 'BI', weight: 1,  needDigit: true },
+    { prefix: 'VR2', weight: 2, needDigit: false },
+    { prefix: 'XX9', weight: 1, needDigit: false },
+
+    // USA (FCC Part 97 Allocations) ~25%
+    { prefix: 'W', weight: 5,  needDigit: true },
+    { prefix: 'K', weight: 5,  needDigit: true },
+    { prefix: 'N', weight: 4,  needDigit: true },
+    { prefix: 'AA', weight: 1, needDigit: true },
+    { prefix: 'AB', weight: 1, needDigit: true },
+    { prefix: 'AC', weight: 1, needDigit: true },
+    { prefix: 'AD', weight: 1, needDigit: true },
+    { prefix: 'AF', weight: 1, needDigit: true },
+    { prefix: 'AG', weight: 1, needDigit: true },
+    { prefix: 'WA', weight: 2, needDigit: true },
+    { prefix: 'WB', weight: 2, needDigit: true },
+    { prefix: 'KA', weight: 2, needDigit: true },
+    { prefix: 'KB', weight: 2, needDigit: true },
+    { prefix: 'KC', weight: 2, needDigit: true },
+    { prefix: 'KD', weight: 2, needDigit: true },
+    { prefix: 'KE', weight: 1, needDigit: true },
+    { prefix: 'KF', weight: 1, needDigit: true },
+    { prefix: 'KG', weight: 1, needDigit: true },
+    { prefix: 'KI', weight: 1, needDigit: true },
+    { prefix: 'KJ', weight: 1, needDigit: true },
+    { prefix: 'KK', weight: 1, needDigit: true },
+    { prefix: 'KL', weight: 1, needDigit: true },
+    { prefix: 'KM', weight: 1, needDigit: true },
+    { prefix: 'KN', weight: 1, needDigit: true },
+    { prefix: 'KO', weight: 1, needDigit: true },
+    { prefix: 'KP', weight: 1, needDigit: true },
+    { prefix: 'KQ', weight: 1, needDigit: true },
+    { prefix: 'KR', weight: 1, needDigit: true },
+    { prefix: 'KS', weight: 1, needDigit: true },
+    { prefix: 'KT', weight: 1, needDigit: true },
+    { prefix: 'KU', weight: 1, needDigit: true },
+    { prefix: 'KV', weight: 1, needDigit: true },
+    { prefix: 'KW', weight: 1, needDigit: true },
+    { prefix: 'KX', weight: 1, needDigit: true },
+    { prefix: 'KY', weight: 1, needDigit: true },
+    { prefix: 'KZ', weight: 1, needDigit: true },
+
+    // Japan (JARL Allocations) ~15%
+    { prefix: 'JA', weight: 4, needDigit: true },
+    { prefix: 'JH', weight: 2, needDigit: true },
+    { prefix: 'JR', weight: 2, needDigit: true },
+    { prefix: 'JE', weight: 1, needDigit: true },
+    { prefix: 'JF', weight: 1, needDigit: true },
+    { prefix: 'JG', weight: 1, needDigit: true },
+    { prefix: 'JI', weight: 1, needDigit: true },
+    { prefix: 'JJ', weight: 1, needDigit: true },
+    { prefix: 'JK', weight: 1, needDigit: true },
+    { prefix: 'JL', weight: 1, needDigit: true },
+    { prefix: 'JM', weight: 1, needDigit: true },
+    { prefix: 'JN', weight: 1, needDigit: true },
+    { prefix: 'JO', weight: 1, needDigit: true },
+    { prefix: 'JP', weight: 1, needDigit: true },
+    { prefix: 'JQ', weight: 1, needDigit: true },
+    { prefix: 'JS', weight: 1, needDigit: true },
+    { prefix: '7K', weight: 1, needDigit: true },
+    { prefix: '7L', weight: 1, needDigit: true },
+    { prefix: '7M', weight: 1, needDigit: true },
+    { prefix: '7N', weight: 1, needDigit: true },
+
+    // Europe & Global DX ~25%
+    { prefix: 'DL', weight: 3, needDigit: true },
+    { prefix: 'DK', weight: 2, needDigit: true },
+    { prefix: 'DF', weight: 2, needDigit: true },
+    { prefix: 'DG', weight: 1, needDigit: true },
+    { prefix: 'DH', weight: 1, needDigit: true },
+    { prefix: 'DO', weight: 1, needDigit: true },
+    { prefix: 'G',  weight: 3, needDigit: true },
+    { prefix: 'M',  weight: 2, needDigit: true },
+    { prefix: '2E', weight: 1, needDigit: true },
+    { prefix: 'F',  weight: 2, needDigit: true },
+    { prefix: 'I',  weight: 2, needDigit: true },
+    { prefix: 'IK', weight: 1, needDigit: true },
+    { prefix: 'IZ', weight: 1, needDigit: true },
+    { prefix: 'EA', weight: 2, needDigit: true },
+    { prefix: 'EB', weight: 1, needDigit: true },
+    { prefix: 'OH', weight: 1, needDigit: true },
+    { prefix: 'SM', weight: 1, needDigit: true },
+    { prefix: 'SP', weight: 1, needDigit: true },
+    { prefix: 'OK', weight: 1, needDigit: true },
+    { prefix: 'OM', weight: 1, needDigit: true },
+    { prefix: 'HA', weight: 1, needDigit: true },
+    { prefix: 'YO', weight: 1, needDigit: true },
+    { prefix: 'LZ', weight: 1, needDigit: true },
+    { prefix: 'SV', weight: 1, needDigit: true },
+    { prefix: 'OE', weight: 1, needDigit: true },
+    { prefix: 'S5', weight: 1, needDigit: true },
+    { prefix: '9A', weight: 1, needDigit: true },
+    { prefix: 'HB9', weight: 1, needDigit: false },
+    { prefix: '4X', weight: 1, needDigit: true },
+    { prefix: '4Z', weight: 1, needDigit: true },
+    { prefix: '9V1', weight: 1, needDigit: false },
+    { prefix: '9M2', weight: 1, needDigit: false },
+    { prefix: 'VK', weight: 2, needDigit: true },
+    { prefix: 'ZL', weight: 1, needDigit: true },
+    { prefix: 'PY', weight: 2, needDigit: true },
+    { prefix: 'LU', weight: 1, needDigit: true },
+    { prefix: 'VE', weight: 2, needDigit: true },
+    { prefix: 'VA', weight: 1, needDigit: true },
+    { prefix: 'RA', weight: 2, needDigit: true },
+    { prefix: 'RU', weight: 2, needDigit: true },
+    { prefix: 'RX', weight: 2, needDigit: true },
+    { prefix: 'UA', weight: 2, needDigit: true },
+]
+
+const TOTAL_PREFIX_WEIGHT = CALLSIGN_PREFIX_WEIGHTED.reduce((sum, item) => sum + item.weight, 0)
 
 const PORTABLE_SUFFIX_POOL = [
     '/1', '/2', '/3', '/4', '/5', '/6', '/7', '/8', '/9', '/0',
-    '/P', '/P', '/M', '/M', '/QRP', '/MM', '/AM'
-];
+    '/P', '/P', '/P', '/M', '/M', '/QRP', '/MM', '/AM'
+]
+
+function generateValidSuffix(suffixLen, random = Math.random) {
+    const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
+    for (let attempt = 0; attempt < 30; attempt++) {
+        let suf = ''
+        for (let i = 0; i < suffixLen; i++) {
+            suf += letters[Math.floor(random() * letters.length)]
+        }
+        if (!FORBIDDEN_SUFFIXES.has(suf)) {
+            return suf
+        }
+    }
+    return 'ABC'
+}
 
 function generateSingleCallsign(includeSuffix = false, random = Math.random) {
-    const prefix = CALLSIGN_PREFIX_POOL[Math.floor(random() * CALLSIGN_PREFIX_POOL.length)];
-    let digitStr = '';
-    if (!/[0-9]$/.test(prefix)) {
-        digitStr = String(Math.floor(random() * 10));
+    let r = random() * TOTAL_PREFIX_WEIGHT
+    let item = CALLSIGN_PREFIX_WEIGHTED[0]
+    for (const p of CALLSIGN_PREFIX_WEIGHTED) {
+        if (r < p.weight) {
+            item = p
+            break
+        }
+        r -= p.weight
     }
 
-    const roll = random();
-    const suffixLen = roll < 0.70 ? 3 : (roll < 0.95 ? 2 : 1);
+    const prefix = item.prefix
+    let digitStr = ''
 
-    const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
-    let suffix = '';
-    for (let i = 0; i < suffixLen; i++) {
-        suffix += letters[Math.floor(random() * letters.length)];
+    if (item.needDigit && !/[0-9]$/.test(prefix)) {
+        if (prefix.startsWith('B')) {
+            digitStr = random() < 0.95 ? String(1 + Math.floor(random() * 9)) : '0'
+        } else {
+            digitStr = String(Math.floor(random() * 10))
+        }
     }
 
-    let callsign = `${prefix}${digitStr}${suffix}`;
+    const roll = random()
+    const suffixLen = roll < 0.65 ? 3 : (roll < 0.90 ? 2 : 1)
+    const suffix = generateValidSuffix(suffixLen, random)
 
-    if (includeSuffix && random() < 0.25) {
-        const pSuffix = PORTABLE_SUFFIX_POOL[Math.floor(random() * PORTABLE_SUFFIX_POOL.length)];
-        callsign += pSuffix;
+    let callsign = `${prefix}${digitStr}${suffix}`
+
+    if (includeSuffix && random() < 0.20) {
+        const pSuffix = PORTABLE_SUFFIX_POOL[Math.floor(random() * PORTABLE_SUFFIX_POOL.length)]
+        callsign += pSuffix
     }
 
-    return callsign;
+    return callsign
 }
 
 export function generateCallsignsContent(config = {}, options = {}) {
