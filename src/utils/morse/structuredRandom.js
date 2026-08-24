@@ -10,7 +10,7 @@ import { charToMorse } from './morse.js'
 export const STRUCTURED_RANDOM_GROUP_LENGTH = {
     [GENERATOR_MODE.NUMBERS]: 4,
     [GENERATOR_MODE.LETTERS]: 5,
-    [GENERATOR_MODE.MIXED]: 4,
+    [GENERATOR_MODE.MIXED]: 5,
     [GENERATOR_MODE.CALLSIGNS]: 5,
 }
 
@@ -87,12 +87,12 @@ const STRUCTURED_RANDOM_PROFILES = Object.freeze({
     [GENERATOR_MODE.MIXED]: {
         pool: '0123456789abcdefghijklmnopqrstuvwxyz'.split(''),
         baseWeights: MIXED_BASE_WEIGHTS,
-        charsPerGroup: 4,
+        charsPerGroup: 5,
         allowAdjacentDuplicate: false,
         repeatPenalty: 1.6,
         samePrefixPenalty: 0.45,
-        targetDurationPerGroup: 48.0,
-        targetDotCountPerGroup: 9.2,
+        targetDurationPerGroup: 55.0,
+        targetDotCountPerGroup: 10.5,
         temperature: 0.95,
     },
 })
@@ -433,6 +433,12 @@ function scoreGroupPermutation(chars, previousGroup, profile) {
     const metas = chars.map(char => getMorseMetadata(char))
     let score = 0
 
+    const hasLetters = chars.some(c => /[a-z]/i.test(c))
+    if (hasLetters) {
+        if (/[0-9]/.test(chars[0])) score -= 3.5
+        if (/[0-9]/.test(chars[chars.length - 1])) score -= 3.5
+    }
+
     for (let i = 1; i < metas.length; i++) {
         const prev = metas[i - 1]
         const current = metas[i]
@@ -643,6 +649,14 @@ function scoreMixedCandidate(context) {
     } = context
 
     let score = context.score
+
+    if (/[0-9]/.test(candidate)) {
+        if (position === 0 || position === charsPerGroup - 1) {
+            score -= 3.5
+        } else {
+            score += 2.5
+        }
+    }
 
     if (previousMeta) {
         const dotDelta = Math.abs(candidateMeta.dotCount - previousMeta.dotCount)

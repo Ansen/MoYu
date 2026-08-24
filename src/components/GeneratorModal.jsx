@@ -10,17 +10,17 @@ export default function GeneratorModal({ isOpen, onClose, onGenerate }) {
   const [presetMode, setPresetMode] = useState('mixed');
   const [includeSymbols, setIncludeSymbols] = useState(false);
   const [includeCallsignSuffix, setIncludeCallsignSuffix] = useState(false);
-  const [groupLength, setGroupLength] = useState(4);
+  const [groupLength, setGroupLength] = useState(5);
   const [isCustomLength, setIsCustomLength] = useState(false);
-  const [customLengthInput, setCustomLengthInput] = useState('4');
+  const [customLengthInput, setCustomLengthInput] = useState('5');
   const [maxDigitsPerGroup, setMaxDigitsPerGroup] = useState(1);
   const [groupCount, setGroupCount] = useState(100);
   const [noAdjacentDup, setNoAdjacentDup] = useState(true);
   const [previewSeed, setPreviewSeed] = useState(0);
 
-  // Recommended length: Letters -> 5 chars, Numbers / Mixed -> 4 chars
+  // Recommended length: Letters & Mixed -> 5 chars, Numbers -> 4 chars
   const recommendedLength = useMemo(() => {
-    if (presetMode === 'letters') return 5;
+    if (presetMode === 'letters' || presetMode === 'mixed') return 5;
     return 4;
   }, [presetMode]);
 
@@ -28,7 +28,7 @@ export default function GeneratorModal({ isOpen, onClose, onGenerate }) {
   const handleSelectPresetMode = (mode) => {
     setPresetMode(mode);
     setIsCustomLength(false);
-    if (mode === 'letters') {
+    if (mode === 'letters' || mode === 'mixed') {
       setGroupLength(5);
     } else {
       setGroupLength(4);
