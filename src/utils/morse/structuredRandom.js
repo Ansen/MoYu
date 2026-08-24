@@ -2,6 +2,7 @@ export const GENERATOR_MODE = {
     NUMBERS: 'numbers', 
     LETTERS: 'letters',
     MIXED: 'mixed',
+    CALLSIGNS: 'callsigns',
     CUSTOM: 'custom'
 };
 import { charToMorse } from './morse.js'
@@ -10,6 +11,7 @@ export const STRUCTURED_RANDOM_GROUP_LENGTH = {
     [GENERATOR_MODE.NUMBERS]: 4,
     [GENERATOR_MODE.LETTERS]: 5,
     [GENERATOR_MODE.MIXED]: 4,
+    [GENERATOR_MODE.CALLSIGNS]: 5,
 }
 
 const DIGIT_BASE_WEIGHTS = Object.freeze({
@@ -98,7 +100,7 @@ const STRUCTURED_RANDOM_PROFILES = Object.freeze({
 const MORSE_METADATA_CACHE = new Map()
 
 export function isStructuredRandomMode(mode) {
-    return mode === GENERATOR_MODE.NUMBERS || mode === GENERATOR_MODE.LETTERS || mode === GENERATOR_MODE.MIXED || mode === GENERATOR_MODE.CUSTOM
+    return mode === GENERATOR_MODE.NUMBERS || mode === GENERATOR_MODE.LETTERS || mode === GENERATOR_MODE.MIXED || mode === GENERATOR_MODE.CALLSIGNS || mode === GENERATOR_MODE.CUSTOM
 }
 
 export function getStructuredGroupLength(mode, fallback = 4) {
@@ -189,7 +191,7 @@ function buildWeights(profile, config) {
     return weights
 }
 
-function buildQuotaCounts(pool, totalChars, weights, random = Math.random) {
+function buildQuotaCounts(pool, totalChars, weights, random = Math.random, maxAllowedDigits = Infinity) {
     if (totalChars <= 0) {
         return new Map(pool.map(char => [char, 0]))
     }
@@ -202,6 +204,7 @@ function buildQuotaCounts(pool, totalChars, weights, random = Math.random) {
             char,
             count,
             remainder: exact - count,
+            isDigit: /[0-9]/.test(char),
         }
     })
 
@@ -209,6 +212,30 @@ function buildQuotaCounts(pool, totalChars, weights, random = Math.random) {
     const byRemainder = shuffle(quotas, random).sort((a, b) => b.remainder - a.remainder)
     for (let i = 0; assigned < totalChars; i++, assigned++) {
         byRemainder[i % byRemainder.length].count++
+    }
+
+    if (Number.isFinite(maxAllowedDigits)) {
+        let currentTotalDigits = quotas.filter(q => q.isDigit).reduce((sum, q) => sum + q.count, 0)
+        if (currentTotalDigits > maxAllowedDigits) {
+            let excessDigits = currentTotalDigits - maxAllowedDigits
+            const digitQuotas = quotas.filter(q => q.isDigit && q.count > 0)
+            while (excessDigits > 0 && digitQuotas.length > 0) {
+                digitQuotas.sort((a, b) => b.count - a.count)
+                digitQuotas[0].count--
+                excessDigits--
+            }
+
+            const nonDigitQuotas = quotas.filter(q => !q.isDigit)
+            if (nonDigitQuotas.length > 0) {
+                let toDistribute = currentTotalDigits - maxAllowedDigits
+                let idx = 0
+                while (toDistribute > 0) {
+                    nonDigitQuotas[idx % nonDigitQuotas.length].count++
+                    idx++
+                    toDistribute--
+                }
+            }
+        }
     }
 
     return new Map(quotas.map(item => [item.char, item.count]))
@@ -234,10 +261,15 @@ function hasNonAdjacentAlternative(candidates, previousChar) {
     return candidates.some(char => char !== previousChar)
 }
 
-function listCandidates(counts, previousChar, allowAdjacentDuplicate) {
+function listCandidates(counts, previousChar, allowAdjacentDuplicate, currentDigitCount = 0, maxDigitsPerGroup = null) {
     const candidates = []
     for (const [char, count] of counts.entries()) {
-        if (count > 0) candidates.push(char)
+        if (count > 0) {
+            if (maxDigitsPerGroup !== null && maxDigitsPerGroup !== undefined && /[0-9]/.test(char) && currentDigitCount >= maxDigitsPerGroup) {
+                continue
+            }
+            candidates.push(char)
+        }
     }
 
     if (allowAdjacentDuplicate || !previousChar || !hasNonAdjacentAlternative(candidates, previousChar)) {
@@ -247,19 +279,24 @@ function listCandidates(counts, previousChar, allowAdjacentDuplicate) {
     return candidates.filter(char => char !== previousChar)
 }
 
-function canCompleteGroup(prefix, counts, remainingSlots, profile) {
+function canCompleteGroup(prefix, counts, remainingSlots, profile, maxDigitsPerGroup = null) {
     if (profile.allowAdjacentDuplicate) return true
     if (hasAdjacentDuplicate(prefix)) return false
     if (remainingSlots <= 0) return true
 
+    const currentDigitCount = prefix.filter(ch => /[0-9]/.test(ch)).length
+    if (maxDigitsPerGroup !== null && maxDigitsPerGroup !== undefined && currentDigitCount > maxDigitsPerGroup) {
+        return false
+    }
+
     const previousChar = prefix[prefix.length - 1] || ''
-    const candidates = listCandidates(counts, previousChar, profile.allowAdjacentDuplicate)
+    const candidates = listCandidates(counts, previousChar, profile.allowAdjacentDuplicate, currentDigitCount, maxDigitsPerGroup)
     for (const candidate of candidates) {
         const currentCount = counts.get(candidate) || 0
         if (currentCount <= 0) continue
 
         counts.set(candidate, currentCount - 1)
-        if (canCompleteGroup([...prefix, candidate], counts, remainingSlots - 1, profile)) {
+        if (canCompleteGroup([...prefix, candidate], counts, remainingSlots - 1, profile, maxDigitsPerGroup)) {
             counts.set(candidate, currentCount)
             return true
         }
@@ -269,7 +306,7 @@ function canCompleteGroup(prefix, counts, remainingSlots, profile) {
     return false
 }
 
-function filterFeasibleCandidates(candidates, counts, groupChars, profile, charsPerGroup) {
+function filterFeasibleCandidates(candidates, counts, groupChars, profile, charsPerGroup, maxDigitsPerGroup = null) {
     if (profile.allowAdjacentDuplicate) {
         return candidates
     }
@@ -281,7 +318,7 @@ function filterFeasibleCandidates(candidates, counts, groupChars, profile, chars
 
         const nextCounts = new Map(counts)
         nextCounts.set(candidate, currentCount - 1)
-        return canCompleteGroup([...groupChars, candidate], nextCounts, remainingSlots, profile)
+        return canCompleteGroup([...groupChars, candidate], nextCounts, remainingSlots, profile, maxDigitsPerGroup)
     })
 
     if (feasible.length > 0) {
@@ -289,13 +326,17 @@ function filterFeasibleCandidates(candidates, counts, groupChars, profile, chars
     }
 
     const previousChar = groupChars[groupChars.length - 1] || ''
+    const currentDigitCount = groupChars.filter(ch => /[0-9]/.test(ch)).length
     const reserveCounts = new Map(profile.pool.map(char => [char, charsPerGroup]))
     const emergencyCandidates = profile.pool
         .filter(candidate => profile.allowAdjacentDuplicate || candidate !== previousChar)
         .filter(candidate => {
+            if (maxDigitsPerGroup !== null && maxDigitsPerGroup !== undefined && /[0-9]/.test(candidate) && currentDigitCount >= maxDigitsPerGroup) {
+                return false
+            }
             const nextCounts = new Map(reserveCounts)
             nextCounts.set(candidate, Math.max(0, (nextCounts.get(candidate) || 0) - 1))
-            return canCompleteGroup([...groupChars, candidate], nextCounts, remainingSlots, profile)
+            return canCompleteGroup([...groupChars, candidate], nextCounts, remainingSlots, profile, maxDigitsPerGroup)
         })
 
     return emergencyCandidates.length > 0 ? emergencyCandidates : candidates
@@ -675,17 +716,20 @@ function buildGroup({
     charsPerGroup,
     previousGroup,
     random = Math.random,
+    maxDigitsPerGroup = null,
 }) {
     const groupChars = []
 
     for (let position = 0; position < charsPerGroup; position++) {
         const previousChar = groupChars[groupChars.length - 1] || ''
+        const currentDigitCount = groupChars.filter(ch => /[0-9]/.test(ch)).length
         const candidates = filterFeasibleCandidates(
-            listCandidates(counts, previousChar, profile.allowAdjacentDuplicate),
+            listCandidates(counts, previousChar, profile.allowAdjacentDuplicate, currentDigitCount, maxDigitsPerGroup),
             counts,
             groupChars,
             profile,
             charsPerGroup,
+            maxDigitsPerGroup,
         )
         if (candidates.length === 0) break
 
@@ -712,7 +756,7 @@ function buildGroup({
     return normalizeGroupOrder(groupChars, previousGroup, profile, random)
 }
 
-function repairRepeatedGroup(group, previousGroup, counts, profile, random = Math.random) {
+function repairRepeatedGroup(group, previousGroup, counts, profile, random = Math.random, maxDigitsPerGroup = null) {
     if (!previousGroup || group.join('') !== previousGroup || group.length === 0) {
         return group
     }
@@ -723,8 +767,10 @@ function repairRepeatedGroup(group, previousGroup, counts, profile, random = Mat
         counts.set(current, (counts.get(current) || 0) + 1)
 
         const prefix = repaired.slice(0, index)
+        const suffix = repaired.slice(index + 1)
+        const otherDigits = prefix.filter(c => /[0-9]/.test(c)).length + suffix.filter(c => /[0-9]/.test(c)).length
         const previousChar = prefix[prefix.length - 1] || ''
-        const candidates = listCandidates(counts, previousChar, profile.allowAdjacentDuplicate)
+        const candidates = listCandidates(counts, previousChar, profile.allowAdjacentDuplicate, otherDigits, maxDigitsPerGroup)
             .filter(candidate => candidate !== current)
         if (candidates.length > 0) {
             const scoredCandidates = candidates.map(candidate => ({
@@ -753,6 +799,70 @@ function repairRepeatedGroup(group, previousGroup, counts, profile, random = Mat
     return repaired
 }
 
+const CALLSIGN_PREFIX_POOL = [
+    // China
+    'BG', 'BG', 'BG', 'BH', 'BH', 'BH', 'BD', 'BA', 'BY', 'VR2', 'XX9',
+    // USA
+    'W', 'W', 'K', 'K', 'N', 'AA', 'AB', 'AC', 'AE', 'AF', 'WA', 'WB', 'WC', 'WD', 'KA', 'KB', 'KC', 'KD', 'KE', 'KF', 'KG', 'KI', 'KJ', 'KK', 'KL', 'KM', 'KN', 'KO', 'KP', 'KQ', 'KR', 'KS', 'KT', 'KU', 'KV', 'KW', 'KX', 'KY', 'KZ', 'NA',
+    // Japan
+    'JA', 'JA', 'JH', 'JR', 'JE', 'JF', 'JG', 'JI', 'JJ', 'JK', 'JL', 'JM', 'JN', 'JO', 'JP', 'JQ', 'JS', '7K', '7L', '7M', '7N',
+    // Europe
+    'DL', 'DK', 'DF', 'DG', 'DH', 'G', 'M', '2E', 'F', 'I', 'IK', 'IZ', 'EA', 'EB', 'EC', 'S5', '9A', 'OH', 'SM', 'SP', 'OK', 'OM', 'HA', 'YO', 'LZ', 'SV', 'OE', 'HB9',
+    // Asia/Americas/DX
+    'VK', 'ZL', 'PY', 'LU', 'VE', 'VA', '9V1', '9M2', '4X', '4Z', '3A2', 'HL', 'DS', 'BV', 'RA', 'RU', 'RX', 'UA'
+];
+
+const PORTABLE_SUFFIX_POOL = [
+    '/1', '/2', '/3', '/4', '/5', '/6', '/7', '/8', '/9', '/0',
+    '/P', '/P', '/M', '/M', '/QRP', '/MM', '/AM'
+];
+
+function generateSingleCallsign(includeSuffix = false, random = Math.random) {
+    const prefix = CALLSIGN_PREFIX_POOL[Math.floor(random() * CALLSIGN_PREFIX_POOL.length)];
+    let digitStr = '';
+    if (!/[0-9]$/.test(prefix)) {
+        digitStr = String(Math.floor(random() * 10));
+    }
+
+    const roll = random();
+    const suffixLen = roll < 0.70 ? 3 : (roll < 0.95 ? 2 : 1);
+
+    const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+    let suffix = '';
+    for (let i = 0; i < suffixLen; i++) {
+        suffix += letters[Math.floor(random() * letters.length)];
+    }
+
+    let callsign = `${prefix}${digitStr}${suffix}`;
+
+    if (includeSuffix && random() < 0.25) {
+        const pSuffix = PORTABLE_SUFFIX_POOL[Math.floor(random() * PORTABLE_SUFFIX_POOL.length)];
+        callsign += pSuffix;
+    }
+
+    return callsign;
+}
+
+export function generateCallsignsContent(config = {}, options = {}) {
+    const { groupCount = 100, includeCallsignSuffix = false } = config;
+    const random = options.random || Math.random;
+    const groups = [];
+    const allChars = [];
+
+    for (let i = 0; i < groupCount; i++) {
+        const cs = generateSingleCallsign(includeCallsignSuffix, random);
+        const chars = cs.split('');
+        groups.push(chars);
+        allChars.push(...chars);
+    }
+
+    return {
+        groups,
+        allChars,
+        totalChars: allChars.length
+    };
+}
+
 /**
  * Generate book-style Morse practice groups.
  */
@@ -760,13 +870,26 @@ export function generateStructuredRandomContent(config, options = {}) {
     const { mode = GENERATOR_MODE.NUMBERS, groupCount = 100 } = config
     if (!isStructuredRandomMode(mode)) return null
 
+    if (mode === GENERATOR_MODE.CALLSIGNS) {
+        return generateCallsignsContent(config, options);
+    }
+
     const profile = getProfile(mode, config)
     if (!profile) return null
 
     const random = options.random || Math.random
     const charsPerGroup = Number(config.charsPerGroup) || getStructuredGroupLength(mode, profile.charsPerGroup)
+
+    let maxDigitsPerGroup = null
+    if (config.maxDigitsPerGroup !== undefined && config.maxDigitsPerGroup !== null) {
+        maxDigitsPerGroup = Math.max(1, Math.min(charsPerGroup - 1, Number(config.maxDigitsPerGroup)))
+    } else if (mode === GENERATOR_MODE.MIXED || (config.pool && config.pool.some(c => /[0-9]/.test(c)) && config.pool.some(c => /[a-z]/i.test(c)))) {
+        maxDigitsPerGroup = Math.max(1, Math.min(charsPerGroup - 1, 1))
+    }
+
     const totalChars = Math.max(0, groupCount) * charsPerGroup
-    const counts = buildQuotaCounts(profile.pool, totalChars, buildWeights(profile, config), random)
+    const maxAllowedDigits = (maxDigitsPerGroup !== null) ? groupCount * maxDigitsPerGroup : Infinity
+    const counts = buildQuotaCounts(profile.pool, totalChars, buildWeights(profile, config), random, maxAllowedDigits)
     const groups = []
     const allChars = []
     let previousGroup = ''
@@ -778,8 +901,9 @@ export function generateStructuredRandomContent(config, options = {}) {
             charsPerGroup,
             previousGroup,
             random,
+            maxDigitsPerGroup,
         })
-        const repaired = repairRepeatedGroup(group, previousGroup, counts, profile, random)
+        const repaired = repairRepeatedGroup(group, previousGroup, counts, profile, random, maxDigitsPerGroup)
         groups.push(repaired)
         allChars.push(...repaired)
         previousGroup = repaired.join('')

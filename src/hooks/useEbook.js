@@ -287,6 +287,7 @@ export function useEbook() {
       if (mode === 'numbers') name = '随机数码报底 (4字组)';
       else if (mode === 'letters') name = '随机英文报底 (5字组)';
       else if (mode === 'mixed') name = '随机数英混合报底 (4字组)';
+      else if (mode === 'callsigns') name = '无线电呼号报底 (100组)';
       else name = '随机报底';
     } else if (modeOrConfig && typeof modeOrConfig === 'object') {
       mode = modeOrConfig.mode || 'custom';
@@ -295,6 +296,8 @@ export function useEbook() {
         name = config.title;
       } else if (mode === 'mixed') {
         name = `随机数英混合报底 (${config.charsPerGroup || 4}字组)`;
+      } else if (mode === 'callsigns') {
+        name = `无线电呼号报底 (${config.groupCount || 100}组)`;
       } else {
         name = `自定义报底 (${config.charsPerGroup || 4}字组)`;
       }

@@ -34,9 +34,15 @@ export function I18nProvider({ children }) {
     }
   }, [langSetting]);
 
-  const t = (key) => {
+  const t = (key, params) => {
     const dict = translations[activeLang] || translations['zh'];
-    return dict[key] || key;
+    let str = dict[key] || key;
+    if (params && typeof params === 'object') {
+      Object.keys(params).forEach(k => {
+        str = str.replace(new RegExp(`\\{${k}\\}`, 'g'), params[k]);
+      });
+    }
+    return str;
   };
 
   return (

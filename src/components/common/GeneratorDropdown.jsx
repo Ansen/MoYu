@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Dices, Shuffle, CaseSensitive, SlidersHorizontal, ChevronDown, Sparkles } from 'lucide-react';
+import { Dices, Shuffle, CaseSensitive, SlidersHorizontal, ChevronDown, Sparkles, Radio } from 'lucide-react';
 import { useI18n } from '../../i18n';
 
 export default function GeneratorDropdown({ 
@@ -128,6 +128,25 @@ export default function GeneratorDropdown({
                 </div>
                 <div className="text-[11px] text-slate-400 dark:text-[#888888]">
                   {t('library.gen.mixed.desc')}
+                </div>
+              </div>
+            </button>
+
+            {/* Callsigns: Realistic ITU Callsigns standard */}
+            <button
+              type="button"
+              onClick={() => handleSelect('callsigns')}
+              className="w-full flex items-start gap-3 px-2.5 py-2 rounded-lg text-left hover:bg-orange-50 dark:hover:bg-orange-500/10 transition-colors group cursor-pointer"
+            >
+              <div className="p-1.5 rounded-md bg-orange-100/70 dark:bg-orange-500/20 text-orange-600 dark:text-orange-400 mt-0.5 shrink-0 group-hover:scale-105 transition-transform">
+                <Radio size={15} />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="text-[13px] font-medium text-slate-800 dark:text-[#dddddd] group-hover:text-orange-600 dark:group-hover:text-orange-400">
+                  {t('library.gen.callsigns')}
+                </div>
+                <div className="text-[11px] text-slate-400 dark:text-[#888888]">
+                  {t('library.gen.callsigns.desc')}
                 </div>
               </div>
             </button>
