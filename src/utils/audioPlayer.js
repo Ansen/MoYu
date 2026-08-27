@@ -63,6 +63,8 @@ class DesktopAudioPlayer {
                 dummySource.buffer = dummyBuffer
                 dummySource.connect(this.audioContext.destination)
                 dummySource.start(0)
+                // 等待系统音频硬件苏醒，防止立刻播放导致开头吞字
+                await new Promise(r => setTimeout(r, 150))
                 this.isWarmedUp = true
             } catch (e) {
                 console.warn('Audio pre-warm error:', e)

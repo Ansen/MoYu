@@ -1,0 +1,80 @@
+name: 'Android Build'
+
+on:
+  workflow_dispatch:
+    inputs:
+      build_type:
+        description: 'Build Type'
+        required: true
+        default: 'release'
+        type: choice
+        options:
+          - release
+          - debug
+
+jobs:
+  build-android:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Java JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+
+      - name: Setup Android NDK
+        uses: nttld/setup-ndk@v1
+        with:
+          ndk-version: r26b
+
+      - name: Set NDK Environment Variable
+        run: echo "NDK_HOME=$ANDROID_NDK_HOME" >> $GITHUB_ENV
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+
+      - name: Install pnpm
+        run: npm install -g pnpm
+
+      - name: Install frontend dependencies
+        run: pnpm install
+
+      - name: Install Rust stable & Android targets
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android,armv7-linux-androideabi,i686-linux-android,x86_64-linux-android
+
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: './src-tauri -> target'
+
+      - name: Inject cdylib into Cargo.toml
+        shell: bash
+        run: |
+          node -e "
+            const fs = require('fs');
+            let cargo = fs.readFileSync('src-tauri/Cargo.toml', 'utf8');
+            cargo = cargo.replace(/crate-type = \[\"staticlib\", \"rlib\"\]/, 'crate-type = [\"staticlib\", \"cdylib\", \"rlib\"]');
+            fs.writeFileSync('src-tauri/Cargo.toml', cargo);
+          "
+
+      - name: Init Android Project & Build APK
+        run: |
+          pnpm tauri android init
+          if [ "${{ inputs.build_type }}" = "debug" ]; then
+            pnpm tauri android build --apk --debug
+          else
+            pnpm tauri android build --apk
+          fi
+
+      - name: Upload Android APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: MoYu-Android-APKs
+          path: src-tauri/gen/android/app/build/outputs/apk/**/*.apk
+          if-no-files-found: error

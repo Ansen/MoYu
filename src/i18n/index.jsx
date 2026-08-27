@@ -1,10 +1,29 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { translations } from './locales';
 
-const I18nContext = createContext();
+const defaultTranslate = (key, params) => {
+  const dict = translations['zh'] || {};
+  let str = dict[key] || key;
+  if (params && typeof params === 'object') {
+    Object.keys(params).forEach(k => {
+      str = str.replace(new RegExp(`\\{${k}\\}`, 'g'), params[k]);
+    });
+  }
+  return str;
+};
+
+const defaultContextValue = {
+  t: defaultTranslate,
+  langSetting: 'system',
+  setLangSetting: () => {},
+  activeLang: 'zh'
+};
+
+const I18nContext = createContext(defaultContextValue);
 
 export function useI18n() {
-  return useContext(I18nContext);
+  const context = useContext(I18nContext);
+  return context || defaultContextValue;
 }
 
 export function I18nProvider({ children }) {

@@ -7,9 +7,8 @@ export default function ReaderHeader({
   handleClose,
   isTocOpen,
   setIsTocOpen,
-  displayFontSize,
+  baseFontSize,
   setBaseFontSize,
-  fontScale,
   morseSpeed,
   setMorseSpeed,
   morseFreq,
@@ -22,7 +21,8 @@ export default function ReaderHeader({
   isPaused,
   togglePlay,
   stopPlay,
-  onRegenerate
+  onRegenerate,
+  isAudioReady = true,
 }) {
   const { t } = useI18n();
   const [isNumberModeOpen, setIsNumberModeOpen] = useState(false);
@@ -72,13 +72,16 @@ export default function ReaderHeader({
             <input
               type="number"
               min="10"
-              max="60"
-              value={displayFontSize}
+              max="120"
+              value={Math.round(baseFontSize)}
               onChange={(e) => {
-                const val = Math.max(10, Math.min(60, Number(e.target.value) || 20));
-                setBaseFontSize(Math.round(val / fontScale));
+                const num = parseInt(e.target.value, 10);
+                if (!isNaN(num)) {
+                  const val = Math.max(10, Math.min(120, num));
+                  setBaseFontSize(val);
+                }
               }}
-              className="w-10 text-[12px] text-center bg-white dark:bg-[#2a2a2a] border border-slate-300 dark:border-[#3a3a3a] rounded px-1 font-mono focus:outline-hidden text-slate-700 dark:text-[#cccccc]"
+              className="w-12 text-[12px] text-center bg-white dark:bg-[#2a2a2a] border border-slate-300 dark:border-[#3a3a3a] rounded px-1 font-mono focus:outline-hidden text-slate-700 dark:text-[#cccccc]"
             />
           </div>
 
@@ -110,7 +113,7 @@ export default function ReaderHeader({
               step="10"
               value={morseFreq}
               onChange={(e) => setMorseFreq(Math.max(100, Math.min(1500, Number(e.target.value) || 380)))}
-              className="w-12 text-[12px] text-center bg-white dark:bg-[#2a2a2a] border border-slate-300 dark:border-[#3a3a3a] rounded px-1 font-mono focus:outline-hidden text-slate-700 dark:text-[#cccccc]"
+              className="w-[50px] text-[12px] text-center bg-white dark:bg-[#2a2a2a] border border-slate-300 dark:border-[#3a3a3a] rounded px-1 font-mono focus:outline-hidden text-slate-700 dark:text-[#cccccc]"
             />
             <span className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">Hz</span>
           </div>
@@ -174,13 +177,14 @@ export default function ReaderHeader({
           <button
             type="button"
             onClick={() => setUseHarmonics(!useHarmonics)}
-            className={`flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[11px] font-medium transition-all cursor-pointer whitespace-nowrap select-none ${useHarmonics
-              ? 'bg-indigo-600 dark:bg-indigo-500 text-white shadow-2xs'
-              : 'bg-white dark:bg-[#2a2a2a] border border-slate-300 dark:border-[#3a3a3a] text-slate-600 dark:text-[#cccccc] hover:border-indigo-400 dark:hover:border-indigo-500/50 hover:text-indigo-600 dark:hover:text-indigo-400'
-              }`}
+            className={`h-6 flex items-center gap-1.5 px-2 rounded text-[12px] font-medium transition-all cursor-pointer whitespace-nowrap select-none border ${
+              useHarmonics
+                ? 'bg-indigo-50/80 dark:bg-indigo-950/40 border-indigo-300 dark:border-indigo-700/60 text-indigo-600 dark:text-indigo-400 shadow-2xs'
+                : 'bg-white dark:bg-[#2a2a2a] border-slate-300 dark:border-[#3a3a3a] text-slate-500 dark:text-slate-400 hover:border-slate-400 dark:hover:border-[#4a4a4a] hover:text-slate-700 dark:hover:text-[#dddddd]'
+            }`}
             title={useHarmonics ? `${t('reader.harmonics')} (已开启)` : t('reader.harmonics.desc')}
           >
-            <Radio size={12} className={useHarmonics ? "text-white" : "text-slate-400 shrink-0"} />
+            <Radio size={12} className={useHarmonics ? "text-indigo-500 dark:text-indigo-400 shrink-0" : "text-slate-400 shrink-0"} />
             <span>{t('reader.harmonics.short')}</span>
           </button>
         </div>
@@ -217,25 +221,24 @@ export default function ReaderHeader({
         <button
           onMouseDown={(e) => e.preventDefault()}
           onClick={togglePlay}
+          disabled={!isAudioReady}
           className={`w-[84px] h-[34px] rounded-lg font-medium flex items-center justify-center gap-1.5 shrink-0 transition-all shadow-xs active:scale-95 cursor-pointer select-none text-[13px] ${
-            isPlaying && !isPaused
+            !isAudioReady
+              ? 'bg-slate-300 dark:bg-[#333333] text-white cursor-not-allowed opacity-60'
+              : (isPlaying && !isPaused
               ? 'bg-amber-500 hover:bg-amber-600 text-white shadow-amber-500/20'
               : isPaused
               ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-500/20'
-              : 'bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600 text-white shadow-indigo-500/20'
+              : 'bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600 text-white shadow-indigo-500/20')
           }`}
         >
           {isPlaying && !isPaused ? (
-            <Pause size={14} className="fill-current" />
+            <Pause size={14} className="stroke-[2.5]" />
           ) : (
-            <Play size={14} className="fill-current" />
+            <Play size={14} className="stroke-[2.5] ml-0.5" />
           )}
           <span>
-            {isPlaying && !isPaused
-              ? t('reader.pause')
-              : isPaused
-              ? t('reader.resume')
-              : t('reader.play')}
+            {!isAudioReady ? t('reader.initializing') : (isPlaying && !isPaused ? t('reader.pause') : isPaused ? t('reader.resume') : t('reader.play'))}
           </span>
         </button>
       </div>

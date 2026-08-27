@@ -123,8 +123,9 @@ const TxtEngine = forwardRef(({ bookData, fontSize, onTocLoaded, onChapterChange
       if (viewer) {
         saveReadingProgress(key, viewer.scrollTop);
       }
+      clearHighlight();
     };
-  }, [getProgressKey]);
+  }, [getProgressKey, clearHighlight]);
 
   useImperativeHandle(ref, () => ({
     getChapterText: async () => {
@@ -213,7 +214,7 @@ const TxtEngine = forwardRef(({ bookData, fontSize, onTocLoaded, onChapterChange
     <div 
       ref={viewerRef}
       onScroll={handleTxtScroll}
-      className="w-full h-full overflow-y-auto overflow-x-hidden py-8 text-slate-800 dark:text-[#cccccc] whitespace-pre-wrap font-medium [text-rendering:optimizeLegibility] [&::-webkit-scrollbar]:hidden select-text"
+      className="w-full h-full overflow-y-auto overflow-x-hidden py-8 text-slate-800 dark:text-[#cccccc] whitespace-pre-wrap font-medium [text-rendering:optimizeLegibility] [&::-webkit-scrollbar]:hidden select-text relative"
       style={{ 
         fontSize: `${fontSize}px`, 
         lineHeight: 1.8,

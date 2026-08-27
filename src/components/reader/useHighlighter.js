@@ -14,7 +14,7 @@ export default function useHighlighter(onScrollRequest) {
           doc.defaultView.CSS.highlights.delete('morse-active');
           doc.defaultView.CSS.highlights.delete('morse-played');
         }
-        const overlay = doc.getElementById('morse-active-overlay');
+        const overlay = textRootRef.current.querySelector('#morse-active-overlay') || doc.getElementById('morse-active-overlay');
         if (overlay) overlay.remove();
       }
     } catch (e) {
@@ -61,24 +61,31 @@ export default function useHighlighter(onScrollRequest) {
     }
 
     if (targetRange) {
+      const rect = targetRange.getBoundingClientRect();
+      const char = targetNode.nodeValue[targetOffset];
+
       const doc = textRootRef.current.ownerDocument;
       const win = doc.defaultView;
-      
-      const scrollX = win ? (win.scrollX || win.pageXOffset) : (doc.documentElement?.scrollLeft || doc.body?.scrollLeft || 0);
-      const scrollY = win ? (win.scrollY || win.pageYOffset) : (doc.documentElement?.scrollTop || doc.body?.scrollTop || 0);
-      
-      // Apply morse-played highlight to text before the current token
+
+      // Apply morse-played and morse-active highlights
       if (win && win.CSS && win.CSS.highlights && nodes.length > 0) {
         try {
           const playedRange = doc.createRange();
           playedRange.setStart(nodes[0].node, 0);
           playedRange.setEnd(targetNode, targetOffset);
           win.CSS.highlights.set('morse-played', new win.Highlight(playedRange));
+          
+          if (char && char !== '\n' && char !== '\r') {
+            win.CSS.highlights.set('morse-active', new win.Highlight(targetRange));
+          } else {
+            win.CSS.highlights.delete('morse-active');
+          }
         } catch {}
       }
 
-      // ALWAYS use DOM overlay because CSS.highlights silently fails in some WebView2 versions for background color
-      let overlay = doc.getElementById('morse-active-overlay');
+      // Use DOM overlay inside the scroll container for guaranteed fallback visibility
+      const container = textRootRef.current;
+      let overlay = container.querySelector('#morse-active-overlay') || doc.getElementById('morse-active-overlay');
       if (!overlay) {
         overlay = doc.createElement('div');
         overlay.id = 'morse-active-overlay';
@@ -86,29 +93,36 @@ export default function useHighlighter(onScrollRequest) {
         overlay.style.backgroundColor = 'rgba(251, 146, 60, 0.4)';
         overlay.style.borderBottom = '2px solid #ea580c';
         overlay.style.pointerEvents = 'none';
-        overlay.style.zIndex = '99999';
-        overlay.style.transition = 'all 0.05s linear';
-        if (doc.body) doc.body.appendChild(overlay);
-      }
-      
-      const rect = targetRange.getBoundingClientRect();
-      const char = targetNode.nodeValue[targetOffset];
-      
-      // Do not update dimensions/position or show overlay for newlines to prevent jumping
-      if (char === '\n' || char === '\r') {
-        overlay.style.opacity = '0';
+        overlay.style.zIndex = '50';
+        overlay.style.transition = 'none';
+        container.appendChild(overlay);
       } else {
-        overlay.style.opacity = '1';
-        if (rect.width > 0 && rect.height > 0) {
-          overlay.style.left = (rect.left + scrollX) + 'px';
-          overlay.style.top = (rect.top + scrollY) + 'px';
-          overlay.style.width = rect.width + 'px';
-          overlay.style.height = rect.height + 'px';
+        overlay.style.transition = 'none';
+        if (overlay.parentElement !== container) {
+          container.appendChild(overlay);
         }
       }
+      
+      const containerRect = container.getBoundingClientRect();
+      
+      // Do not show overlay for newlines, or invalid zero rects
+      if (!char || char === '\n' || char === '\r' || rect.width <= 0 || rect.height <= 0) {
+        overlay.style.opacity = '0';
+      } else {
+        const left = rect.left - containerRect.left + container.scrollLeft;
+        const top = rect.top - containerRect.top + container.scrollTop;
+
+        overlay.style.left = left + 'px';
+        overlay.style.top = top + 'px';
+        overlay.style.width = rect.width + 'px';
+        overlay.style.height = rect.height + 'px';
+        overlay.style.opacity = '1';
+      }
         
-      // Request parent to handle scroll if needed
+      // Request parent to handle auto-scroll if needed
       if (onScrollRequest) {
+        const scrollX = win ? (win.scrollX || win.pageXOffset) : (doc.documentElement?.scrollLeft || doc.body?.scrollLeft || 0);
+        const scrollY = win ? (win.scrollY || win.pageYOffset) : (doc.documentElement?.scrollTop || doc.body?.scrollTop || 0);
         onScrollRequest(rect, targetRange, win, doc, scrollY, scrollX, overlay);
       }
     }

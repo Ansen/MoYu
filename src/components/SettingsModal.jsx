@@ -6,7 +6,7 @@ export default function SettingsModal({ isOpen, onClose }) {
   const [morseSpeed, setMorseSpeed] = useState(20);
   const [morseFreq, setMorseFreq] = useState(700);
   const [startupBehavior, setStartupBehavior] = useState('restore');
-  
+
   const { t } = useI18n();
 
   // 模拟读取保存的设置
@@ -23,7 +23,7 @@ export default function SettingsModal({ isOpen, onClose }) {
     localStorage.setItem('pref_morse_speed', morseSpeed);
     localStorage.setItem('pref_morse_freq', morseFreq);
     localStorage.setItem('pref_startup', startupBehavior);
-    
+
     // 通知其他组件设置已更改
     window.dispatchEvent(new Event('moyu_settings_changed'));
     onClose();
@@ -45,7 +45,7 @@ export default function SettingsModal({ isOpen, onClose }) {
 
         {/* Modal Body */}
         <div className="p-6 space-y-6 text-[13px] text-slate-700 dark:text-[#cccccc]">
-          
+
           {/* Startup Behavior */}
           <div className="space-y-2">
             <label className="font-bold block">{t('settings.startup')}</label>

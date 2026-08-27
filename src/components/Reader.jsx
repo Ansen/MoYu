@@ -23,27 +23,43 @@ export default function Reader({ bookData, onClose, jumpToSibling, jumpToChapter
   const [numberMode, setNumberMode] = useState(localStorage.getItem('pref_number_mode') || 'long');
   const [useHarmonics, setUseHarmonics] = useState(localStorage.getItem('pref_use_harmonics') === 'true');
 
-  const [windowWidth, setWindowWidth] = useState(window.innerWidth);
+  const [windowSize, setWindowSize] = useState({ width: window.innerWidth, height: window.innerHeight });
 
-  // 纯算法驱动的响应式字号计算：以 800px 宽度为基准 1.0x
-  const fontScale = Math.max(0.5, windowWidth / 800);
+  // 纯算法驱动的响应式字号计算：为了保证放大/缩小窗口时，文本在屏幕中的面积占比（铺满率）恒定
+  // 使用几何平均值(面积的平方根)替代单维度的宽度线性缩放。以 800x600 为基准 1.0x
+  const currentGeo = Math.sqrt(windowSize.width * windowSize.height);
+  const baseGeo = Math.sqrt(800 * 600);
+  const fontScale = Math.max(0.5, currentGeo / baseGeo);
   const displayFontSize = Math.round(baseFontSize * fontScale);
+
+  const [isAudioReady, setIsAudioReady] = useState(false);
 
   useEffect(() => {
     let timeout;
     const handleResize = () => {
       clearTimeout(timeout);
       timeout = setTimeout(() => {
-        setWindowWidth(window.innerWidth);
-      }, 150);
+        setWindowSize({ width: window.innerWidth, height: window.innerHeight });
+      }, 50);
     };
     window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      clearTimeout(timeout);
+    };
   }, []);
 
   // 进入阅读器页面时提前预热 AudioContext，避免点击播放时声卡驱动冷启动导致开头卡顿/断续
   useEffect(() => {
-    audioPlayer.init().catch(() => {});
+    let isMounted = true;
+    audioPlayer.init()
+      .then(() => { if (isMounted) setIsAudioReady(true); })
+      .catch(() => { if (isMounted) setIsAudioReady(true); });
+      
+    return () => {
+      isMounted = false;
+      audioPlayer.stop();
+    };
   }, []);
 
   const moreMenuRef = useRef(null);
@@ -208,9 +224,8 @@ export default function Reader({ bookData, onClose, jumpToSibling, jumpToChapter
         isTocOpen={isTocOpen}
         setIsTocOpen={setIsTocOpen}
         currentChapterTitle={currentChapterTitle}
-        displayFontSize={displayFontSize}
+        baseFontSize={baseFontSize}
         setBaseFontSize={setBaseFontSize}
-        fontScale={fontScale}
         morseSpeed={morseSpeed}
         setMorseSpeed={setMorseSpeed}
         morseFreq={morseFreq}
@@ -223,6 +238,7 @@ export default function Reader({ bookData, onClose, jumpToSibling, jumpToChapter
         isPaused={isPaused}
         togglePlay={togglePlay}
         stopPlay={stopPlay}
+        isAudioReady={isAudioReady}
         onRegenerate={onRegenerate}
       />
 

@@ -434,9 +434,16 @@ function scoreGroupPermutation(chars, previousGroup, profile) {
     let score = 0
 
     const hasLetters = chars.some(c => /[a-z]/i.test(c))
-    if (hasLetters) {
-        if (/[0-9]/.test(chars[0])) score -= 3.5
-        if (/[0-9]/.test(chars[chars.length - 1])) score -= 3.5
+    const hasDigits = chars.some(c => /[0-9]/.test(c))
+    if (hasLetters && hasDigits && chars.length >= 3) {
+        if (/[0-9]/.test(chars[0])) score -= 100
+        if (/[0-9]/.test(chars[chars.length - 1])) score -= 100
+        chars.forEach((c, idx) => {
+            if (/[0-9]/.test(c)) {
+                if (idx === 1 || idx === 2) score += 15
+                else score -= 5
+            }
+        })
     }
 
     for (let i = 1; i < metas.length; i++) {
@@ -466,7 +473,18 @@ function scoreGroupPermutation(chars, previousGroup, profile) {
 
 function normalizeGroupOrder(group, previousGroup, profile, random = Math.random) {
     if (!group || group.length <= 1) return group
-    if (!hasAdjacentDuplicate(group) && (!previousGroup || group.join('') !== previousGroup)) {
+
+    const hasLetters = group.some(c => /[a-z]/i.test(c))
+    const hasDigits = group.some(c => /[0-9]/.test(c))
+    const isMixed = hasLetters && hasDigits && group.length >= 3
+
+    const hasBadDigitPlacement = isMixed && (
+        /[0-9]/.test(group[0]) || 
+        /[0-9]/.test(group[group.length - 1]) ||
+        !group.some((c, i) => /[0-9]/.test(c) && (i === 1 || i === 2))
+    )
+
+    if (!hasAdjacentDuplicate(group) && (!previousGroup || group.join('') !== previousGroup) && !hasBadDigitPlacement) {
         return group
     }
 
@@ -651,10 +669,16 @@ function scoreMixedCandidate(context) {
     let score = context.score
 
     if (/[0-9]/.test(candidate)) {
-        if (position === 0 || position === charsPerGroup - 1) {
-            score -= 3.5
-        } else {
-            score += 2.5
+        if (charsPerGroup >= 3) {
+            if (position === 0 || position === charsPerGroup - 1) {
+                score -= 50
+            } else if (position === 1) {
+                score += 1.5
+            } else if (position === 2) {
+                score += 6.0
+            } else {
+                score -= 4.0
+            }
         }
     }
 
@@ -691,7 +715,9 @@ function scoreCandidate(context) {
     if (context.profile === STRUCTURED_RANDOM_PROFILES[GENERATOR_MODE.NUMBERS]) {
         return scoreNumberCandidate({ ...context, ...shared })
     }
-    if (context.profile === STRUCTURED_RANDOM_PROFILES[GENERATOR_MODE.MIXED] || context.profile?.charsPerGroup === 4) {
+    const hasDigits = context.profile?.pool?.some(c => /[0-9]/.test(c))
+    const hasLetters = context.profile?.pool?.some(c => /[a-z]/i.test(c))
+    if (context.profile === STRUCTURED_RANDOM_PROFILES[GENERATOR_MODE.MIXED] || (hasDigits && hasLetters)) {
         return scoreMixedCandidate({ ...context, ...shared })
     }
     return scoreLetterCandidate({ ...context, ...shared })

@@ -7,7 +7,7 @@ export const translations = {
     'menu.view.system': '跟随系统',
     'menu.view.light': '浅色模式',
     'menu.view.dark': '深色模式',
-    
+
     'menu.language': '语言(L)',
     'menu.language.system': '跟随系统',
     'menu.language.zh': '简体中文',
@@ -15,17 +15,17 @@ export const translations = {
 
     'menu.settings': '设置(S)',
     'menu.settings.prefs': '全局偏好设置',
-    
+
     'menu.help': '帮助(H)',
     'menu.help.guide': '使用帮助指南',
     'menu.help.about': '关于 摩语',
-    
+
     // 关于
     'about.author': '作者',
     'about.website': '网站',
     'about.email': '联系邮箱',
     'about.repo': '开源仓库',
-    
+
     // 侧边栏
     'sidebar.home': '首页导航',
     'sidebar.explorer': '功能导航',
@@ -33,7 +33,7 @@ export const translations = {
     'sidebar.library': '电码播放器',
     'sidebar.expand': '展开侧边栏',
     'sidebar.collapse': '折叠侧边栏',
-    
+
     // 摩言密语
     'translator.editor.title': '摩言密语 (自动识别)',
     'translator.editor.placeholder': '在此输入需要转换的中文、摩尔斯码或标准电码...',
@@ -42,7 +42,7 @@ export const translations = {
     'translator.codes': '标准电码 (TELECODES)',
     'translator.morse': '摩尔斯码 (MORSE CODE)',
     'translator.output.placeholder': '翻译输出结果',
-    
+
     // 播放器 (Player)
     'library.title': '工作区 / 播放列表',
     'library.import.file': '打开文件',
@@ -52,7 +52,7 @@ export const translations = {
     'library.gen.numbers.desc': '4 字/组 · 100 组 (0-9)',
     'library.gen.letters': '随机英文报底',
     'library.gen.letters.desc': '5 字/组 · 100 组 (A-Z)',
-    'library.gen.mixed': '随机数英混合',
+    'library.gen.mixed': '随机混合报底',
     'library.gen.mixed.desc': '5 字/组 · 100 组 (0-9 + A-Z)',
     'library.gen.callsigns': '无线电呼号',
     'library.gen.callsigns.desc': '4-6 字/呼号 · 100 组 (模拟真实 CW QSO)',
@@ -63,15 +63,15 @@ export const translations = {
     'library.empty.title': '没有打开的文档',
     'library.empty.desc': '打开一个 EPUB 或 TXT 文件以开始阅读和练习，或生成随机练习报底。',
     'library.recent': '最近打开',
-    
+
     // 随机报底生成器弹窗
     'generator.modal.title': '随机报底生成器',
     'generator.mode.type': '报底类型',
-    'generator.mode.numbers': '纯数码报',
+    'generator.mode.numbers': '数码分组报底',
     'generator.mode.numbers.sub': '0-9',
-    'generator.mode.letters': '纯英文报',
+    'generator.mode.letters': '英文分组报底',
     'generator.mode.letters.sub': 'A-Z',
-    'generator.mode.mixed': '数英混合',
+    'generator.mode.mixed': '混合报底',
     'generator.mode.mixed.sub': '0-9 + A-Z',
     'generator.mode.callsigns': '无线电呼号',
     'generator.mode.callsigns.sub': 'ITU 规范',
@@ -88,11 +88,9 @@ export const translations = {
     'generator.options.includeSymbols': '包含常用标点 (/ ? , . =)',
     'generator.options.includeCallsignSuffix': '包含随附附加码 (如 /1, /P, /M)',
     'generator.options.noAdjacentDup': '禁止相邻字符重复',
-    'generator.preview': '实时生成预览',
-    'generator.preview.refresh': '换一组示例',
     'generator.title.numbers': '数码报底',
     'generator.title.letters': '英文报底',
-    'generator.title.mixed': '数英混合报底',
+    'generator.title.mixed': '混合报底',
     'generator.title.callsigns': '无线电呼号报底',
     'generator.title.chars': '字组',
     'generator.title.groups': '组',
@@ -103,7 +101,17 @@ export const translations = {
     'generator.title.maxDigits': '最多{count}数字',
     'generator.btn.generate': '立即开始练习',
     'generator.btn.cancel': '取消',
-    
+    'generator.btn.exportEpub': '下载为 EPUB',
+    'generator.btn.exporting': '正在生成...',
+    'generator.epubOptions': '导出 EPUB 配置',
+    'generator.epubPages': '生成页数',
+    'generator.epubStartMarker': '每页开头字符',
+    'generator.epubEndMarker': '每页结尾字符',
+    'generator.epubExport.success': '成功导出 EPUB：',
+    'generator.epubExport.error': '导出失败：',
+    'generator.epubExport.successToast': '导出成功！',
+    'generator.epubExport.errorToast': '导出失败，请重试',
+
     // 偏好设置
     'settings.title': '全局偏好设置 (Preferences)',
     'settings.startup': '启动行为 (Startup)',
@@ -118,7 +126,7 @@ export const translations = {
     'settings.audio.freq': '音调频率 (Hz)',
     'settings.cancel': '取消',
     'settings.save': '保存设置',
-    
+
     // 阅读器 (Reader)
     'reader.back': '返回',
     'reader.sidebar': '侧边栏',
@@ -136,6 +144,7 @@ export const translations = {
     'reader.number.short5': '短五',
     'reader.number.short10': '短十',
     'reader.regenerate': '重新生成',
+    'reader.initializing': '准备中...',
     'reader.play': '播放',
     'reader.pause': '暂停',
     'reader.resume': '继续',
@@ -154,7 +163,7 @@ export const translations = {
     'reader.shortcut.flip': '翻页',
     'reader.shortcut.play': '播放',
     'reader.shortcut.playPause': '播放 / 暂停',
-    
+
     // 字典导入 & 翻译器
     'dict.import.title': '导入自定义字典',
     'dict.import.desc': '支持导入 .txt 纯文本文件或 .json 格式的映射文件。请参考以下示例格式：',
@@ -170,7 +179,7 @@ export const translations = {
     'dict.btn.delete': '删除当前字典',
     'dict.btn.import': '导入',
     'dict.delete.confirm': '确定要删除此自定义字典吗？',
-    
+
     // 问候语
     'greeting.earlyMorning': '凌晨好',
     'greeting.morning': '早上好',
@@ -188,7 +197,7 @@ export const translations = {
     'home.recent': '最近打开的文档',
     'home.recent.clear': '清除此记录',
     'home.card.launch': '进入工具',
-    
+
     // 更新
     'update.check': '检查更新',
     'update.checking': '正在检查更新...',
@@ -199,7 +208,7 @@ export const translations = {
     'update.install.restart': '立刻更新并重启',
     'update.downloading': '正在下载更新...',
     'update.failed': '更新失败',
-    
+
     // 标题栏
     'titlebar.restore': '向下还原',
     'titlebar.maximize': '最大化',
@@ -213,7 +222,7 @@ export const translations = {
     'help.core.2.desc': '在阅读界面，点击任意单词/段落，即可直接从该位置开始播放。',
     'help.core.3': '导入书籍：',
     'help.core.3.desc': '在“阅读器”界面，点击侧边栏下方的导入按钮，支持选择本地的 .txt 或 .epub 文件。也可直接将文件拖拽进窗口。',
-    
+
     'help.settings.title': '发报参数 (Settings)',
     'help.settings.1': 'WPM (词语速度)：',
     'help.settings.1.desc': 'Words Per Minute。数值越大，发报速度越快。新手建议设置在 15~20 左右，熟练后可逐渐提高。',
@@ -221,7 +230,7 @@ export const translations = {
     'help.settings.2.desc': '控制摩斯电码的音高。通常在 600Hz ~ 800Hz 之间听感最佳。如果您觉得高频刺耳，可适当调低至 500Hz。',
     'help.settings.3': '数字模式：',
     'help.settings.3.desc': '短码（只发报单个点或划，适合专业比赛）；长码（标准全码发送，适合日常训练）。',
-    
+
     'help.shortcuts.title': '快捷操作 (Shortcuts)',
     'help.shortcuts.play': '播放 / 暂停',
     'help.shortcuts.play.key': 'Space / 空格键',
@@ -238,7 +247,7 @@ export const translations = {
     'menu.view.system': 'System Theme',
     'menu.view.light': 'Light Theme',
     'menu.view.dark': 'Dark Theme',
-    
+
     'menu.language': 'Language(L)',
     'menu.language.system': 'System Default',
     'menu.language.zh': '简体中文',
@@ -246,17 +255,17 @@ export const translations = {
 
     'menu.settings': 'Settings(S)',
     'menu.settings.prefs': 'Preferences',
-    
+
     'menu.help': 'Help(H)',
     'menu.help.guide': 'User Guide',
     'menu.help.about': 'About MoYu',
-    
+
     // About
     'about.author': 'Author',
     'about.website': 'Website',
     'about.email': 'Email',
     'about.repo': 'Repository',
-    
+
     // Sidebar
     'sidebar.home': 'Home',
     'sidebar.explorer': 'NAVIGATION',
@@ -264,7 +273,7 @@ export const translations = {
     'sidebar.library': 'Morse Player',
     'sidebar.expand': 'Expand',
     'sidebar.collapse': 'Collapse',
-    
+
     // Translator
     'translator.editor.title': 'EDITOR (AUTO-DETECT)',
     'translator.editor.placeholder': 'Type Chinese, Telecodes, or Morse code here...',
@@ -273,7 +282,7 @@ export const translations = {
     'translator.codes': 'TELECODES',
     'translator.morse': 'MORSE CODE',
     'translator.output.placeholder': 'Translation Output',
-    
+
     // Player
     'library.title': 'WORKSPACE / PLAYLIST',
     'library.import.file': 'Open File',
@@ -319,8 +328,6 @@ export const translations = {
     'generator.options.includeSymbols': 'Include Punctuation (/ ? , . =)',
     'generator.options.includeCallsignSuffix': 'Include Portable Suffixes (e.g. /1, /P, /M)',
     'generator.options.noAdjacentDup': 'Disallow adjacent duplicates',
-    'generator.preview': 'Live Preview',
-    'generator.preview.refresh': 'Refresh Sample',
     'generator.title.numbers': 'Digits Telegram',
     'generator.title.letters': 'Letters Telegram',
     'generator.title.mixed': 'Mixed Alphanumeric',
@@ -334,7 +341,17 @@ export const translations = {
     'generator.title.maxDigits': 'max {count} digits',
     'generator.btn.generate': 'Start Practice',
     'generator.btn.cancel': 'Cancel',
-    
+    'generator.btn.exportEpub': 'Export EPUB',
+    'generator.btn.exporting': 'Generating...',
+    'generator.epubOptions': 'EPUB Export Config',
+    'generator.epubPages': 'Pages to Generate',
+    'generator.epubStartMarker': 'Page Start Marker',
+    'generator.epubEndMarker': 'Page End Marker',
+    'generator.epubExport.success': 'Successfully exported EPUB: ',
+    'generator.epubExport.error': 'Failed to export EPUB: ',
+    'generator.epubExport.successToast': 'Export succeeded!',
+    'generator.epubExport.errorToast': 'Export failed, please try again',
+
     // Settings
     'settings.title': 'Preferences',
     'settings.startup': 'Startup Behavior',
@@ -367,13 +384,14 @@ export const translations = {
     'reader.number.short5': 'Short 5',
     'reader.number.short10': 'Short 10',
     'reader.regenerate': 'Regenerate',
+    'reader.initializing': 'Init...',
     'reader.play': 'Play',
     'reader.pause': 'Pause',
     'reader.resume': 'Resume',
     'reader.stop': 'Stop',
     'reader.prev': 'Prev',
     'reader.next': 'Next',
-    'reader.toc': 'Table of Contents',
+    'reader.toc': 'TOC',
     'reader.filelist': 'File List',
     'reader.doc.epub': 'EPUB Book',
     'reader.doc.folder': 'Folder Files',
@@ -408,7 +426,7 @@ export const translations = {
     'greeting.noon': 'Good afternoon',
     'greeting.afternoon': 'Good afternoon',
     'greeting.evening': 'Good evening',
-    
+
     // Home
     'home.welcome': 'Welcome to MoYu',
     'home.subtitle': 'Professional Morse Code & Telecode Training Terminal',
@@ -419,7 +437,7 @@ export const translations = {
     'home.recent': 'Recent Documents',
     'home.recent.clear': 'Clear this record',
     'home.card.launch': 'Open Tool',
-    
+
     // Updater
     'update.check': 'Check for Updates',
     'update.checking': 'Checking for updates...',
@@ -430,7 +448,7 @@ export const translations = {
     'update.install.restart': 'Install Update and Restart',
     'update.downloading': 'Downloading Update...',
     'update.failed': 'Update Failed',
-    
+
     // Titlebar
     'titlebar.restore': 'Restore Down',
     'titlebar.maximize': 'Maximize',
@@ -444,7 +462,7 @@ export const translations = {
     'help.core.2.desc': 'In the reader view, click any word or paragraph to start playing directly from that position.',
     'help.core.3': 'Import Books:',
     'help.core.3.desc': 'In the "Library" view, click the import button in the sidebar to open local .txt or .epub files. You can also drag and drop files into the window.',
-    
+
     'help.settings.title': 'Audio Settings',
     'help.settings.1': 'WPM (Speed):',
     'help.settings.1.desc': 'Words Per Minute. Higher values mean faster speed. Beginners are recommended to start around 15-20.',
@@ -452,7 +470,7 @@ export const translations = {
     'help.settings.2.desc': 'Controls the pitch of the Morse code. 600Hz - 800Hz usually sounds best. If it is too harsh, lower it to 500Hz.',
     'help.settings.3': 'Number Mode:',
     'help.settings.3.desc': 'Short code (single dot/dash, suitable for competitions) vs Long code (standard full code, suitable for training).',
-    
+
     'help.shortcuts.title': 'Shortcuts',
     'help.shortcuts.play': 'Play / Pause',
     'help.shortcuts.play.key': 'Space',

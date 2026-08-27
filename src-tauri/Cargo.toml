@@ -1,7 +1,7 @@
 [package]
 name = "moyu"
-version = "0.1.7"
-description = "A Tauri App"
+version = "0.1.8"
+description = "MoYu Reader"
 authors = ["you"]
 license = ""
 repository = ""
@@ -28,6 +28,7 @@ tauri-plugin-dialog = "2"
 tauri-plugin-fs = "2"
 tauri-plugin-persisted-scope = "2.3.7"
 tauri-plugin-process = "2"
+epub-builder = "0.7"
 
 # Optimizations for the final release build (reduces binary size significantly)
 [profile.release]
