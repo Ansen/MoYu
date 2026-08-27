@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { X, Sparkles, RefreshCw, Check, Play, Settings2, Dices, CaseSensitive, Shuffle, Radio, Download } from 'lucide-react';
+import { X, Sparkles, RefreshCw, Check, Play, Dices, CaseSensitive, Shuffle, Radio, Download } from 'lucide-react';
 import { save } from '@tauri-apps/plugin-dialog';
 import { writeFile } from '@tauri-apps/plugin-fs';
 import { invoke } from '@tauri-apps/api/core';

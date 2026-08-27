@@ -42,6 +42,12 @@ export const translations = {
     'translator.codes': '标准电码 (TELECODES)',
     'translator.morse': '摩尔斯码 (MORSE CODE)',
     'translator.output.placeholder': '翻译输出结果',
+    'translator.mode.text': '文本模式',
+    'translator.mode.voice': '语音模式',
+    'translator.voice.tapToTalk': '点击开始录音',
+    'translator.voice.listening': '正在聆听...',
+    'translator.voice.error': '录音失败',
+    'translator.voice.notsupported': '当前浏览器不支持语音识别',
 
     // 播放器 (Player)
     'library.title': '工作区 / 播放列表',
@@ -282,6 +288,12 @@ export const translations = {
     'translator.codes': 'TELECODES',
     'translator.morse': 'MORSE CODE',
     'translator.output.placeholder': 'Translation Output',
+    'translator.mode.text': 'Text Mode',
+    'translator.mode.voice': 'Voice Mode',
+    'translator.voice.tapToTalk': 'Tap to talk',
+    'translator.voice.listening': 'Listening...',
+    'translator.voice.error': 'Recognition Error',
+    'translator.voice.notsupported': 'Speech recognition not supported in this browser',
 
     // Player
     'library.title': 'WORKSPACE / PLAYLIST',

@@ -21,20 +21,99 @@ const morseToChar = Object.fromEntries(
 // We will load the dictionary mapping externally (e.g. via fetch)
 // and pass it to these functions.
 
+const monthChars = '㋀㋁㋂㋃㋄㋅㋆㋇㋈㋉㋊㋋';
+const dayChars = '㏠㏡㏢㏣㏤㏥㏦㏧㏨㏩㏪㏫㏬㏭㏮㏯㏰㏱㏲㏳㏴㏵㏶㏷㏸㏹㏺㏻㏼㏽㏾';
+const hourChars = '㍘㍙㍚㍛㍜㍝㍞㍟㍠㍡㍢㍣㍤㍥㍦㍧㍨㍩㍪㍫㍬㍭㍮㍯㍰';
+
+function normalizeShortcuts(text) {
+  let result = text;
+  result = result.replace(/([1-9]|1[0-2])月/g, (match, p1) => monthChars[parseInt(p1, 10) - 1]);
+  result = result.replace(/([1-9]|[12]\d|3[01])日/g, (match, p1) => dayChars[parseInt(p1, 10) - 1]);
+  result = result.replace(/(0|[1-9]|1\d|2[0-4])[点时]/g, (match, p1) => hourChars[parseInt(p1, 10)]);
+  return result;
+}
+
+export function denormalizeShortcuts(text) {
+  let result = text;
+  for (let i = 0; i < monthChars.length; i++) {
+    result = result.replace(new RegExp(monthChars[i], 'g'), `${i+1}月`);
+  }
+  for (let i = 0; i < dayChars.length; i++) {
+    result = result.replace(new RegExp(dayChars[i], 'g'), `${i+1}日`);
+  }
+  for (let i = 0; i < hourChars.length; i++) {
+    result = result.replace(new RegExp(hourChars[i], 'g'), `${i}时`);
+  }
+  return result;
+}
+
 export function chineseToCodes(text, charToCodeDict) {
   let codes = [];
-  for (let i = 0; i < text.length; i++) {
-    const char = text[i];
-    // If it's in the dict, append its 4-digit code
-    if (charToCodeDict[char]) {
-      codes.push(charToCodeDict[char]);
-    } else if (char.trim() !== '') {
-      // Unmapped character (e.g., an English letter or unsupported punctuation)
-      // Keep it as uppercase
-      codes.push(char.toUpperCase());
+  let currentWord = '';
+  
+  const normalizedText = normalizeShortcuts(text);
+
+  for (let i = 0; i < normalizedText.length; i++) {
+    const char = normalizedText[i];
+    
+    // Group ASCII alphanumeric characters together
+    if (/^[0-9a-zA-Z]$/.test(char)) {
+      currentWord += char.toUpperCase();
+    } else {
+      // Flush any accumulated alphanumeric characters
+      if (currentWord) {
+        codes.push(currentWord);
+        currentWord = '';
+      }
+      
+      // Look up Chinese character or special symbol
+      if (charToCodeDict[char]) {
+        codes.push(charToCodeDict[char]);
+      } else if (char.trim() !== '') {
+        // Unmapped character, push as is
+        codes.push(char.toUpperCase());
+      }
     }
   }
+  
+  // Flush remaining alphanumeric characters
+  if (currentWord) {
+    codes.push(currentWord);
+  }
+  
   return codes.join(' ');
+}
+
+export function chineseToCodesTokens(text, charToCodeDict) {
+  let tokens = [];
+  let currentWord = '';
+  
+  const normalizedText = normalizeShortcuts(text);
+
+  for (let i = 0; i < normalizedText.length; i++) {
+    const char = normalizedText[i];
+    
+    if (/^[0-9a-zA-Z]$/.test(char)) {
+      currentWord += char;
+    } else {
+      if (currentWord) {
+        tokens.push({ char: currentWord, code: currentWord.toUpperCase() });
+        currentWord = '';
+      }
+      
+      if (charToCodeDict[char]) {
+        tokens.push({ char: denormalizeShortcuts(char), code: charToCodeDict[char] });
+      } else if (char.trim() !== '') {
+        tokens.push({ char: char, code: char.toUpperCase() });
+      }
+    }
+  }
+  
+  if (currentWord) {
+    tokens.push({ char: currentWord, code: currentWord.toUpperCase() });
+  }
+  
+  return tokens;
 }
 
 export function codesToMorse(codesStr) {
@@ -101,7 +180,7 @@ export function codesToChinese(codesStr, codeToCharDict) {
       result += group; // keep as is if not found, like English letters
     }
   }
-  return result;
+  return denormalizeShortcuts(result);
 }
 
 // Auto detection helpers

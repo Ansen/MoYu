@@ -23,21 +23,10 @@ def parse_local_html():
     for table in tables:
         for row in table.find_all('tr'):
             cells = row.find_all(['td', 'th'])
-            for i in range(len(cells) - 1):
-                # The wiktionary table cells might contain something like:
-                # <td>0001<br/><span>一</span></td>
-                # Let's extract raw text and see if it looks like "0001一" or something
-                c1_text = cells[i].get_text(separator=' ', strip=True)
-                c2_text = cells[i+1].get_text(separator=' ', strip=True)
-                
-                # If cells are strictly Code -> Char
-                if re.match(r'^\d{4}$', c1_text) and len(c2_text) >= 1:
-                    code = c1_text
-                    char = c2_text.split()[0][0] # take the first actual character
-                    char_to_code[char] = code
-                    code_to_char[code] = char
-                    
-            # Some wiktionary cells have BOTH code and char in ONE cell:
+            # The wiktionary table cells always contain BOTH code and char in ONE cell:
+            # <td>0001<br/>一</td> or <td>3991</td>
+            # The previous logic that assumed Code -> Char across two cells was flawed
+            # and caused empty cells to incorrectly map to the first digit of the next cell's code.
             # <td>0001<br/>一</td>
             for cell in cells:
                 cell_text = cell.get_text(separator=' ', strip=True)
@@ -62,24 +51,10 @@ def parse_local_html():
                 char_to_code[char] = code
                 code_to_char[code] = char
                 
-    punctuations = [
-        ('，', '9901'), ('。', '9902'), ('！', '9903'), ('？', '9904'),
-        ('、', '9905'), ('；', '9906'), ('：', '9907'), ('“', '9908'),
-        ('”', '9909'), ('‘', '9910'), ('’', '9911'), ('（', '9912'),
-        ('）', '9913'), ('【', '9914'), ('】', '9915'), ('《', '9916'),
-        ('》', '9917'), ('-', '9918'), ('——', '9919'), ('…', '9920'),
-        (',', '9921'), ('.', '9922'), ('!', '9923'), ('?', '9924'),
-        (' ', '9925'), ('\n', '9926')
-    ]
-    
-    for char, code in punctuations:
-        if char not in char_to_code:
-            char_to_code[char] = code
-            code_to_char[code] = char
 
     print(f"Extracted {len(char_to_code)} characters.")
 
-    out_dir = os.path.join(base_dir, 'web', 'public', 'dict')
+    out_dir = os.path.join(base_dir, 'public', 'dict')
     os.makedirs(out_dir, exist_ok=True)
     out_path = os.path.join(out_dir, 'mapping.json')
     
