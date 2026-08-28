@@ -205,7 +205,7 @@ jobs:
       - name: Init Android Project & Build APK
         run: |
           pnpm tauri android init
-          pnpm tauri android build --apk
+          pnpm tauri android build --apk --split-per-abi
 
       - name: Upload APKs to Release
         shell: bash
@@ -219,7 +219,10 @@ jobs:
           
           find src-tauri/gen/android/app/build/outputs/apk -type f -name "*release*.apk" | while read -r apk_path; do
             filename=$(basename "$apk_path")
-            new_name="MoYu_${RAW_VERSION}_${filename}"
+            # Convert app-arm64-v8a-release-unsigned.apk to MoYu_0.1.9_android_arm64-v8a.apk
+            # Or app-universal-release-unsigned.apk to MoYu_0.1.9_android_universal.apk
+            clean_name=$(echo "$filename" | sed -E 's/^app-//' | sed -E 's/-release(-unsigned)?//')
+            new_name="MoYu_${RAW_VERSION}_android_${clean_name}"
             cp "$apk_path" "release-apks/${new_name}"
             
             cd release-apks

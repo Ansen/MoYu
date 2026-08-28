@@ -68,9 +68,9 @@ jobs:
         run: |
           pnpm tauri android init
           if [ "${{ inputs.build_type }}" = "debug" ]; then
-            pnpm tauri android build --apk --debug
+            pnpm tauri android build --apk --debug --split-per-abi
           else
-            pnpm tauri android build --apk
+            pnpm tauri android build --apk --split-per-abi
           fi
 
       - name: Upload Android APK
