@@ -68,7 +68,8 @@ export default function useHighlighter(onScrollRequest) {
       const win = doc.defaultView;
 
       // Apply morse-played and morse-active highlights
-      if (win && win.CSS && win.CSS.highlights && nodes.length > 0) {
+      const hasNativeHighlight = !!(win && win.CSS && win.CSS.highlights);
+      if (hasNativeHighlight && nodes.length > 0) {
         try {
           const playedRange = doc.createRange();
           playedRange.setStart(nodes[0].node, 0);
@@ -83,41 +84,38 @@ export default function useHighlighter(onScrollRequest) {
         } catch {}
       }
 
-      // Use DOM overlay inside the scroll container for guaranteed fallback visibility
+      // Handle DOM overlay fallback only for browsers without CSS Custom Highlight API
       const container = textRootRef.current;
       let overlay = container.querySelector('#morse-active-overlay') || doc.getElementById('morse-active-overlay');
-      if (!overlay) {
-        overlay = doc.createElement('div');
-        overlay.id = 'morse-active-overlay';
-        overlay.style.position = 'absolute';
-        overlay.style.backgroundColor = 'rgba(234, 88, 12, 0.4)';
-        overlay.style.borderBottom = '2px solid #ea580c';
-        overlay.style.borderRadius = '2px';
-        overlay.style.pointerEvents = 'none';
-        overlay.style.zIndex = '50';
-        overlay.style.transition = 'none';
-        container.appendChild(overlay);
-      } else {
-        overlay.style.transition = 'none';
-        if (overlay.parentElement !== container) {
+      
+      if (!hasNativeHighlight) {
+        if (!overlay) {
+          overlay = doc.createElement('div');
+          overlay.id = 'morse-active-overlay';
+          overlay.style.position = 'absolute';
+          overlay.style.backgroundColor = '#ea580c';
+          overlay.style.color = '#ffffff';
+          overlay.style.borderRadius = '2px';
+          overlay.style.pointerEvents = 'none';
+          overlay.style.zIndex = '50';
+          overlay.style.transition = 'none';
           container.appendChild(overlay);
         }
-      }
-      
-      const containerRect = container.getBoundingClientRect();
-      
-      // Do not show overlay for newlines, or invalid zero rects
-      if (!char || char === '\n' || char === '\r' || rect.width <= 0 || rect.height <= 0) {
-        overlay.style.opacity = '0';
-      } else {
-        const left = rect.left - containerRect.left + container.scrollLeft;
-        const top = rect.top - containerRect.top + container.scrollTop;
-
-        overlay.style.left = left + 'px';
-        overlay.style.top = top + 'px';
-        overlay.style.width = rect.width + 'px';
-        overlay.style.height = rect.height + 'px';
-        overlay.style.opacity = '1';
+        
+        const containerRect = container.getBoundingClientRect();
+        if (!char || char === '\n' || char === '\r' || rect.width <= 0 || rect.height <= 0) {
+          overlay.style.opacity = '0';
+        } else {
+          const left = rect.left - containerRect.left + container.scrollLeft;
+          const top = rect.top - containerRect.top + container.scrollTop;
+          overlay.style.left = left + 'px';
+          overlay.style.top = top + 'px';
+          overlay.style.width = rect.width + 'px';
+          overlay.style.height = rect.height + 'px';
+          overlay.style.opacity = '1';
+        }
+      } else if (overlay) {
+        overlay.remove();
       }
         
       // Request parent to handle auto-scroll if needed

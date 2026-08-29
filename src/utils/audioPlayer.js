@@ -193,18 +193,20 @@ class DesktopAudioPlayer {
             }
             if (this.playbackState.stopRequested || this._activeSessionId !== sessionId) break;
 
-            // Trigger UI callback
-            const waitMs = (currentTime - this.audioContext.currentTime) * 1000;
-            if (waitMs > 0 && onCharPlay) {
-                const timerId = setTimeout(() => {
-                    if (!this.playbackState.stopRequested && this._activeSessionId === sessionId) {
-                        onCharPlay(token, i);
-                    }
-                    this.cleanupTimers.delete(timerId);
-                }, waitMs);
-                this.cleanupTimers.add(timerId);
-            } else if (onCharPlay) {
-                onCharPlay(token, i);
+            // Trigger UI callback synchronously with the exact start of the sound / pause
+            if (onCharPlay) {
+                const waitMs = Math.max(0, (currentTime - this.audioContext.currentTime) * 1000);
+                if (waitMs <= 4) {
+                    onCharPlay(token, i);
+                } else {
+                    const timerId = setTimeout(() => {
+                        if (!this.playbackState.stopRequested && this._activeSessionId === sessionId) {
+                            onCharPlay(token, i);
+                        }
+                        this.cleanupTimers.delete(timerId);
+                    }, waitMs);
+                    this.cleanupTimers.add(timerId);
+                }
             }
 
             if (token.code === null) {
