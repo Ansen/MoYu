@@ -72,20 +72,39 @@ export function useSpeechRecognition(options = {}) {
     };
   }, []);
 
-  const startListening = useCallback(() => {
-    if (recognitionRef.current && !isListening) {
-      setTranscript('');
-      setError(null);
+  const startListening = useCallback(async () => {
+    if (isListening) return;
+    setTranscript('');
+    setError(null);
 
+    // Proactively request mic stream to trigger system permission prompt on macOS / Windows if not yet granted
+    if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
       try {
-        recognitionRef.current.start();
-      } catch (err) {
-        console.error("Failed to start listening", err);
-        if (err.name !== 'InvalidStateError') {
-          setError(err.name || 'error');
-        }
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        stream.getTracks().forEach(t => t.stop());
+      } catch (permErr) {
+        console.error("Microphone permission denied or device error:", permErr);
+        setError('not-allowed');
         setIsListening(false);
+        return;
       }
+    }
+
+    if (!recognitionRef.current) {
+      console.warn("Speech Recognition API is not supported in this environment.");
+      setError('not-supported');
+      setIsListening(false);
+      return;
+    }
+
+    try {
+      recognitionRef.current.start();
+    } catch (err) {
+      console.error("Failed to start listening", err);
+      if (err.name !== 'InvalidStateError') {
+        setError(err.name || 'error');
+      }
+      setIsListening(false);
     }
   }, [isListening]);
 
