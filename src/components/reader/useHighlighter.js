@@ -1,17 +1,31 @@
 import { useRef, useCallback } from 'react';
 
+/**
+ * High-Performance Smooth Highlighter for Morse Audio Playback
+ * - Zero Layout-Thrashing: Defers getBoundingClientRect to scroll boundaries
+ * - Incremental Range Caching: Preserves completed cell ranges instead of allocating 100s of DOM ranges per frame
+ * - Native CSS Custom Highlight API with 60/120fps compositor updates
+ */
 export default function useHighlighter(onScrollRequest) {
   const textRootRef = useRef(null);
   const textNodesRef = useRef([]);
   const lastNodeIdxRef = useRef(0);
   const lastCharIdxRef = useRef(0);
-  const startNodeRef = useRef(null);
+  const startNodeIdxRef = useRef(0);
   const startOffsetRef = useRef(0);
+
+  // Cached completed ranges for morse-played
+  const completedRangesRef = useRef([]);
+  const lastProcessedNodeIdxRef = useRef(-1);
+  const lastScrollCheckTimeRef = useRef(0);
 
   const clearHighlight = useCallback(() => {
     try {
-      startNodeRef.current = null;
+      startNodeIdxRef.current = 0;
       startOffsetRef.current = 0;
+      completedRangesRef.current = [];
+      lastProcessedNodeIdxRef.current = -1;
+
       if (textRootRef.current && textRootRef.current.ownerDocument) {
         const doc = textRootRef.current.ownerDocument;
         if (doc.defaultView && doc.defaultView.CSS && doc.defaultView.CSS.highlights) {
@@ -29,8 +43,10 @@ export default function useHighlighter(onScrollRequest) {
   const resetHighlightState = useCallback(() => {
     lastNodeIdxRef.current = 0;
     lastCharIdxRef.current = 0;
-    startNodeRef.current = null;
+    startNodeIdxRef.current = 0;
     startOffsetRef.current = 0;
+    completedRangesRef.current = [];
+    lastProcessedNodeIdxRef.current = -1;
   }, []);
 
   const highlightToken = useCallback((token) => {
@@ -40,12 +56,17 @@ export default function useHighlighter(onScrollRequest) {
     let targetRange = null;
     let targetNode = null;
     let targetOffset = 0;
+    let targetNodeIdx = 0;
     
     // Fast path tracking
     if (token.index < lastCharIdxRef.current) {
-       // user jumped back? Reset search
-       lastNodeIdxRef.current = 0;
-       lastCharIdxRef.current = 0;
+      // User jumped back / seeked: reset search
+      lastNodeIdxRef.current = 0;
+      lastCharIdxRef.current = 0;
+      completedRangesRef.current = [];
+      lastProcessedNodeIdxRef.current = -1;
+      startNodeIdxRef.current = 0;
+      startOffsetRef.current = 0;
     }
     
     let currentIndex = lastCharIdxRef.current;
@@ -59,6 +80,7 @@ export default function useHighlighter(onScrollRequest) {
         targetRange.setEnd(node, offset + 1);
         targetNode = node;
         targetOffset = offset;
+        targetNodeIdx = i;
         lastNodeIdxRef.current = i;
         lastCharIdxRef.current = currentIndex;
         break;
@@ -67,41 +89,49 @@ export default function useHighlighter(onScrollRequest) {
     }
 
     if (targetRange) {
-      if (startNodeRef.current === null) {
-        startNodeRef.current = targetNode;
-        startOffsetRef.current = targetOffset;
-      }
-
-      const rect = targetRange.getBoundingClientRect();
-      const char = targetNode.nodeValue[targetOffset];
-
       const doc = textRootRef.current.ownerDocument;
       const win = doc.defaultView;
+      const char = targetNode.nodeValue[targetOffset];
 
-      // Apply morse-played and morse-active highlights
+      // Track start position on first played token
+      if (lastProcessedNodeIdxRef.current === -1) {
+        startNodeIdxRef.current = targetNodeIdx;
+        startOffsetRef.current = targetOffset;
+        lastProcessedNodeIdxRef.current = targetNodeIdx;
+      }
+
+      // If we crossed node boundaries, commit previous completed nodes into cached completedRanges
+      if (targetNodeIdx > lastProcessedNodeIdxRef.current) {
+        for (let pIdx = lastProcessedNodeIdxRef.current; pIdx < targetNodeIdx; pIdx++) {
+          const prevN = nodes[pIdx];
+          const isStartNode = pIdx === startNodeIdxRef.current;
+          const sOffset = isStartNode ? startOffsetRef.current : 0;
+          const eOffset = prevN.length;
+          if (eOffset > sOffset) {
+            const completedRange = doc.createRange();
+            completedRange.setStart(prevN.node, sOffset);
+            completedRange.setEnd(prevN.node, eOffset);
+            completedRangesRef.current.push(completedRange);
+          }
+        }
+        lastProcessedNodeIdxRef.current = targetNodeIdx;
+      }
+
       const hasNativeHighlight = !!(win && win.CSS && win.CSS.highlights);
-      if (hasNativeHighlight && nodes.length > 0) {
+
+      if (hasNativeHighlight) {
         try {
-          // 采用节点离散 Range 构造：每个数据单元格独立创建 Range，绝不跨行，行号(01, 02...)100%不受高亮影响
-          const playedRanges = [];
-          const startIdx = nodes.findIndex(n => n.node === (startNodeRef.current || nodes[0]?.node));
-          const effectiveStartIdx = startIdx !== -1 ? startIdx : 0;
-          const currentTargetIdx = lastNodeIdxRef.current;
+          // Construct current node's active played slice (Incremental - O(1) allocation)
+          const isCurrentStart = targetNodeIdx === startNodeIdxRef.current;
+          const curStartOffset = isCurrentStart ? startOffsetRef.current : 0;
+          const curEndOffset = targetOffset;
 
-          for (let nIdx = effectiveStartIdx; nIdx <= currentTargetIdx && nIdx < nodes.length; nIdx++) {
-            const n = nodes[nIdx];
-            const isStart = nIdx === effectiveStartIdx;
-            const isEnd = nIdx === currentTargetIdx;
-
-            const nStartOffset = isStart ? (startOffsetRef.current || 0) : 0;
-            const nEndOffset = isEnd ? targetOffset : n.length;
-
-            if (nEndOffset > nStartOffset) {
-              const r = doc.createRange();
-              r.setStart(n.node, nStartOffset);
-              r.setEnd(n.node, nEndOffset);
-              playedRanges.push(r);
-            }
+          const playedRanges = [...completedRangesRef.current];
+          if (curEndOffset > curStartOffset) {
+            const currentSliceRange = doc.createRange();
+            currentSliceRange.setStart(targetNode, curStartOffset);
+            currentSliceRange.setEnd(targetNode, curEndOffset);
+            playedRanges.push(currentSliceRange);
           }
 
           if (playedRanges.length > 0) {
@@ -116,13 +146,10 @@ export default function useHighlighter(onScrollRequest) {
             win.CSS.highlights.delete('morse-active');
           }
         } catch {}
-      }
-
-      // Handle DOM overlay fallback only for browsers without CSS Custom Highlight API
-      const container = textRootRef.current;
-      let overlay = container.querySelector('#morse-active-overlay') || doc.getElementById('morse-active-overlay');
-      
-      if (!hasNativeHighlight) {
+      } else {
+        // Fallback DOM Overlay mode (only when CSS highlights API unavailable)
+        const container = textRootRef.current;
+        let overlay = container.querySelector('#morse-active-overlay') || doc.getElementById('morse-active-overlay');
         if (!overlay) {
           overlay = doc.createElement('div');
           overlay.id = 'morse-active-overlay';
@@ -135,7 +162,8 @@ export default function useHighlighter(onScrollRequest) {
           overlay.style.transition = 'none';
           container.appendChild(overlay);
         }
-        
+
+        const rect = targetRange.getBoundingClientRect();
         const containerRect = container.getBoundingClientRect();
         if (!char || char === '\n' || char === '\r' || rect.width <= 0 || rect.height <= 0) {
           overlay.style.opacity = '0';
@@ -148,15 +176,16 @@ export default function useHighlighter(onScrollRequest) {
           overlay.style.height = rect.height + 'px';
           overlay.style.opacity = '1';
         }
-      } else if (overlay) {
-        overlay.remove();
       }
-        
-      // Request parent to handle auto-scroll if needed
+
+      // Smooth auto-scroll request (throttled to 250ms to prevent layout thrashing)
       if (onScrollRequest) {
-        const scrollX = win ? (win.scrollX || win.pageXOffset) : (doc.documentElement?.scrollLeft || doc.body?.scrollLeft || 0);
-        const scrollY = win ? (win.scrollY || win.pageYOffset) : (doc.documentElement?.scrollTop || doc.body?.scrollTop || 0);
-        onScrollRequest(rect, targetRange, win, doc, scrollY, scrollX, overlay);
+        const now = performance.now();
+        if (now - lastScrollCheckTimeRef.current > 250) {
+          lastScrollCheckTimeRef.current = now;
+          const rect = targetRange.getBoundingClientRect();
+          onScrollRequest(rect);
+        }
       }
     }
   }, [onScrollRequest]);

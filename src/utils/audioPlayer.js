@@ -3,484 +3,340 @@ import { textToMorseTokens } from './morseCode.js';
 
 const TONE_VOLUME = MORSE_AUDIO_CONFIG.OUTPUT.TONE_VOLUME;
 const TONE_FADE_SECONDS = 0.002;
-const STOP_FADE_SECONDS = 0.012;
-const PRE_ROLL_LEAD_IN_SECONDS = 0.1; // 100ms 安全预滚缓冲，避免系统声卡唤醒抖动与首音吞音
+const LOOKAHEAD_INTERVAL_MS = 25; // 25ms 调度器轮询间隔
+const SCHEDULE_AHEAD_TIME_SEC = 0.1; // 100ms 前瞻调度窗口 (W3C A Tale of Two Clocks 标准)
 
 /**
- * 桌面端原生 Web Audio 播放器引擎
- * 基于 OscillatorNode 高精度实时波形合成与微秒级包络线防护
+ * 桌面端高精度 Web Audio 摩尔斯码发音引擎
+ * 采用 W3C 标准 Lookahead Scheduler (双时钟前瞻调度) 架构：
+ * 1. 硬件时钟 (AudioContext.currentTime)：毫秒/微秒级精准控制声音发声与淡入淡出包络
+ * 2. 调度器时钟 (setInterval 25ms)：前瞻 100ms 批量向硬件管道提交音符，免疫主线程卡顿
+ * 3. 彻底移除冗余复杂的虚拟静音预热、30s 休眠定时器及嵌套 while 循环
  */
 class DesktopAudioPlayer {
   constructor() {
     this.audioContext = null;
     this.masterGain = null;
     this.volume = MORSE_AUDIO_CONFIG.VOLUME.DEFAULT;
-    this.currentNodes = [];
-    this.cleanupTimers = new Set();
-    this.idleTimer = null;
-    this.isWarmedUp = false;
-    this.playbackConfig = null;
+    this.activeNodes = [];
     this.customWave = null;
-    this._activeSessionId = null;
+    this.timerId = null;
+
+    this.playbackConfig = {
+      wpm: 20,
+      freq: 700,
+      numberMode: 'long',
+      useHarmonics: false
+    };
+
     this.playbackState = {
       isPlaying: false,
       isPaused: false,
-      stopRequested: false,
+      stopRequested: false
     };
-  }
 
-  resetIdleTimer() {
-    if (this.idleTimer) {
-      clearTimeout(this.idleTimer);
-      this.idleTimer = null;
-    }
-  }
-
-  scheduleIdleSuspend() {
-    this.resetIdleTimer();
-    this.idleTimer = setTimeout(() => {
-      if (!this.playbackState.isPlaying && this.audioContext && this.audioContext.state === 'running') {
-        this.audioContext.suspend().catch(() => {});
-      }
-    }, 30000); // 空闲 30s 后挂起音频上下文以节能
+    // 调度队列与游标
+    this.queue = [];
+    this.queueIndex = 0;
+    this.nextNoteTime = 0;
+    this.callbacks = {};
   }
 
   /**
-   * 初始化 AudioContext 及主增益节点
+   * 初始化 AudioContext (按需单例懒加载)
    */
-  async init() {
-    this.resetIdleTimer();
+  async ensureContext() {
     if (!this.audioContext) {
-      const AudioCtxClass = typeof window !== 'undefined' ? (window.AudioContext || window.webkitAudioContext) : null;
-      if (AudioCtxClass) {
-        this.audioContext = new AudioCtxClass();
+      const AudioCtx = typeof window !== 'undefined' ? (window.AudioContext || window.webkitAudioContext) : null;
+      if (AudioCtx) {
+        this.audioContext = new AudioCtx();
         this.masterGain = this.audioContext.createGain();
         this.masterGain.connect(this.audioContext.destination);
-        this.setOutputVolume(this.volume, true);
+        this.setOutputVolume(this.volume);
+      }
+    }
+    if (this.audioContext && this.audioContext.state === 'suspended') {
+      try {
+        await this.audioContext.resume();
+      } catch {
+        // Ignored
       }
     }
     return this.audioContext;
   }
 
-  /**
-   * 强保证音频上下文处于 running 状态并完成声卡硬件链路预热
-   */
   async ensureReady() {
-    this.resetIdleTimer();
-    if (!this.audioContext) {
-      await this.init();
-    }
-
-    if (this.audioContext) {
-      if (this.audioContext.state === 'suspended') {
-        try {
-          await this.audioContext.resume();
-        } catch (e) {
-          console.warn('AudioContext resume error:', e);
-        }
-      }
-
-      // 预热硬件声卡驱动输出（WASAPI / DirectSound / CoreAudio），打通静默通路
-      if (!this.isWarmedUp && this.audioContext.state === 'running') {
-        try {
-          const osc = this.audioContext.createOscillator();
-          const silentGain = this.audioContext.createGain();
-          silentGain.gain.setValueAtTime(0, this.audioContext.currentTime);
-          osc.connect(silentGain);
-          silentGain.connect(this.masterGain || this.audioContext.destination);
-          osc.start(0);
-          osc.stop(this.audioContext.currentTime + 0.02);
-          this.isWarmedUp = true;
-        } catch (e) {
-          console.warn('Audio pre-warm error:', e);
-        }
-      }
-    }
-
-    return !!(this.audioContext && this.audioContext.state === 'running');
+    return this.ensureContext();
   }
 
-  isReady() {
-    return !!(this.audioContext && this.audioContext.state === 'running');
-  }
-
-  setOutputVolume(volumePercent, immediate = false) {
+  setOutputVolume(volumePercent) {
     this.volume = volumePercent;
     if (!this.masterGain || !this.audioContext) return;
-
-    const gain = Math.min((volumePercent / 100), 1);
-    const now = this.audioContext.currentTime;
-    if (immediate) {
-      this.masterGain.gain.setValueAtTime(gain, now);
-    } else {
-      this.masterGain.gain.setTargetAtTime(gain, now, 0.01);
-    }
+    const gain = Math.min(Math.max(volumePercent / 100, 0), 1);
+    this.masterGain.gain.setValueAtTime(gain, this.audioContext.currentTime);
   }
 
-  async playTone(frequency, durationMs, startTime) {
-    if (!this.audioContext) {
-      await this.ensureReady();
-    }
+  updateConfig(config) {
+    this.playbackConfig = { ...this.playbackConfig, ...config };
+  }
+
+  /**
+   * 物理发音：向音频管道注入一个正弦波音符
+   */
+  scheduleTone(frequency, durationSec, startTime, itemIndex) {
     if (!this.audioContext) return;
 
-    const oscillator = this.audioContext.createOscillator();
-    const gainNode = this.audioContext.createGain();
+    const osc = this.audioContext.createOscillator();
+    const gain = this.audioContext.createGain();
 
-    const start = startTime !== undefined ? startTime : this.audioContext.currentTime;
-    const durationSec = durationMs / 1000;
-
-    // 谐波拟合处理
-    if (this.playbackConfig && this.playbackConfig.useHarmonics) {
+    if (this.playbackConfig.useHarmonics) {
       if (!this.customWave) {
         const real = new Float32Array([0, 1, 0.1, 0.05, 0]);
         const imag = new Float32Array([0, 0, 0, 0, 0]);
         this.customWave = this.audioContext.createPeriodicWave(real, imag);
       }
-      oscillator.setPeriodicWave(this.customWave);
+      osc.setPeriodicWave(this.customWave);
     } else {
-      oscillator.type = 'sine';
+      osc.type = 'sine';
     }
 
-    oscillator.frequency.value = frequency;
-    oscillator.connect(gainNode);
-    gainNode.connect(this.masterGain);
+    osc.frequency.setValueAtTime(frequency, startTime);
+    osc.connect(gain);
+    gain.connect(this.masterGain);
 
-    // 极短淡入淡出包络，杜绝声卡突变爆音 (Clicking noise)
-    const fadeTime = Math.min(TONE_FADE_SECONDS, durationSec * 0.2);
-    gainNode.gain.setValueAtTime(0, start)
-    gainNode.gain.linearRampToValueAtTime(TONE_VOLUME, start + fadeTime);
-    gainNode.gain.setValueAtTime(TONE_VOLUME, start + durationSec - fadeTime);
-    gainNode.gain.linearRampToValueAtTime(0, start + durationSec);
+    // 2ms 微秒级淡入淡出包络，杜绝发声爆音 (Clicking noise)
+    const fade = Math.min(TONE_FADE_SECONDS, durationSec * 0.2);
+    gain.gain.setValueAtTime(0, startTime);
+    gain.gain.linearRampToValueAtTime(TONE_VOLUME, startTime + fade);
+    gain.gain.setValueAtTime(TONE_VOLUME, startTime + durationSec - fade);
+    gain.gain.linearRampToValueAtTime(0, startTime + durationSec);
 
-    oscillator.start(start);
-    oscillator.stop(start + durationSec);
+    osc.start(startTime);
+    osc.stop(startTime + durationSec);
 
-    const endTime = start + durationSec;
-    this.currentNodes.push({ oscillator, gainNode, startTime: start, endTime });
+    const nodeItem = {
+      osc,
+      gain,
+      startTime,
+      endTime: startTime + durationSec,
+      itemIndex
+    };
+    this.activeNodes.push(nodeItem);
 
-    // 节点生命周期自动清理
-    const timerId = setTimeout(() => {
+    osc.onended = () => {
       try {
-        oscillator.disconnect();
-        gainNode.disconnect();
+        osc.disconnect();
+        gain.disconnect();
       } catch {}
-      this.currentNodes = this.currentNodes.filter(n => n.oscillator !== oscillator);
-      this.cleanupTimers.delete(timerId);
-    }, Math.max(0, (start - this.audioContext.currentTime) * 1000) + durationMs + 100);
-
-    this.cleanupTimers.add(timerId);
+      const idx = this.activeNodes.indexOf(nodeItem);
+      if (idx !== -1) this.activeNodes.splice(idx, 1);
+    };
   }
 
-  updateConfig(config) {
-    if (!this.playbackConfig) {
-      this.playbackConfig = { ...config };
-    } else {
-      this.playbackConfig = { ...this.playbackConfig, ...config };
+  /**
+   * 停止当前所有正在发音的节点 (8ms 毫秒级防爆音平滑渐变)
+   */
+  stopActiveNodes() {
+    const now = this.audioContext ? this.audioContext.currentTime : 0;
+    const DECLICK_FADE_SEC = 0.008; // 8ms 工业标准 De-click 平滑淡出
+
+    for (const { osc, gain, startTime, endTime } of this.activeNodes) {
+      try {
+        if (startTime > now) {
+          // 尚未发声的未来前瞻音符：直接静音并取消
+          gain.gain.cancelScheduledValues(now);
+          gain.gain.setValueAtTime(0, now);
+          osc.stop(now + 0.001);
+        } else if (endTime > now) {
+          // 当前正在振荡发声的音符：平滑 8ms 渐降至 0，杜绝突变波形截断导致的爆音/破音尾音
+          gain.gain.cancelScheduledValues(now);
+          gain.gain.setValueAtTime(gain.gain.value || TONE_VOLUME, now);
+          gain.gain.linearRampToValueAtTime(0, now + DECLICK_FADE_SEC);
+          osc.stop(now + DECLICK_FADE_SEC + 0.002);
+        }
+      } catch {}
+    }
+    this.activeNodes = [];
+  }
+
+  /**
+   * 调度器主轮询 (W3C Lookahead Loop)
+   */
+  scheduler() {
+    if (!this.audioContext || !this.playbackState.isPlaying || this.playbackState.isPaused) return;
+
+    const dotSec = (1200 / this.playbackConfig.wpm) / 1000;
+    const freq = this.playbackConfig.freq;
+
+    // 前瞻 100ms 批量填充硬件管道
+    while (this.queueIndex < this.queue.length && this.nextNoteTime < this.audioContext.currentTime + SCHEDULE_AHEAD_TIME_SEC) {
+      const item = this.queue[this.queueIndex];
+      const curIndex = this.queueIndex;
+      const itemStartTime = this.nextNoteTime;
+      item.startTime = itemStartTime;
+
+      if (item.type === 'prefix' || item.type === 'suffix') {
+        // 起止符标记发声
+        if (this.callbacks.onMarkerPlay) {
+          const delayMs = Math.max(0, (itemStartTime - this.audioContext.currentTime) * 1000);
+          setTimeout(() => {
+            if (this.playbackState.isPlaying && !this.playbackState.isPaused && !this.playbackState.stopRequested) {
+              this.callbacks.onMarkerPlay({ type: item.type, text: item.markerText });
+            }
+          }, delayMs);
+        }
+      } else if (item.type === 'body') {
+        // 正文 Token 高亮通知
+        if (this.callbacks.onCharPlay) {
+          const delayMs = Math.max(0, (itemStartTime - this.audioContext.currentTime) * 1000);
+          setTimeout(() => {
+            if (this.playbackState.isPlaying && !this.playbackState.isPaused && !this.playbackState.stopRequested) {
+              this.callbacks.onCharPlay(item.rawToken);
+            }
+          }, delayMs);
+        }
+      }
+
+      if (item.code === null) {
+        // 空格/间隔
+        this.nextNoteTime += 4 * dotSec;
+      } else {
+        // 点划发射
+        const symbols = item.code.split('');
+        for (let s = 0; s < symbols.length; s++) {
+          const sym = symbols[s];
+          const durSec = sym === '-' ? 3 * dotSec : 1 * dotSec;
+          this.scheduleTone(freq, durSec, this.nextNoteTime, curIndex);
+          this.nextNoteTime += durSec;
+          if (s < symbols.length - 1) {
+            this.nextNoteTime += 1 * dotSec; // 字符内点划间隙 1 dot
+          }
+        }
+        this.nextNoteTime += 3 * dotSec; // 字符间间隙 3 dots
+      }
+
+      item.endTime = this.nextNoteTime;
+      this.queueIndex++;
+    }
+
+    // 播放完毕检测
+    if (this.queueIndex >= this.queue.length) {
+      if (this.audioContext.currentTime >= this.nextNoteTime) {
+        this.stop();
+        if (this.callbacks.onComplete) {
+          this.callbacks.onComplete();
+        }
+      }
     }
   }
 
   /**
-   * 播放摩尔斯文本流
-   * @param {string} text
-   * @param {Object} options
+   * 启动播放
    */
-  async playMorseText(text, {
-    wpm = 20,
-    freq = 700,
-    numberMode = 'long',
-    useHarmonics = false,
-    startIndex = 0,
-    prefixMarker = '',
-    suffixMarker = '',
-    enableMarkers = false,
-    onCharPlay,
-    onMarkerPlay,
-    onComplete
-  } = {}) {
-    this.resetIdleTimer();
-    this.stopScheduledNodes();
+  async playMorseText(text, options = {}) {
+    this.stop();
 
-    // 兜底校验：确保 AudioContext 硬件时钟就绪
-    await this.ensureReady();
+    const {
+      wpm = 20,
+      freq = 700,
+      numberMode = 'long',
+      useHarmonics = false,
+      startIndex = 0,
+      prefixMarker = '',
+      suffixMarker = '',
+      enableMarkers = false,
+      onCharPlay,
+      onMarkerPlay,
+      onComplete
+    } = options;
 
-    const sessionId = Date.now() + Math.random();
-    this._activeSessionId = sessionId;
+    this.playbackConfig = { wpm, freq, numberMode, useHarmonics };
+    this.callbacks = { onCharPlay, onMarkerPlay, onComplete };
 
+    await this.ensureContext();
+
+    // 构建扁平化的待播放队列
+    const queue = [];
+
+    // 1. 报头起止符
+    if (startIndex === 0 && enableMarkers && prefixMarker && prefixMarker.trim()) {
+      const pTokens = textToMorseTokens(prefixMarker.trim(), numberMode);
+      for (const tok of pTokens) {
+        queue.push({ ...tok, type: 'prefix', markerText: prefixMarker.trim() });
+      }
+    }
+
+    // 2. 正文 Tokens
+    const bodyTokens = textToMorseTokens(text, numberMode);
+    for (const tok of bodyTokens) {
+      if (tok.index >= startIndex) {
+        queue.push({ ...tok, type: 'body', rawToken: tok });
+      }
+    }
+
+    // 3. 报尾起止符
+    if (enableMarkers && suffixMarker && suffixMarker.trim()) {
+      const sTokens = textToMorseTokens(suffixMarker.trim(), numberMode);
+      for (const tok of sTokens) {
+        queue.push({ ...tok, type: 'suffix', markerText: suffixMarker.trim() });
+      }
+    }
+
+    if (queue.length === 0) return;
+
+    this.queue = queue;
+    this.queueIndex = 0;
     this.playbackState.isPlaying = true;
     this.playbackState.isPaused = false;
     this.playbackState.stopRequested = false;
 
-    this.playbackConfig = { wpm, freq, numberMode, useHarmonics };
+    // 预滚 50ms 启动硬件
+    this.nextNoteTime = (this.audioContext ? this.audioContext.currentTime : 0) + 0.05;
 
-    let tokens = textToMorseTokens(text, this.playbackConfig.numberMode);
-    let dotSec = (1200 / this.playbackConfig.wpm) / 1000;
-
-    // 引入 100ms 发声前置安全缓冲，给硬件声卡与线程对齐充足时间
-    let currentTime = (this.audioContext ? this.audioContext.currentTime : 0) + PRE_ROLL_LEAD_IN_SECONDS;
-
-    // 1. 播放报头起始符 (如 '===', 'KA')
-    if (startIndex === 0 && enableMarkers && prefixMarker && prefixMarker.trim()) {
-      const prefixStartAudioTime = currentTime;
-      const prefixTokens = textToMorseTokens(prefixMarker.trim(), this.playbackConfig.numberMode);
-      for (let p = 0; p < prefixTokens.length; p++) {
-        if (this.playbackState.stopRequested || this._activeSessionId !== sessionId) break;
-
-        while (this.playbackState.isPaused && !this.playbackState.stopRequested && this._activeSessionId === sessionId) {
-          await new Promise(r => setTimeout(r, 60));
-          if (this.audioContext) {
-            currentTime = this.audioContext.currentTime + PRE_ROLL_LEAD_IN_SECONDS;
-          }
-        }
-        if (this.playbackState.stopRequested || this._activeSessionId !== sessionId) break;
-
-        const pTok = prefixTokens[p];
-        if (pTok.code === null) {
-          currentTime += 4 * dotSec;
-        } else {
-          const symbols = pTok.code.split('');
-          for (let j = 0; j < symbols.length; j++) {
-            const sym = symbols[j];
-            const durSec = sym === '-' ? 3 * dotSec : 1 * dotSec;
-            this.playTone(freq, durSec * 1000, currentTime);
-            currentTime += durSec;
-            if (j < symbols.length - 1) currentTime += 1 * dotSec;
-          }
-          currentTime += 3 * dotSec;
-        }
-      }
-      currentTime += 4 * dotSec;
-      const prefixEndAudioTime = currentTime;
-
-      // 实时音频时间同步触发 UI 报头状态
-      if (onMarkerPlay && this.audioContext) {
-        const startWaitMs = Math.max(0, (prefixStartAudioTime - this.audioContext.currentTime) * 1000);
-        const endWaitMs = Math.max(0, (prefixEndAudioTime - this.audioContext.currentTime) * 1000);
-
-        if (startWaitMs <= 4) {
-          onMarkerPlay({ type: 'prefix', text: prefixMarker.trim() });
-        } else {
-          const startTimer = setTimeout(() => {
-            if (!this.playbackState.stopRequested && this._activeSessionId === sessionId) {
-              onMarkerPlay({ type: 'prefix', text: prefixMarker.trim() });
-            }
-            this.cleanupTimers.delete(startTimer);
-          }, startWaitMs);
-          this.cleanupTimers.add(startTimer);
-        }
-
-        const endTimer = setTimeout(() => {
-          if (!this.playbackState.stopRequested && this._activeSessionId === sessionId) {
-            onMarkerPlay(null);
-          }
-          this.cleanupTimers.delete(endTimer);
-        }, endWaitMs);
-        this.cleanupTimers.add(endTimer);
-      }
-    }
-
-    // 2. 播放正文 Tokens
-    for (let i = 0; i < tokens.length; i++) {
-      if (this.playbackState.stopRequested || this._activeSessionId !== sessionId) break;
-
-      if (this.playbackConfig) {
-        dotSec = (1200 / this.playbackConfig.wpm) / 1000;
-        freq = this.playbackConfig.freq;
-        if (this.playbackConfig.numberMode !== numberMode) {
-          numberMode = this.playbackConfig.numberMode;
-          tokens = textToMorseTokens(text, numberMode);
-        }
-      }
-
-      const token = tokens[i];
-      if (token.index < startIndex) continue;
-
-      // 暂停等待循环
-      while (this.playbackState.isPaused && !this.playbackState.stopRequested && this._activeSessionId === sessionId) {
-        await new Promise(r => setTimeout(r, 60));
-        if (this.audioContext) {
-          currentTime = this.audioContext.currentTime + PRE_ROLL_LEAD_IN_SECONDS;
-        }
-      }
-      if (this.playbackState.stopRequested || this._activeSessionId !== sessionId) break;
-
-      // 高亮回调严格对齐发声时刻
-      if (onCharPlay && this.audioContext) {
-        const waitMs = Math.max(0, (currentTime - this.audioContext.currentTime) * 1000);
-        if (waitMs <= 4) {
-          onCharPlay(token, i);
-        } else {
-          const timerId = setTimeout(() => {
-            if (!this.playbackState.stopRequested && this._activeSessionId === sessionId) {
-              onCharPlay(token, i);
-            }
-            this.cleanupTimers.delete(timerId);
-          }, waitMs);
-          this.cleanupTimers.add(timerId);
-        }
-      }
-
-      if (token.code === null) {
-        currentTime += 4 * dotSec;
-      } else {
-        const symbols = token.code.split('');
-        for (let j = 0; j < symbols.length; j++) {
-          const sym = symbols[j];
-          const durSec = sym === '-' ? 3 * dotSec : 1 * dotSec;
-
-          this.playTone(freq, durSec * 1000, currentTime);
-          currentTime += durSec;
-
-          if (j < symbols.length - 1) {
-            currentTime += 1 * dotSec;
-          }
-        }
-        currentTime += 3 * dotSec;
-      }
-
-      // 动态控制调度前瞻窗口 (保持约 200ms 前瞻，防止定时器阻塞导致断流)
-      let interruptedDuringSound = false;
-      while (this.audioContext && currentTime - this.audioContext.currentTime > 0.2) {
-        await new Promise(r => setTimeout(r, 40));
-        if (this.playbackState.isPaused || this.playbackState.stopRequested || this._activeSessionId !== sessionId) {
-          const soundEndTime = token.code ? (currentTime - 3 * dotSec) : currentTime;
-          if (this.audioContext && this.audioContext.currentTime < soundEndTime) {
-            interruptedDuringSound = true;
-          }
-          break;
-        }
-      }
-
-      if (interruptedDuringSound && this.playbackState.isPaused) {
-        i--;
-        continue;
-      }
-    }
-
-    // 3. 播放报尾结束符 (如 'iii', 'iii +', 'AR', 'SK', '+')
-    if (!this.playbackState.stopRequested && this._activeSessionId === sessionId && enableMarkers && suffixMarker && suffixMarker.trim()) {
-      currentTime += 4 * dotSec;
-      const suffixStartAudioTime = currentTime;
-
-      const suffixTokens = textToMorseTokens(suffixMarker.trim(), this.playbackConfig.numberMode);
-      for (let s = 0; s < suffixTokens.length; s++) {
-        if (this.playbackState.stopRequested || this._activeSessionId !== sessionId) break;
-
-        while (this.playbackState.isPaused && !this.playbackState.stopRequested && this._activeSessionId === sessionId) {
-          await new Promise(r => setTimeout(r, 60));
-          if (this.audioContext) {
-            currentTime = this.audioContext.currentTime + PRE_ROLL_LEAD_IN_SECONDS;
-          }
-        }
-        if (this.playbackState.stopRequested || this._activeSessionId !== sessionId) break;
-
-        const sTok = suffixTokens[s];
-        if (sTok.code === null) {
-          currentTime += 4 * dotSec;
-        } else {
-          const symbols = sTok.code.split('');
-          for (let j = 0; j < symbols.length; j++) {
-            const sym = symbols[j];
-            const durSec = sym === '-' ? 3 * dotSec : 1 * dotSec;
-            this.playTone(freq, durSec * 1000, currentTime);
-            currentTime += durSec;
-            if (j < symbols.length - 1) currentTime += 1 * dotSec;
-          }
-          currentTime += 3 * dotSec;
-        }
-      }
-      const suffixEndAudioTime = currentTime;
-
-      // 实时音频时间同步触发 UI 报尾状态
-      if (onMarkerPlay && this.audioContext) {
-        const startWaitMs = Math.max(0, (suffixStartAudioTime - this.audioContext.currentTime) * 1000);
-        const endWaitMs = Math.max(0, (suffixEndAudioTime - this.audioContext.currentTime) * 1000);
-
-        if (startWaitMs <= 4) {
-          onMarkerPlay({ type: 'suffix', text: suffixMarker.trim() });
-        } else {
-          const startTimer = setTimeout(() => {
-            if (!this.playbackState.stopRequested && this._activeSessionId === sessionId) {
-              onMarkerPlay({ type: 'suffix', text: suffixMarker.trim() });
-            }
-            this.cleanupTimers.delete(startTimer);
-          }, startWaitMs);
-          this.cleanupTimers.add(startTimer);
-        }
-
-        const endTimer = setTimeout(() => {
-          if (!this.playbackState.stopRequested && this._activeSessionId === sessionId) {
-            onMarkerPlay(null);
-          }
-          this.cleanupTimers.delete(endTimer);
-        }, endWaitMs);
-        this.cleanupTimers.add(endTimer);
-      }
-
-      if (this.audioContext) {
-        const remainingWait = Math.max(0, (currentTime - this.audioContext.currentTime) * 1000);
-        if (remainingWait > 0) {
-          await new Promise(r => setTimeout(r, remainingWait));
-        }
-      }
-    }
-
-    if (this._activeSessionId === sessionId) {
-      this.playbackState.isPlaying = false;
-      this.scheduleIdleSuspend();
-      if (onMarkerPlay) onMarkerPlay(null);
-      if (onComplete && !this.playbackState.stopRequested) {
-        onComplete();
-      }
-    }
+    // 启动 25ms 轮询调度器
+    this.timerId = setInterval(() => this.scheduler(), LOOKAHEAD_INTERVAL_MS);
   }
 
   pause() {
+    if (!this.playbackState.isPlaying || this.playbackState.isPaused) return;
     this.playbackState.isPaused = true;
-    this.stopScheduledNodes();
+    if (this.timerId) {
+      clearInterval(this.timerId);
+      this.timerId = null;
+    }
+    const now = this.audioContext ? this.audioContext.currentTime : 0;
+    this.stopActiveNodes();
+
+    // 状态精确回退：将游标回退至实际正在发声或尚未发声的项目（消除前瞻缓冲区的时间超前）
+    for (let i = 0; i < this.queue.length; i++) {
+      const it = this.queue[i];
+      if (it.startTime !== undefined && (it.endTime > now || it.startTime > now)) {
+        this.queueIndex = i;
+        break;
+      }
+    }
   }
 
   async resume() {
-    this.resetIdleTimer();
-    await this.ensureReady();
+    if (!this.playbackState.isPlaying || !this.playbackState.isPaused) return;
+    await this.ensureContext();
     this.playbackState.isPaused = false;
-  }
-
-  stopScheduledNodes() {
-    this.cleanupTimers.forEach(clearTimeout);
-    this.cleanupTimers.clear();
-
-    const now = this.audioContext ? this.audioContext.currentTime : 0;
-    let lastEndTime = now;
-
-    this.currentNodes.forEach(({ oscillator, gainNode, startTime, endTime }) => {
-      try {
-        if (startTime > now) {
-          gainNode.gain.cancelScheduledValues(now);
-          gainNode.gain.setValueAtTime(0, now);
-          oscillator.stop(now + 0.001);
-        } else if (endTime > now) {
-          gainNode.gain.cancelScheduledValues(now);
-          gainNode.gain.setValueAtTime(gainNode.gain.value, now);
-          gainNode.gain.linearRampToValueAtTime(0, now + STOP_FADE_SECONDS);
-          oscillator.stop(now + STOP_FADE_SECONDS + 0.001);
-          lastEndTime = Math.max(lastEndTime, now + STOP_FADE_SECONDS);
-        }
-      } catch (e) {
-        console.error('Stop error:', e);
-      }
-    });
-
-    this.currentNodes = [];
-    return Math.max(50, (lastEndTime - now) * 1000 + 50);
+    this.nextNoteTime = (this.audioContext ? this.audioContext.currentTime : 0) + 0.05;
+    this.timerId = setInterval(() => this.scheduler(), LOOKAHEAD_INTERVAL_MS);
   }
 
   stop() {
-    this._activeSessionId = null;
-    this.playbackState.stopRequested = true;
+    if (this.timerId) {
+      clearInterval(this.timerId);
+      this.timerId = null;
+    }
+    this.stopActiveNodes();
+    this.queue = [];
+    this.queueIndex = 0;
     this.playbackState.isPlaying = false;
     this.playbackState.isPaused = false;
-    this.scheduleIdleSuspend();
-    return this.stopScheduledNodes();
+    this.playbackState.stopRequested = true;
+    if (this.callbacks.onMarkerPlay) this.callbacks.onMarkerPlay(null);
   }
 
   get currentTime() {
@@ -488,15 +344,12 @@ class DesktopAudioPlayer {
   }
 
   destroy() {
-    const closeDelay = this.stop();
+    this.stop();
     if (this.audioContext) {
-      const ctx = this.audioContext;
+      try {
+        this.audioContext.close();
+      } catch {}
       this.audioContext = null;
-      setTimeout(() => {
-        try {
-          ctx.close();
-        } catch {}
-      }, closeDelay + 40);
     }
   }
 }

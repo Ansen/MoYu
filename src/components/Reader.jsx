@@ -6,6 +6,7 @@ import TxtEngine from './reader/TxtEngine';
 import { parseTelegramContent } from '../utils/telegramParser';
 import TocSidebar from './reader/TocSidebar';
 import { useI18n } from '../i18n';
+import { FONT_OPTIONS } from '../config/fonts';
 
 export default function Reader({ bookData, onClose, jumpToSibling, jumpToChapter, onRegenerate }) {
   const { t } = useI18n();
@@ -33,7 +34,7 @@ export default function Reader({ bookData, onClose, jumpToSibling, jumpToChapter
   const [viewMode, setViewMode] = useState(() => localStorage.getItem('pref_reader_view_mode') || 'grid');
   const [fontFamily, setFontFamily] = useState(() => {
     const saved = localStorage.getItem('pref_reader_font_family');
-    const valid = ['Cascadia Mono', 'JetBrains Mono', 'Fira Code'];
+    const valid = FONT_OPTIONS.map(f => f.id);
     return valid.includes(saved) ? saved : 'Cascadia Mono';
   });
   const [enableMarkers, setEnableMarkers] = useState(() => localStorage.getItem('pref_reader_enable_markers') !== 'false');
@@ -48,8 +49,6 @@ export default function Reader({ bookData, onClose, jumpToSibling, jumpToChapter
   const baseGeo = Math.sqrt(800 * 600);
   const fontScale = Math.max(0.5, currentGeo / baseGeo);
   const displayFontSize = Math.round(baseFontSize * fontScale);
-
-  const [isAudioReady, setIsAudioReady] = useState(false);
 
   useEffect(() => {
     let timeout;
@@ -66,15 +65,9 @@ export default function Reader({ bookData, onClose, jumpToSibling, jumpToChapter
     };
   }, []);
 
-  // 阅读器打开时提前预热并唤醒 AudioContext，消除点播放时的硬件冷启动抖动
+  // 离开阅读器时清理播放器
   useEffect(() => {
-    let isMounted = true;
-    audioPlayer.ensureReady()
-      .then(() => { if (isMounted) setIsAudioReady(true); })
-      .catch(() => { if (isMounted) setIsAudioReady(true); });
-      
     return () => {
-      isMounted = false;
       audioPlayer.stop();
     };
   }, []);
@@ -114,17 +107,17 @@ export default function Reader({ bookData, onClose, jumpToSibling, jumpToChapter
 
   const togglePlay = useCallback(async () => {
     if (isPlaying && !isPaused) {
-      // 1. 暂停操作：即刻响应 UI 与音频
+      // 1. 暂停
       audioPlayer.pause();
       setIsPaused(true);
       setActiveMarker(null);
       if (engineRef.current) engineRef.current.saveProgress();
     } else if (isPlaying && isPaused) {
-      // 2. 继续播放操作：极速乐观更新 UI，异步确保音频引擎唤醒后发声
+      // 2. 继续
       setIsPaused(false);
       await audioPlayer.resume();
     } else {
-      // 3. 开始全新播放：极速乐观更新 UI 按钮状态
+      // 3. 开始全新播放
       if (!engineRef.current) return;
       setIsPlaying(true);
       setIsPaused(false);
@@ -134,14 +127,14 @@ export default function Reader({ bookData, onClose, jumpToSibling, jumpToChapter
         const { text, startIndex } = await engineRef.current.getChapterText();
         if (!text || !text.trim()) {
           setIsPlaying(false);
+          setIsPaused(false);
           return;
         }
 
-        // 若文档检测到特定的起止符且用户未关闭起止符，优先使用
         const effectivePrefix = enableMarkers ? (prefixMarker || parsedTelegram.startMarker || '') : '';
         const effectiveSuffix = enableMarkers ? (suffixMarker || parsedTelegram.endMarker || '') : '';
 
-        audioPlayer.playMorseText(text, {
+        await audioPlayer.playMorseText(text, {
           wpm: morseSpeed,
           freq: morseFreq,
           numberMode: numberMode,
@@ -243,7 +236,6 @@ export default function Reader({ bookData, onClose, jumpToSibling, jumpToChapter
         setSuffixMarker={setSuffixMarker}
         autoFit={autoFit}
         setAutoFit={setAutoFit}
-        isAudioReady={isAudioReady}
         isPlaying={isPlaying}
         isPaused={isPaused}
         togglePlay={togglePlay}
@@ -292,12 +284,12 @@ export default function Reader({ bookData, onClose, jumpToSibling, jumpToChapter
                 activeMarker.type === 'prefix' ? (
                   <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11.5px] font-mono font-semibold bg-indigo-50 text-indigo-600 dark:bg-indigo-950/80 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 shadow-2xs animate-pulse">
                     <Radio size={12} className="text-indigo-500 animate-spin shrink-0" style={{ animationDuration: '3s' }} />
-                    <span className="truncate">报头起始符: <strong className="font-bold text-indigo-700 dark:text-indigo-200">{activeMarker.text}</strong> (发送中)</span>
+                    <span className="truncate">{t('reader.marker.prefixSending', { marker: activeMarker.text }, `报头起始符: ${activeMarker.text} (发送中)`)}</span>
                   </div>
                 ) : (
                   <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11.5px] font-mono font-semibold bg-emerald-50 text-emerald-600 dark:bg-emerald-950/80 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 shadow-2xs animate-pulse">
                     <Radio size={12} className="text-emerald-500 animate-spin shrink-0" style={{ animationDuration: '3s' }} />
-                    <span className="truncate">报尾结束符: <strong className="font-bold text-emerald-700 dark:text-emerald-200">{activeMarker.text}</strong> (发送中)</span>
+                    <span className="truncate">{t('reader.marker.suffixSending', { marker: activeMarker.text }, `报尾结束符: ${activeMarker.text} (发送中)`)}</span>
                   </div>
                 )
               ) : (
@@ -373,7 +365,7 @@ export default function Reader({ bookData, onClose, jumpToSibling, jumpToChapter
               </div>
             ) : (
               <div className="font-mono text-slate-600 dark:text-slate-400 text-[12px] font-medium shrink-0">
-                {t('reader.stats.totalChars', '共 {count} 字符').replace('{count}', (parsedTelegram.cleanText ? parsedTelegram.cleanText.replace(/\s+/g, '').length : (bookData.data?.length || 0)).toLocaleString())}
+                {t('reader.stats.totalChars', { count: (parsedTelegram.cleanText ? parsedTelegram.cleanText.replace(/\s+/g, '').length : (bookData.data?.length || 0)).toLocaleString() }, `共 ${(parsedTelegram.cleanText ? parsedTelegram.cleanText.replace(/\s+/g, '').length : (bookData.data?.length || 0)).toLocaleString()} 字符`)}
               </div>
             )}
 

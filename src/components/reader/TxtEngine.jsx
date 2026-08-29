@@ -3,8 +3,10 @@ import useHighlighter from './useHighlighter';
 import { saveReadingProgress, loadReadingProgress } from '../../utils/store';
 import { getFontFamilyCss } from '../../config/fonts';
 import { parseTelegramContent } from '../../utils/telegramParser';
+import { useI18n } from '../../i18n';
 
 const TxtEngine = forwardRef(({ bookData, fontSize, fontFamily = 'Cascadia Mono', viewMode = 'grid', autoFit = true, onTocLoaded, onChapterChange, jumpToSibling, jumpToChapter }, ref) => {
+  const { t } = useI18n();
   const viewerRef = useRef(null);
   const tableRef = useRef(null);
   const [fitFontSize, setFitFontSize] = useState(fontSize);
@@ -64,14 +66,15 @@ const TxtEngine = forwardRef(({ bookData, fontSize, fontFamily = 'Cascadia Mono'
   const effectiveFontSize = autoFit ? fitFontSize : fontSize;
 
   const handleScrollRequest = useCallback((rect) => {
+    if (autoFit) return; // In auto-fit mode, entire table is visible without scrolling
     const container = viewerRef.current;
     if (container) {
       const containerRect = container.getBoundingClientRect();
-      if (rect.top < containerRect.top || rect.bottom > containerRect.bottom) {
-        container.scrollTo({ top: container.scrollTop + (rect.top - containerRect.top) - containerRect.height / 2, behavior: 'smooth' });
+      if (rect.top < containerRect.top + 30 || rect.bottom > containerRect.bottom - 30) {
+        container.scrollTo({ top: container.scrollTop + (rect.top - containerRect.top) - containerRect.height / 2, behavior: 'auto' });
       }
     }
-  }, []);
+  }, [autoFit]);
 
   const { textRootRef, textNodesRef, clearHighlight, resetHighlightState, highlightToken } = useHighlighter(handleScrollRequest);
 
@@ -161,54 +164,6 @@ const TxtEngine = forwardRef(({ bookData, fontSize, fontFamily = 'Cascadia Mono'
 
     return () => clearTimeout(timer);
   }, [bookData, onTocLoaded, onChapterChange, clearHighlight, resetHighlightState, extractNodes]);
-
-  // Dynamic highlight theme listener (guarantees real-time theme syncing between Dark & Light modes)
-  useEffect(() => {
-    const updateHighlightTheme = () => {
-      const isDarkMode = document.documentElement.classList.contains('dark');
-      
-      // 浅色模式：清晰柔和的淡蓝底色 + 深邃蓝字（绝不消失，清晰美观）
-      // 深色模式：通透深蓝底色 + 柔亮淡蓝字（温润护眼，绝不刺眼）
-      const playedBg = isDarkMode ? 'rgba(59, 130, 246, 0.20)' : 'rgba(37, 99, 235, 0.16)';
-      const playedColor = isDarkMode ? '#93c5fd' : '#1e40af';
-      const activeBg = isDarkMode ? '#3b82f6' : '#2563eb';
-      const activeColor = '#ffffff';
-
-      let styleEl = document.getElementById('moyu-reader-highlight-style');
-      if (!styleEl) {
-        styleEl = document.createElement('style');
-        styleEl.id = 'moyu-reader-highlight-style';
-        document.head.appendChild(styleEl);
-      }
-      styleEl.textContent = `
-        ::highlight(morse-played) { 
-          background-color: ${playedBg} !important; 
-          color: ${playedColor} !important; 
-        }
-        ::highlight(morse-active) { 
-          background-color: ${activeBg} !important; 
-          color: ${activeColor} !important; 
-          font-weight: 700 !important; 
-        }
-      `;
-    };
-
-    updateHighlightTheme();
-
-    const observer = new MutationObserver((mutations) => {
-      for (const mutation of mutations) {
-        if (mutation.attributeName === 'class') {
-          updateHighlightTheme();
-        }
-      }
-    });
-
-    observer.observe(document.documentElement, { attributes: true });
-
-    return () => {
-      observer.disconnect();
-    };
-  }, []);
 
   const getProgressKey = useCallback(() => {
     return bookData?.type === 'epub' 
@@ -316,10 +271,10 @@ const TxtEngine = forwardRef(({ bookData, fontSize, fontFamily = 'Cascadia Mono'
     getPaginationLabel: () => {
       if (bookData?.type === 'epub') {
         const total = bookData.toc?.length || 1;
-        return total > 1 ? `第 ${(bookData.currentChapterIndex || 0) + 1} / ${total} 章` : '';
+        return total > 1 ? t('reader.chapter.info', { current: (bookData.currentChapterIndex || 0) + 1, total }, `第 ${(bookData.currentChapterIndex || 0) + 1} / ${total} 章`) : '';
       }
       const total = bookData?.siblings?.length || 1;
-      return total > 1 ? `文件 ${(bookData?.currentIndex || 0) + 1} / ${total}` : '';
+      return total > 1 ? t('reader.file.info', { current: (bookData?.currentIndex || 0) + 1, total }, `文件 ${(bookData?.currentIndex || 0) + 1} / ${total}`) : '';
     }
   }));
 
@@ -360,7 +315,7 @@ const TxtEngine = forwardRef(({ bookData, fontSize, fontFamily = 'Cascadia Mono'
             {rows.map((row, rowIdx) => (
               <tr 
                 key={rowIdx} 
-                className={`transition-colors group ${
+                className={`group ${
                   rowIdx % 2 === 1 
                     ? 'bg-slate-100/85 dark:bg-[#262626] hover:bg-indigo-100/70 dark:hover:bg-indigo-950/60' 
                     : 'bg-white dark:bg-[#181818] hover:bg-slate-50 dark:hover:bg-[#202020]'
@@ -369,7 +324,7 @@ const TxtEngine = forwardRef(({ bookData, fontSize, fontFamily = 'Cascadia Mono'
                 {/* Left Line Number Gutter */}
                 <td 
                   data-skip-speech="true" 
-                  className="w-7 sm:w-8 py-2 px-1 text-center text-slate-400 dark:text-[#666666] group-hover:text-slate-700 dark:group-hover:text-slate-300 transition-colors select-none text-[11px] font-medium border-r border-slate-300 dark:border-[#383838]"
+                  className="w-7 sm:w-8 py-2 px-1 text-center text-slate-400 dark:text-[#666666] group-hover:text-slate-700 dark:group-hover:text-slate-300 select-none text-[11px] font-medium border-r border-slate-300 dark:border-[#383838]"
                 >
                   {String(rowIdx + 1).padStart(2, '0')}
                 </td>
@@ -379,7 +334,7 @@ const TxtEngine = forwardRef(({ bookData, fontSize, fontFamily = 'Cascadia Mono'
                   return (
                     <td
                       key={colIdx}
-                      className="py-2 px-1 text-center whitespace-nowrap font-normal transition-colors"
+                      className="py-2 px-1 text-center whitespace-nowrap font-normal"
                       style={{
                         fontSize: `${effectiveFontSize}px`,
                         lineHeight: 1.3,
@@ -390,7 +345,7 @@ const TxtEngine = forwardRef(({ bookData, fontSize, fontFamily = 'Cascadia Mono'
                       }}
                     >
                       {token ? (
-                        <span className="morse-word px-1.5 py-0.5 rounded-md text-slate-800 dark:text-slate-200 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors tracking-wide">
+                        <span className="morse-word px-1.5 py-0.5 rounded-md text-slate-800 dark:text-slate-200 hover:text-indigo-600 dark:hover:text-indigo-400 tracking-wide">
                           {token}
                         </span>
                       ) : (

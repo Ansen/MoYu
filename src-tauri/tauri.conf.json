@@ -2,7 +2,7 @@
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "MoYu",
   "mainBinaryName": "moyu",
-  "version": "0.1.12",
+  "version": "0.1.13",
   "identifier": "com.moyu.desktop",
   "build": {
     "frontendDist": "../dist",
@@ -14,7 +14,7 @@
     "windows": [
       {
         "title": "摩语 MoYu",
-        "width": 960,
+        "width": 1010,
         "height": 680,
         "center": true,
         "minWidth": 800,

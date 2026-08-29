@@ -10,25 +10,35 @@ fn generate_epub(title: String, chapters: Vec<String>) -> Result<Vec<u8>, String
     builder.metadata("title", &title)
         .map_err(|e| e.to_string())?;
 
-    builder.stylesheet(&b"body { font-family: Consolas, 'Cascadia Mono', monospace; font-variant-ligatures: none; font-feature-settings: 'liga' 0, 'calt' 0; white-space: pre-wrap; line-height: 1.2; word-wrap: break-word; font-size: 1.2em; }"[..])
-        .map_err(|e| e.to_string())?;
-
     for (i, content) in chapters.iter().enumerate() {
-        let escaped_content = content
-            .replace('&', "&amp;")
-            .replace('<', "&lt;")
-            .replace('>', "&gt;");
-
         let chapter_html = format!(
             r#"<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE html>
 <html xmlns="http://www.w3.org/1999/xhtml">
 <head>
+<meta charset="utf-8"/>
+<title>Page {}</title>
+<style type="text/css">
+body {{
+    margin: 1.5em;
+    padding: 0;
+    background-color: #ffffff;
+    color: #111111;
+    font-family: 'Cascadia Mono', 'SF Mono', 'JetBrains Mono', 'Fira Code', Consolas, monospace;
+}}
+.telegram-content {{
+    line-height: 1.8;
+    word-break: break-all;
+    white-space: pre-wrap;
+}}
+</style>
 </head>
 <body>
-<p>{}</p>
+{}
 </body>
 </html>"#,
-            escaped_content
+            i + 1,
+            content
         );
         
         builder.add_content(
@@ -43,6 +53,15 @@ fn generate_epub(title: String, chapters: Vec<String>) -> Result<Vec<u8>, String
     Ok(out)
 }
 
+#[tauri::command]
+fn toggle_devtools(window: tauri::WebviewWindow) {
+    if window.is_devtools_open() {
+        window.close_devtools();
+    } else {
+        window.open_devtools();
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let mut builder = tauri::Builder::default()
@@ -51,7 +70,7 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_persisted_scope::init())
         .plugin(tauri_plugin_store::Builder::new().build())
-        .invoke_handler(tauri::generate_handler![generate_epub]);
+        .invoke_handler(tauri::generate_handler![generate_epub, toggle_devtools]);
 
     #[cfg(desktop)]
     {

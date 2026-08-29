@@ -1,4 +1,3 @@
-import audioPlayer from '../../utils/audioPlayer';
 import React, { useState, useRef } from 'react';
 import { 
   ArrowLeft, 
@@ -55,7 +54,6 @@ export default function ReaderHeader({
   togglePlay,
   stopPlay,
   onRegenerate,
-  isAudioReady = true,
 }) {
   const { t } = useI18n();
   const [isNumberModeOpen, setIsNumberModeOpen] = useState(false);
@@ -119,14 +117,14 @@ export default function ReaderHeader({
         <div className="flex items-center gap-1.5 sm:gap-2 bg-slate-200/80 dark:bg-[#181818] px-2.5 py-1 rounded-xl border border-slate-300/70 dark:border-[#2d2d2d] shadow-2xs">
           
           {/* Font Size Stepper */}
-          <div className="flex items-center gap-1 shrink-0" title={`${t('reader.font.size')} (支持点击+-或滚轮微调)`}>
+          <div className="flex items-center gap-1 shrink-0" title={`${t('reader.font.size')} (${t('reader.tooltip.fontSizeAdjust', '支持点击+-或滚轮微调')})`}>
             <Type size={13} className="text-slate-500 shrink-0" />
             <div className="flex items-center bg-white dark:bg-[#252525] border border-slate-300 dark:border-[#383838] rounded-md overflow-hidden shadow-2xs h-7">
               <button
                 type="button"
                 onClick={() => setBaseFontSize(Math.max(10, Math.round(baseFontSize) - 2))}
                 className="w-4.5 h-full flex items-center justify-center text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-slate-100 dark:hover:bg-[#333333] transition-colors cursor-pointer select-none active:bg-slate-200 dark:active:bg-[#3a3a3a]"
-                title="减小字号 (-2)"
+                title={t('reader.tooltip.fontSizeDec', '减小字号 (-2)')}
               >
                 <Minus size={10} className="stroke-[2.5]" />
               </button>
@@ -156,7 +154,7 @@ export default function ReaderHeader({
                 type="button"
                 onClick={() => setBaseFontSize(Math.min(120, Math.round(baseFontSize) + 2))}
                 className="w-4.5 h-full flex items-center justify-center text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-slate-100 dark:hover:bg-[#333333] transition-colors cursor-pointer select-none active:bg-slate-200 dark:active:bg-[#3a3a3a]"
-                title="增大字号 (+2)"
+                title={t('reader.tooltip.fontSizeInc', '增大字号 (+2)')}
               >
                 <Plus size={10} className="stroke-[2.5]" />
               </button>
@@ -166,14 +164,14 @@ export default function ReaderHeader({
           <div className="h-3 w-px bg-slate-300 dark:bg-[#333333]"></div>
 
           {/* Speed Stepper (WPM) */}
-          <div className="flex items-center gap-1 shrink-0" title={`${t('reader.speed')} (支持点击+-或滚轮微调)`}>
+          <div className="flex items-center gap-1 shrink-0" title={`${t('reader.speed')} (${t('reader.tooltip.fontSizeAdjust', '支持点击+-或滚轮微调')})`}>
             <Activity size={13} className="text-slate-500 shrink-0" />
             <div className="flex items-center bg-white dark:bg-[#252525] border border-slate-300 dark:border-[#383838] rounded-md overflow-hidden shadow-2xs h-7">
               <button
                 type="button"
                 onClick={() => setMorseSpeed(Math.max(5, morseSpeed - 1))}
                 className="w-4.5 h-full flex items-center justify-center text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-slate-100 dark:hover:bg-[#333333] transition-colors cursor-pointer select-none active:bg-slate-200 dark:active:bg-[#3a3a3a]"
-                title="减速 (-1 WPM)"
+                title={t('reader.tooltip.speedDec', '减速 (-1 WPM)')}
               >
                 <Minus size={10} className="stroke-[2.5]" />
               </button>
@@ -197,7 +195,7 @@ export default function ReaderHeader({
                 type="button"
                 onClick={() => setMorseSpeed(Math.min(60, morseSpeed + 1))}
                 className="w-4.5 h-full flex items-center justify-center text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-slate-100 dark:hover:bg-[#333333] transition-colors cursor-pointer select-none active:bg-slate-200 dark:active:bg-[#3a3a3a]"
-                title="加速 (+1 WPM)"
+                title={t('reader.tooltip.speedInc', '加速 (+1 WPM)')}
               >
                 <Plus size={10} className="stroke-[2.5]" />
               </button>
@@ -208,14 +206,14 @@ export default function ReaderHeader({
           <div className="h-3 w-px bg-slate-300 dark:bg-[#333333]"></div>
 
           {/* Frequency Stepper (Hz) */}
-          <div className="flex items-center gap-1 shrink-0" title={`${t('reader.freq')} (支持点击+-或滚轮微调)`}>
+          <div className="flex items-center gap-1 shrink-0" title={`${t('reader.freq')} (${t('reader.tooltip.fontSizeAdjust', '支持点击+-或滚轮微调')})`}>
             <Music size={13} className="text-slate-500 shrink-0" />
             <div className="flex items-center bg-white dark:bg-[#252525] border border-slate-300 dark:border-[#383838] rounded-md overflow-hidden shadow-2xs h-7">
               <button
                 type="button"
                 onClick={() => setMorseFreq(Math.max(100, morseFreq - 20))}
                 className="w-4.5 h-full flex items-center justify-center text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-slate-100 dark:hover:bg-[#333333] transition-colors cursor-pointer select-none active:bg-slate-200 dark:active:bg-[#3a3a3a]"
-                title="降调 (-20 Hz)"
+                title={t('reader.tooltip.freqDec', '降调 (-20 Hz)')}
               >
                 <Minus size={10} className="stroke-[2.5]" />
               </button>
@@ -240,7 +238,7 @@ export default function ReaderHeader({
                 type="button"
                 onClick={() => setMorseFreq(Math.min(1500, morseFreq + 20))}
                 className="w-4.5 h-full flex items-center justify-center text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-slate-100 dark:hover:bg-[#333333] transition-colors cursor-pointer select-none active:bg-slate-200 dark:active:bg-[#3a3a3a]"
-                title="升调 (+20 Hz)"
+                title={t('reader.tooltip.freqInc', '升调 (+20 Hz)')}
               >
                 <Plus size={10} className="stroke-[2.5]" />
               </button>
@@ -306,24 +304,7 @@ export default function ReaderHeader({
 
           <div className="h-3 w-px bg-slate-300 dark:bg-[#333333]"></div>
 
-          {/* Radio Harmonics One-Click Toggle Switch */}
-          <button
-            type="button"
-            onClick={() => setUseHarmonics(!useHarmonics)}
-            className={`h-7 flex items-center gap-1 px-2 rounded-md text-[11.5px] font-medium transition-all cursor-pointer whitespace-nowrap select-none border ${
-              useHarmonics
-                ? 'bg-indigo-50/90 dark:bg-indigo-950/50 border-indigo-300 dark:border-indigo-600 text-indigo-600 dark:text-indigo-300 font-semibold shadow-2xs ring-1 ring-indigo-400/20'
-                : 'bg-white dark:bg-[#252525] border-slate-300 dark:border-[#383838] text-slate-600 dark:text-slate-400 hover:border-slate-400 dark:hover:border-[#4a4a4a] hover:text-slate-800 dark:hover:text-[#dddddd] shadow-2xs'
-            }`}
-            title={useHarmonics ? `${t('reader.harmonics')} (已开启)` : t('reader.harmonics.desc')}
-          >
-            <Radio size={12} className={useHarmonics ? "text-indigo-500 dark:text-indigo-400 shrink-0" : "text-slate-400 shrink-0"} />
-            <span>{t('reader.harmonics.short')}</span>
-          </button>
-
-          <div className="h-3 w-px bg-slate-300 dark:bg-[#333333]"></div>
-
-          {/* More Settings Dropdown Menu (Contains Layout Mode & Font Selector) */}
+          {/* More Settings Dropdown Menu (Contains Layout Mode, Harmonics, Font Selector & Markers) */}
           <div className="relative flex items-center shrink-0" ref={moreMenuRef}>
             <button
               type="button"
@@ -367,6 +348,31 @@ export default function ReaderHeader({
                         <span
                           className={`absolute top-0.5 left-0.5 h-3.5 w-3.5 rounded-full bg-white transition-transform shadow-xs ${
                             autoFit ? 'translate-x-3.5' : 'translate-x-0'
+                          }`}
+                        />
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Row 2: Radio Harmonics Switch */}
+                  {setUseHarmonics && (
+                    <div className="flex items-center justify-between py-1 px-1.5 rounded-lg hover:bg-slate-50 dark:hover:bg-[#252525]/60 transition-colors">
+                      <div className="flex items-center gap-1.5">
+                        <Radio size={13} className={useHarmonics ? "text-indigo-600 dark:text-indigo-400" : "text-slate-400"} />
+                        <span className="text-[12px] text-slate-700 dark:text-slate-300 font-medium">
+                          {t('reader.harmonics.short')}
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setUseHarmonics(!useHarmonics)}
+                        className={`h-4.5 w-8 shrink-0 rounded-full transition-colors relative cursor-pointer ${
+                          useHarmonics ? 'bg-indigo-600' : 'bg-slate-300 dark:bg-[#3e3e3e]'
+                        }`}
+                      >
+                        <span
+                          className={`absolute top-0.5 left-0.5 h-3.5 w-3.5 rounded-full bg-white transition-transform shadow-xs ${
+                            useHarmonics ? 'translate-x-3.5' : 'translate-x-0'
                           }`}
                         />
                       </button>
@@ -576,18 +582,15 @@ export default function ReaderHeader({
 
         {/* Primary Play / Pause / Resume Button */}
         <button
+          type="button"
           onMouseDown={(e) => e.preventDefault()}
-          onMouseEnter={() => { if (audioPlayer?.ensureReady) audioPlayer.ensureReady(); }}
           onClick={togglePlay}
-          disabled={!isAudioReady}
           className={`h-8 px-3 min-w-[78px] sm:min-w-[84px] rounded-lg font-medium flex items-center justify-center gap-1.5 shrink-0 transition-all shadow-xs active:scale-95 cursor-pointer select-none text-[12.5px] whitespace-nowrap ${
-            !isAudioReady
-              ? 'bg-slate-200 dark:bg-[#2a2a2a] text-slate-400 dark:text-slate-500 cursor-not-allowed opacity-60'
-              : (isPlaying && !isPaused
+            isPlaying && !isPaused
               ? 'bg-amber-500/15 dark:bg-amber-500/20 text-amber-700 dark:text-amber-300 border border-amber-300/70 dark:border-amber-700/60 hover:bg-amber-500/25 dark:hover:bg-amber-500/30'
               : isPaused
               ? 'bg-emerald-500/15 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border border-emerald-300/70 dark:border-emerald-700/60 hover:bg-emerald-500/25 dark:hover:bg-emerald-500/30'
-              : 'bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-500/80 dark:hover:bg-indigo-500 dark:border dark:border-indigo-400/30 text-white')
+              : 'bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-500/80 dark:hover:bg-indigo-500 dark:border dark:border-indigo-400/30 text-white'
           }`}
         >
           {isPlaying && !isPaused ? (
@@ -596,7 +599,7 @@ export default function ReaderHeader({
             <Play size={13} className="stroke-[2.5] ml-0.5 fill-current" />
           )}
           <span>
-            {!isAudioReady ? t('reader.initializing') : (isPlaying && !isPaused ? t('reader.pause') : isPaused ? t('reader.resume') : t('reader.play'))}
+            {isPlaying && !isPaused ? t('reader.pause') : isPaused ? t('reader.resume') : t('reader.play')}
           </span>
         </button>
       </div>

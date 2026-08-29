@@ -1,5 +1,5 @@
-import audioPlayer from './utils/audioPlayer';
 import React, { useState, useEffect, useRef } from 'react';
+import { invoke } from '@tauri-apps/api/core';
 import Titlebar from './components/layout/Titlebar';
 import Sidebar from './components/layout/Sidebar';
 import TranslatorView from './views/Translator';
@@ -11,6 +11,7 @@ import AboutModal from './components/AboutModal';
 import { useEbook } from './hooks/useEbook';
 import { checkForUpdates, installUpdate } from './utils/updater';
 import { useI18n } from './i18n';
+
 function App() {
   const [currentView, setView] = useState('home');
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -21,26 +22,25 @@ function App() {
   const [updateInfo, setUpdateInfo] = useState(null);
   const { t } = useI18n();
 
-  
-  // Global proactive AudioContext unlock & hardware pre-warm on first user interaction
-  useEffect(() => {
-    const handleFirstInteraction = () => {
-      audioPlayer.ensureReady().catch(() => {});
-      window.removeEventListener('pointerdown', handleFirstInteraction);
-      window.removeEventListener('keydown', handleFirstInteraction);
-    };
-    window.addEventListener('pointerdown', handleFirstInteraction, { passive: true });
-    window.addEventListener('keydown', handleFirstInteraction, { passive: true });
-    return () => {
-      window.removeEventListener('pointerdown', handleFirstInteraction);
-      window.removeEventListener('keydown', handleFirstInteraction);
-    };
-  }, []);
-
   // Lift ebook state up to share between Home and Library
   const ebook = useEbook();
 
-  // Startup behavior & theme initialization
+  // 开发者调试工具快捷键 (F12 或 Ctrl+Shift+Alt+D)
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (
+        e.key === 'F12' || 
+        (e.ctrlKey && e.shiftKey && (e.key === 'I' || e.key === 'i')) ||
+        (e.ctrlKey && e.shiftKey && e.altKey && (e.key === 'D' || e.key === 'd'))
+      ) {
+        e.preventDefault();
+        invoke('toggle_devtools').catch(() => {});
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
   useEffect(() => {
     const storedTheme = localStorage.getItem('theme');
     if (storedTheme) setTheme(storedTheme);

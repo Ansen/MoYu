@@ -34,7 +34,21 @@ export function testI18nReader() {
     'reader.markers.customPrefix',
     'reader.markers.customSuffix',
     'reader.markers.clear',
-    'reader.markers.none'
+    'reader.markers.none',
+    'reader.pages.unit',
+    'reader.chapter.info',
+    'reader.file.info',
+    'reader.stats.totalChars',
+    'reader.marker.prefixSending',
+    'reader.marker.suffixSending',
+    'common.copy',
+    'common.copied',
+    'common.fontSize.decrease',
+    'common.fontSize.increase',
+    'generator.epubPages',
+    'generator.epubExport.generating',
+    'generator.epubExport.packaging',
+    'generator.epubExport.saving'
   ];
 
   for (const lang of ['zh', 'en']) {

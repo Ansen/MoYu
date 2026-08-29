@@ -4,6 +4,8 @@ import { testMarkersConfig } from './markers.test.js';
 import { testHighlighterLogic } from './highlighter_logic.test.js';
 import { testReaderToolbarLogic } from './reader_toolbar.test.js';
 import { testAudioPlayerLogic } from './audio_player.test.js';
+import { testEpubExportFormatting } from './epub_export.test.js';
+import { testPdfExport } from './pdf_export.test.js';
 
 console.log('========================================');
 console.log('    MoYu Reader Unit Test Suite        ');
@@ -17,6 +19,8 @@ async function main() {
     testHighlighterLogic();
     testReaderToolbarLogic();
     await testAudioPlayerLogic();
+    testEpubExportFormatting();
+    testPdfExport();
     
     console.log('========================================');
     console.log('🎉 ALL UNIT TESTS PASSED SUCCESSFULLY! ');

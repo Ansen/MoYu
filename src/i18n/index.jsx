@@ -1,9 +1,18 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { translations } from './locales';
 
-const defaultTranslate = (key, params) => {
+const defaultTranslate = (key, params, fallback) => {
   const dict = translations['zh'] || {};
-  let str = dict[key] || key;
+  let str = dict[key];
+  if (str === undefined) {
+    if (typeof params === 'string') {
+      str = params;
+    } else if (typeof fallback === 'string') {
+      str = fallback;
+    } else {
+      str = key;
+    }
+  }
   if (params && typeof params === 'object') {
     Object.keys(params).forEach(k => {
       str = str.replace(new RegExp(`\\{${k}\\}`, 'g'), params[k]);
@@ -53,9 +62,18 @@ export function I18nProvider({ children }) {
     }
   }, [langSetting]);
 
-  const t = (key, params) => {
-    const dict = translations[activeLang] || translations['zh'];
-    let str = dict[key] || key;
+  const t = (key, params, fallback) => {
+    const dict = translations[activeLang] || translations['zh'] || {};
+    let str = dict[key];
+    if (str === undefined) {
+      if (typeof params === 'string') {
+        str = params;
+      } else if (typeof fallback === 'string') {
+        str = fallback;
+      } else {
+        str = key;
+      }
+    }
     if (params && typeof params === 'object') {
       Object.keys(params).forEach(k => {
         str = str.replace(new RegExp(`\\{${k}\\}`, 'g'), params[k]);

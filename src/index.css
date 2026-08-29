@@ -3,7 +3,7 @@
 
 @layer base {
   body {
-    @apply bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-200 antialiased transition-colors duration-300;
+    @apply bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-200 antialiased;
   }
 
   .font-mono, pre, code, kbd, samp {
@@ -29,35 +29,28 @@
   }
 }
 
+/* 原生 CSS 自定义高亮属性（纯 CSS 零延迟响应主题切换） */
+:root {
+  --morse-played-bg: rgba(37, 99, 235, 0.16);
+  --morse-played-color: #1e40af;
+  --morse-active-bg: #2563eb;
+  --morse-active-color: #ffffff;
+}
 
-.dark
+.dark {
+  --morse-played-bg: rgba(59, 130, 246, 0.20);
+  --morse-played-color: #93c5fd;
+  --morse-active-bg: #3b82f6;
+  --morse-active-color: #ffffff;
+}
 
-/* 浅色模式阅读高亮层次 */
-
-
-/* 深色模式阅读高亮层次：已读文字沉底弱化（绝不刺眼），未读文字与当前光标清晰明亮 */
-.dark
-
-/* 浅色模式阅读高亮层次 */
 ::highlight(morse-played) {
-  background-color: rgba(37, 99, 235, 0.16) !important;
-  color: #1e40af !important;
+  background-color: var(--morse-played-bg) !important;
+  color: var(--morse-played-color) !important;
 }
 
 ::highlight(morse-active) {
-  background-color: #2563eb !important;
-  color: #ffffff !important;
-  font-weight: 700 !important;
-}
-
-/* 深色模式阅读高亮层次 */
-.dark ::highlight(morse-played) {
-  background-color: rgba(59, 130, 246, 0.20) !important;
-  color: #93c5fd !important;
-}
-
-.dark ::highlight(morse-active) {
-  background-color: #3b82f6 !important;
-  color: #ffffff !important;
+  background-color: var(--morse-active-bg) !important;
+  color: var(--morse-active-color) !important;
   font-weight: 700 !important;
 }

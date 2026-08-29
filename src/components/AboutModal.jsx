@@ -3,6 +3,7 @@ import { X, Mail, Globe, Info } from 'lucide-react';
 import { getVersion } from '@tauri-apps/api/app';
 import { checkForUpdates, installUpdate } from '../utils/updater';
 import { useI18n } from '../i18n';
+import { handleDevtoolsEasterEgg } from '../utils/easterEgg';
 
 const GithubIcon = ({ size = 16, className = "" }) => (
   <svg 
@@ -87,14 +88,22 @@ export default function AboutModal({ isOpen, onClose }) {
       <div className="relative w-full max-w-sm bg-white dark:bg-[#1a1a1a] rounded-2xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200 border border-slate-200 dark:border-[#333333]">
         
         {/* Header Background */}
-        <div className="h-28 bg-gradient-to-br from-indigo-600 to-slate-900 relative flex flex-col items-center justify-center pt-2">
-          <img src="/logo.png" className="w-10 h-10 object-contain drop-shadow-md mb-1" alt="MoYu Logo" />
-          <h1 className="text-2xl font-extrabold text-white tracking-wider drop-shadow-md z-10 flex items-center gap-2">
+        <div className="h-28 bg-gradient-to-br from-indigo-600 to-slate-900 relative flex flex-col items-center justify-center pt-2 select-none cursor-default">
+          <img 
+            src="/logo.png" 
+            className="w-10 h-10 object-contain drop-shadow-md mb-1 cursor-default" 
+            alt="MoYu Logo"
+            onClick={handleDevtoolsEasterEgg}
+          />
+          <h1 
+            className="text-2xl font-extrabold text-white tracking-wider drop-shadow-md z-10 flex items-center gap-2 cursor-default"
+            onClick={handleDevtoolsEasterEgg}
+          >
             MoYu 摩语
           </h1>
           <button 
             onClick={onClose}
-            className="absolute top-3 right-3 p-1.5 rounded-full bg-black/20 text-white/80 hover:bg-black/40 hover:text-white transition-colors z-20"
+            className="absolute top-3 right-3 p-1.5 rounded-full bg-black/20 text-white/80 hover:bg-black/40 hover:text-white transition-colors z-20 cursor-pointer"
           >
             <X size={16} />
           </button>
@@ -102,8 +111,13 @@ export default function AboutModal({ isOpen, onClose }) {
 
         {/* Body */}
         <div className="p-6 pt-5">
-          <div className="text-center mb-6">
-            <h2 className="text-lg font-bold text-slate-800 dark:text-[#eeeeee]">{version}</h2>
+          <div className="text-center mb-6 select-none">
+            <h2 
+              className="text-lg font-bold text-slate-800 dark:text-[#eeeeee] cursor-default inline-block"
+              onClick={handleDevtoolsEasterEgg}
+            >
+              {version}
+            </h2>
             <p className="text-[13px] text-slate-500 dark:text-[#999999] mt-1">{t('home.subtitle')}</p>
           </div>
 
