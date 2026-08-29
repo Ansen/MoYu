@@ -47,7 +47,10 @@ export const translations = {
     'translator.voice.tapToTalk': '点击开始录音',
     'translator.voice.listening': '正在聆听...',
     'translator.voice.error': '录音失败',
-    'translator.voice.notsupported': '当前浏览器不支持语音识别',
+    'translator.voice.notAllowed': '麦克风权限已被拒绝，请在系统设置中允许使用麦克风',
+    'translator.voice.networkError': '语音识别服务连接失败（需网络连接）',
+    'translator.voice.audioCapture': '未检测到麦克风或麦克风被占用',
+    'translator.voice.notsupported': '当前环境不支持系统内置语音识别',
 
     // 播放器 (Player)
     'library.title': '工作区 / 播放列表',
@@ -295,7 +298,10 @@ export const translations = {
     'translator.voice.tapToTalk': 'Tap to talk',
     'translator.voice.listening': 'Listening...',
     'translator.voice.error': 'Recognition Error',
-    'translator.voice.notsupported': 'Speech recognition not supported in this browser',
+    'translator.voice.notAllowed': 'Microphone permission denied. Please allow it in System Settings.',
+    'translator.voice.networkError': 'Speech service network error (Requires internet connection)',
+    'translator.voice.audioCapture': 'Microphone not found or in use',
+    'translator.voice.notsupported': 'Speech recognition not supported in this environment',
 
     // Player
     'library.title': 'WORKSPACE / PLAYLIST',

@@ -444,8 +444,12 @@ export default function TranslatorView() {
               </div>
             )}
             {error && (
-              <div className="self-center bg-rose-50 dark:bg-rose-500/10 text-rose-500 px-4 py-2 rounded-full text-sm mt-4">
-                {error === 'not-supported' ? t('translator.voice.notsupported') : t('translator.voice.error')}
+              <div className="self-center bg-rose-50 dark:bg-rose-500/10 text-rose-500 border border-rose-200/80 dark:border-rose-800/40 px-4 py-2 rounded-full text-xs md:text-sm mt-4 text-center select-none shadow-2xs">
+                {error === 'not-supported' ? t('translator.voice.notsupported') :
+                 error === 'not-allowed' ? t('translator.voice.notAllowed') :
+                 error === 'network' ? t('translator.voice.networkError') :
+                 error === 'audio-capture' ? t('translator.voice.audioCapture') :
+                 t('translator.voice.error')}
               </div>
             )}
           </div>

@@ -58,16 +58,18 @@ class DesktopAudioPlayer {
         // 预热音频设备：播放极短静音，促使系统音频驱动 (WASAPI / CoreAudio) 完成硬件缓冲区初始化
         if (!this.isWarmedUp && this.audioContext) {
             try {
-                const dummyBuffer = this.audioContext.createBuffer(1, 1, this.audioContext.sampleRate)
-                const dummySource = this.audioContext.createBufferSource()
-                dummySource.buffer = dummyBuffer
-                dummySource.connect(this.audioContext.destination)
-                dummySource.start(0)
+                const osc = this.audioContext.createOscillator();
+                const silentGain = this.audioContext.createGain();
+                silentGain.gain.setValueAtTime(0, this.audioContext.currentTime);
+                osc.connect(silentGain);
+                silentGain.connect(this.audioContext.destination);
+                osc.start(0);
+                osc.stop(this.audioContext.currentTime + 0.05);
                 // 等待系统音频硬件苏醒，防止立刻播放导致开头吞字
-                await new Promise(r => setTimeout(r, 150))
-                this.isWarmedUp = true
+                await new Promise(r => setTimeout(r, 100));
+                this.isWarmedUp = true;
             } catch (e) {
-                console.warn('Audio pre-warm error:', e)
+                console.warn('Audio pre-warm error:', e);
             }
         }
     }
@@ -147,7 +149,8 @@ class DesktopAudioPlayer {
      * @param {Object} options 
      */
     async playMorseText(text, { wpm = 20, freq = 700, numberMode = 'long', startIndex = 0, onCharPlay, onComplete }) {
-        this.stop();
+        this.resetIdleTimer();
+        this.stopScheduledNodes();
         await this.init();
         if (this.audioContext && this.audioContext.state === 'suspended') {
             await this.audioContext.resume();

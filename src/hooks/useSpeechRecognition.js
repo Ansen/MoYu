@@ -76,10 +76,14 @@ export function useSpeechRecognition(options = {}) {
     if (recognitionRef.current && !isListening) {
       setTranscript('');
       setError(null);
+
       try {
         recognitionRef.current.start();
       } catch (err) {
         console.error("Failed to start listening", err);
+        if (err.name !== 'InvalidStateError') {
+          setError(err.name || 'error');
+        }
         setIsListening(false);
       }
     }
