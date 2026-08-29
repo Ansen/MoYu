@@ -28,12 +28,36 @@
     @apply bg-slate-400 dark:bg-slate-600;
   }
 }
+
+
+.dark
+
+/* 浅色模式阅读高亮层次 */
+
+
+/* 深色模式阅读高亮层次：已读文字沉底弱化（绝不刺眼），未读文字与当前光标清晰明亮 */
+.dark
+
+/* 浅色模式阅读高亮层次 */
 ::highlight(morse-played) {
-  color: #94a3b8;
+  background-color: rgba(37, 99, 235, 0.16) !important;
+  color: #1e40af !important;
 }
 
 ::highlight(morse-active) {
-  background-color: rgba(251, 146, 60, 0.4);
-  color: #ea580c;
-  border-bottom: 2px solid #ea580c;
+  background-color: #2563eb !important;
+  color: #ffffff !important;
+  font-weight: 700 !important;
+}
+
+/* 深色模式阅读高亮层次 */
+.dark ::highlight(morse-played) {
+  background-color: rgba(59, 130, 246, 0.20) !important;
+  color: #93c5fd !important;
+}
+
+.dark ::highlight(morse-active) {
+  background-color: #3b82f6 !important;
+  color: #ffffff !important;
+  font-weight: 700 !important;
 }

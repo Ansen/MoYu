@@ -1,3 +1,4 @@
+import audioPlayer from './utils/audioPlayer';
 import React, { useState, useEffect, useRef } from 'react';
 import Titlebar from './components/layout/Titlebar';
 import Sidebar from './components/layout/Sidebar';
@@ -19,6 +20,22 @@ function App() {
   const [isReady, setIsReady] = useState(false);
   const [updateInfo, setUpdateInfo] = useState(null);
   const { t } = useI18n();
+
+  
+  // Global proactive AudioContext unlock & hardware pre-warm on first user interaction
+  useEffect(() => {
+    const handleFirstInteraction = () => {
+      audioPlayer.ensureReady().catch(() => {});
+      window.removeEventListener('pointerdown', handleFirstInteraction);
+      window.removeEventListener('keydown', handleFirstInteraction);
+    };
+    window.addEventListener('pointerdown', handleFirstInteraction, { passive: true });
+    window.addEventListener('keydown', handleFirstInteraction, { passive: true });
+    return () => {
+      window.removeEventListener('pointerdown', handleFirstInteraction);
+      window.removeEventListener('keydown', handleFirstInteraction);
+    };
+  }, []);
 
   // Lift ebook state up to share between Home and Library
   const ebook = useEbook();

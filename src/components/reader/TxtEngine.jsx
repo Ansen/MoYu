@@ -1,63 +1,67 @@
-import React, { useEffect, useRef, useCallback, useMemo, forwardRef, useImperativeHandle } from 'react';
+import React, { useEffect, useState, useRef, useCallback, useMemo, forwardRef, useImperativeHandle } from 'react';
 import useHighlighter from './useHighlighter';
 import { saveReadingProgress, loadReadingProgress } from '../../utils/store';
+import { getFontFamilyCss } from '../../config/fonts';
+import { parseTelegramContent } from '../../utils/telegramParser';
 
-// Intelligent Telegram token parser: separates start/end markers and chunks long continuous strings
-function parseTelegramContent(rawText) {
-  if (!rawText) return { startMarker: '', rows: [], endMarker: '', rawTokens: [] };
-
-  let text = rawText.trim();
-  let startMarker = '';
-  let endMarker = '';
-
-  // 1. Extract start marker if present (e.g. ===, = = =, KA, etc.)
-  const startMatch = text.match(/^((?:=+\s*)+|(?:KA|HR|BT)\s+)/i);
-  if (startMatch) {
-    startMarker = startMatch[0].trim();
-    text = text.slice(startMatch[0].length).trim();
-  }
-
-  // 2. Extract end marker if present (e.g. iii, ===, AR, SK, K)
-  const endMatch = text.match(/(\s+(?:iii|[iI]{1,5}|(?:=+\s*)+|AR|SK|K))$/i);
-  if (endMatch) {
-    endMarker = endMatch[0].trim();
-    text = text.slice(0, text.length - endMatch[0].length).trim();
-  }
-
-  // 3. Process data tokens (split by whitespace)
-  const splitTokens = text.split(/\s+/).filter(Boolean);
-  const dataTokens = [];
-
-  for (const t of splitTokens) {
-    // If a token is a continuous sequence of digits >= 8 (e.g. 40 numbers without spaces in some telegraph EPUBs)
-    if (/^\d{8,}$/.test(t)) {
-      const chunkLen = (t.length % 5 === 0 && t.length % 4 !== 0) ? 5 : 4;
-      for (let i = 0; i < t.length; i += chunkLen) {
-        dataTokens.push(t.slice(i, i + chunkLen));
-      }
-    } else if (/^[a-zA-Z]{10,}$/.test(t) && t.length % 5 === 0) {
-      // Continuous 5-char letter groups
-      for (let i = 0; i < t.length; i += 5) {
-        dataTokens.push(t.slice(i, i + 5));
-      }
-    } else {
-      dataTokens.push(t);
-    }
-  }
-
-  // 4. Organize data tokens into rows of 10 groups
-  const rows = [];
-  const COLS = 10;
-  for (let i = 0; i < dataTokens.length; i += COLS) {
-    rows.push(dataTokens.slice(i, i + COLS));
-  }
-
-  return { startMarker, rows, endMarker, rawTokens: dataTokens };
-}
-
-const TxtEngine = forwardRef(({ bookData, fontSize, viewMode = 'grid', onTocLoaded, onChapterChange, jumpToSibling, jumpToChapter }, ref) => {
+const TxtEngine = forwardRef(({ bookData, fontSize, fontFamily = 'Cascadia Mono', viewMode = 'grid', autoFit = true, onTocLoaded, onChapterChange, jumpToSibling, jumpToChapter }, ref) => {
   const viewerRef = useRef(null);
+  const tableRef = useRef(null);
+  const [fitFontSize, setFitFontSize] = useState(fontSize);
   const scrollTimeoutRef = useRef(null);
+  const cachedDataRef = useRef({ text: '', nodes: [] });
+  const currentFontFamily = useMemo(() => getFontFamilyCss(fontFamily), [fontFamily]);
+
+  // 单帧比例自适应算法 (Ratio-based Auto Scale)：彻底消除多余滚动条，0循环重绘，0闪烁
+  useEffect(() => {
+    if (!autoFit) {
+      setFitFontSize(fontSize);
+      return;
+    }
+
+    const container = viewerRef.current;
+    if (!container) return;
+
+    let timeoutId;
+    const measureAndFit = () => {
+      if (!container) return;
+      const targetEl = tableRef.current || container.firstElementChild;
+      if (!targetEl) return;
+
+      const clientH = container.clientHeight;
+      const clientW = container.clientWidth;
+      const scrollH = targetEl.scrollHeight || container.scrollHeight;
+      const scrollW = targetEl.scrollWidth || container.scrollWidth;
+
+      if (clientH <= 0 || clientW <= 0 || scrollH <= 0 || scrollW <= 0) return;
+
+      if (scrollH > clientH + 2 || scrollW > clientW + 2) {
+        const ratioH = clientH / scrollH;
+        const ratioW = clientW / scrollW;
+        const fitRatio = Math.min(ratioH, ratioW, 1.0);
+        const calculated = Math.max(10, Math.min(fontSize, Math.floor(fontSize * fitRatio)));
+        setFitFontSize(calculated);
+      } else {
+        setFitFontSize(fontSize);
+      }
+    };
+
+    // 延迟 30ms 测算，确保 DOM 布局及自定义字体包围盒计算完成
+    timeoutId = setTimeout(measureAndFit, 30);
+
+    const ro = new ResizeObserver(() => {
+      clearTimeout(timeoutId);
+      timeoutId = setTimeout(measureAndFit, 30);
+    });
+    ro.observe(container);
+
+    return () => {
+      clearTimeout(timeoutId);
+      ro.disconnect();
+    };
+  }, [autoFit, fontSize, fontFamily, viewMode, bookData?.data]);
+
+  const effectiveFontSize = autoFit ? fitFontSize : fontSize;
 
   const handleScrollRequest = useCallback((rect) => {
     const container = viewerRef.current;
@@ -71,14 +75,50 @@ const TxtEngine = forwardRef(({ bookData, fontSize, viewMode = 'grid', onTocLoad
 
   const { textRootRef, textNodesRef, clearHighlight, resetHighlightState, highlightToken } = useHighlighter(handleScrollRequest);
 
-  // Parse text into 10-column table rows, start marker, and end marker
-  const { startMarker, rows, endMarker, rawTokens } = useMemo(() => {
+  // 解析电报内容：自动剥离报头报尾起止符，获取纯净 10 列表格数据与纯净正文
+  const { rows, cleanText, isGridEligible } = useMemo(() => {
     return parseTelegramContent(bookData?.data || '');
   }, [bookData?.data]);
 
-  // Setup book data, TOC, and initial scroll position
+  const extractNodes = useCallback(() => {
+    const root = viewerRef.current;
+    if (!root) return { text: '', nodes: [] };
+
+    textRootRef.current = root;
+    let text = '';
+    const nodes = [];
+    const walker = root.ownerDocument.createTreeWalker(
+      root,
+      NodeFilter.SHOW_TEXT,
+      {
+        acceptNode: (node) => {
+          if (node.parentElement?.closest('[data-skip-speech="true"]')) {
+            return NodeFilter.FILTER_REJECT;
+          }
+          return NodeFilter.FILTER_ACCEPT;
+        }
+      },
+      false
+    );
+
+    let node;
+    while ((node = walker.nextNode())) {
+      const nodeText = node.nodeValue;
+      text += nodeText;
+      nodes.push({ node, length: nodeText.length });
+    }
+    textNodesRef.current = nodes;
+    cachedDataRef.current = { text, nodes };
+    return { text, nodes };
+  }, [textRootRef, textNodesRef]);
+
+  // Setup book data, TOC, initial scroll position, and pre-index DOM nodes
   useEffect(() => {
-    if (bookData.type === 'epub') {
+    clearHighlight();
+    resetHighlightState();
+    cachedDataRef.current = { text: '', nodes: [] };
+
+    if (bookData?.type === 'epub') {
       const parsedToc = (bookData.toc || []).map((t, idx) => ({
         id: t.id !== undefined ? t.id : idx,
         label: t.label,
@@ -88,7 +128,7 @@ const TxtEngine = forwardRef(({ bookData, fontSize, viewMode = 'grid', onTocLoad
       }));
       if (onTocLoaded) onTocLoaded(parsedToc);
       if (onChapterChange) onChapterChange(bookData.currentChapterLabel || '');
-    } else if (bookData.siblings && bookData.siblings.length > 0) {
+    } else if (bookData?.siblings && bookData.siblings.length > 0) {
       const parsedToc = bookData.siblings.map((sib, idx) => ({
         id: idx,
         label: sib.name,
@@ -102,9 +142,9 @@ const TxtEngine = forwardRef(({ bookData, fontSize, viewMode = 'grid', onTocLoad
       if (onChapterChange) onChapterChange('');
     }
 
-    const progressKey = bookData.type === 'epub' 
+    const progressKey = bookData?.type === 'epub' 
       ? `${bookData.name}_ch_${bookData.currentChapterIndex || 0}` 
-      : bookData.name;
+      : bookData?.name || 'untitled';
 
     loadReadingProgress(progressKey).then(scrollPos => {
       if (scrollPos && typeof scrollPos === 'number' && viewerRef.current) {
@@ -113,15 +153,26 @@ const TxtEngine = forwardRef(({ bookData, fontSize, viewMode = 'grid', onTocLoad
         viewerRef.current.scrollTop = 0;
       }
     });
-  }, [bookData, onTocLoaded, onChapterChange]);
 
-  // Dynamic theme highlight styles for reader (CW Player style solid inverted highlight)
+    // 预提取并缓存文本节点，避免用户点击播放时产生主线程 TreeWalker 卡顿
+    const timer = setTimeout(() => {
+      extractNodes();
+    }, 50);
+
+    return () => clearTimeout(timer);
+  }, [bookData, onTocLoaded, onChapterChange, clearHighlight, resetHighlightState, extractNodes]);
+
+  // Dynamic highlight theme listener (guarantees real-time theme syncing between Dark & Light modes)
   useEffect(() => {
     const updateHighlightTheme = () => {
       const isDarkMode = document.documentElement.classList.contains('dark');
-      const playedColor = isDarkMode ? '#64748b' : '#94a3b8';
-      const activeColor = '#ffffff'; // White text
-      const activeBg = '#ea580c'; // Vibrant CW Player solid orange block
+      
+      // 浅色模式：清晰柔和的淡蓝底色 + 深邃蓝字（绝不消失，清晰美观）
+      // 深色模式：通透深蓝底色 + 柔亮淡蓝字（温润护眼，绝不刺眼）
+      const playedBg = isDarkMode ? 'rgba(59, 130, 246, 0.20)' : 'rgba(37, 99, 235, 0.16)';
+      const playedColor = isDarkMode ? '#93c5fd' : '#1e40af';
+      const activeBg = isDarkMode ? '#3b82f6' : '#2563eb';
+      const activeColor = '#ffffff';
 
       let styleEl = document.getElementById('moyu-reader-highlight-style');
       if (!styleEl) {
@@ -131,14 +182,13 @@ const TxtEngine = forwardRef(({ bookData, fontSize, viewMode = 'grid', onTocLoad
       }
       styleEl.textContent = `
         ::highlight(morse-played) { 
+          background-color: ${playedBg} !important; 
           color: ${playedColor} !important; 
-          opacity: 0.65;
         }
         ::highlight(morse-active) { 
           background-color: ${activeBg} !important; 
           color: ${activeColor} !important; 
-          font-weight: 800 !important; 
-          border-radius: 2px !important;
+          font-weight: 700 !important; 
         }
       `;
     };
@@ -157,16 +207,14 @@ const TxtEngine = forwardRef(({ bookData, fontSize, viewMode = 'grid', onTocLoad
 
     return () => {
       observer.disconnect();
-      const el = document.getElementById('moyu-reader-highlight-style');
-      if (el) el.remove();
     };
   }, []);
 
   const getProgressKey = useCallback(() => {
-    return bookData.type === 'epub' 
+    return bookData?.type === 'epub' 
       ? `${bookData.name}_ch_${bookData.currentChapterIndex || 0}` 
-      : bookData.name;
-  }, [bookData.name, bookData.type, bookData.currentChapterIndex]);
+      : bookData?.name || 'untitled';
+  }, [bookData?.name, bookData?.type, bookData?.currentChapterIndex]);
 
   // Debounced scroll handler (300ms)
   const handleTxtScroll = useCallback((e) => {
@@ -199,31 +247,15 @@ const TxtEngine = forwardRef(({ bookData, fontSize, viewMode = 'grid', onTocLoad
       const root = viewerRef.current;
       if (!root) return { text: '', startIndex: 0 };
 
-      textRootRef.current = root;
-      let text = "";
-      const nodes = [];
-      const walker = root.ownerDocument.createTreeWalker(
-        root, 
-        NodeFilter.SHOW_TEXT, 
-        {
-          acceptNode: (node) => {
-            // Skip line/col number headers and decorative label elements
-            if (node.parentElement?.closest('[data-skip-speech="true"]')) {
-              return NodeFilter.FILTER_REJECT;
-            }
-            return NodeFilter.FILTER_ACCEPT;
-          }
-        }, 
-        false
-      );
-      
-      let node;
-      while ((node = walker.nextNode())) {
-        const nodeText = node.nodeValue;
-        text += nodeText;
-        nodes.push({ node, length: nodeText.length });
+      let { text, nodes } = cachedDataRef.current;
+      if (!nodes || nodes.length === 0 || !text) {
+        const extracted = extractNodes();
+        text = extracted.text;
+        nodes = extracted.nodes;
+      } else {
+        textNodesRef.current = nodes;
       }
-      textNodesRef.current = nodes;
+
       resetHighlightState();
       
       let startIndex = 0;
@@ -256,143 +288,134 @@ const TxtEngine = forwardRef(({ bookData, fontSize, viewMode = 'grid', onTocLoad
       }
     },
     jumpTo: (item) => {
-      if (bookData.type === 'epub' && jumpToChapter) {
+      if (bookData?.type === 'epub' && jumpToChapter) {
         jumpToChapter(item.index !== undefined ? item.index : item.href);
       } else if (jumpToSibling) {
         jumpToSibling(item.index);
       }
     },
     prevPage: () => {
-      if (bookData.type === 'epub' && jumpToChapter) {
+      if (bookData?.type === 'epub' && jumpToChapter) {
         if (bookData.currentChapterIndex > 0) {
           jumpToChapter(bookData.currentChapterIndex - 1);
         }
-      } else if (jumpToSibling && bookData.currentIndex > 0) {
+      } else if (jumpToSibling && bookData?.currentIndex > 0) {
         jumpToSibling(bookData.currentIndex - 1);
       }
     },
     nextPage: () => {
-      if (bookData.type === 'epub' && jumpToChapter) {
+      if (bookData?.type === 'epub' && jumpToChapter) {
         const total = bookData.toc?.length || 0;
         if (bookData.currentChapterIndex < total - 1) {
           jumpToChapter(bookData.currentChapterIndex + 1);
         }
-      } else if (jumpToSibling && bookData.siblings && bookData.currentIndex < bookData.siblings.length - 1) {
+      } else if (jumpToSibling && bookData?.siblings && bookData.currentIndex < bookData.siblings.length - 1) {
         jumpToSibling(bookData.currentIndex + 1);
       }
     },
     getPaginationLabel: () => {
-      if (bookData.type === 'epub') {
+      if (bookData?.type === 'epub') {
         const total = bookData.toc?.length || 1;
-        return total > 1 ? `章节 ${(bookData.currentChapterIndex || 0) + 1} / ${total}` : '';
+        return total > 1 ? `第 ${(bookData.currentChapterIndex || 0) + 1} / ${total} 章` : '';
       }
-      const total = bookData.siblings?.length || 1;
-      return total > 1 ? `文件 ${bookData.currentIndex + 1} / ${total}` : '';
+      const total = bookData?.siblings?.length || 1;
+      return total > 1 ? `文件 ${(bookData?.currentIndex || 0) + 1} / ${total}` : '';
     }
   }));
 
-  const isGridView = viewMode === 'grid' && (rawTokens.length > 0 || startMarker || endMarker);
+  const isGridView = viewMode === 'grid' && isGridEligible;
 
   return (
     <div 
       ref={viewerRef}
       onScroll={handleTxtScroll}
       className={`w-full h-full overflow-y-auto overflow-x-auto select-text relative custom-scrollbar ${
-        isGridView ? 'p-3 md:p-6 flex flex-col items-center' : 'py-2 md:py-3 px-2 md:px-4'
+        isGridView ? 'p-1 sm:p-2' : 'py-2 md:py-3 px-2 md:px-4'
       }`}
     >
       {isGridView ? (
-        /* Clean Lightweight IDE Layout (Left Gutter + Top Column Markers + 10 Aligned Columns) */
-        <div className="w-full flex justify-center py-2 px-2 min-w-fit">
-          <div className="flex flex-col">
-            
-            {/* Top Bar with Start/End Status */}
-            {(startMarker || endMarker) && (
-              <div className="flex items-center justify-between pb-2 mb-2 border-b border-slate-200 dark:border-[#2d2d2d] text-[12px] font-mono select-none text-slate-400 dark:text-[#666666]">
-                <div className="flex items-center gap-1.5">
-                  <span data-skip-speech="true" className="text-slate-400">开始:</span>
-                  {startMarker ? (
-                    <span className="font-semibold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/50 px-1.5 py-0.5 rounded border border-indigo-200/80 dark:border-indigo-800/60">
-                      <span className="morse-word">{startMarker}</span>{' '}
-                    </span>
-                  ) : <span className="text-slate-300">-</span>}
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <span data-skip-speech="true" className="text-slate-400">结束:</span>
-                  {endMarker ? (
-                    <span className="font-semibold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/50 px-1.5 py-0.5 rounded border border-indigo-200/80 dark:border-indigo-800/60">
-                      <span className="morse-word">{endMarker}</span>{' '}
-                    </span>
-                  ) : <span className="text-slate-300">-</span>}
-                </div>
-              </div>
-            )}
-
-            <table className="border-collapse select-text font-mono border border-slate-200/80 dark:border-[#2e2e2e] shadow-2xs rounded-lg overflow-hidden">
-              <thead>
-                <tr data-skip-speech="true" className="text-[11px] text-slate-500 dark:text-[#777777] select-none bg-slate-50/70 dark:bg-[#1a1a1a]">
-                  <th className="w-12 py-1.5 pr-2.5 text-right font-normal border border-slate-200/80 dark:border-[#2e2e2e]">
-                    #
-                  </th>
-                  {Array.from({ length: 10 }).map((_, colIdx) => (
-                    <th key={colIdx} className="py-1.5 px-3 text-center font-normal tracking-wide min-w-[58px] border border-slate-200/80 dark:border-[#2e2e2e]">
-                      {String(colIdx + 1).padStart(2, '0')}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map((row, rowIdx) => (
-                  <tr key={rowIdx} className="transition-colors group">
-                    {/* Left Line Number (IDE Gutter) */}
-                    <td data-skip-speech="true" className="w-12 py-1.5 pr-2.5 text-right text-slate-400 dark:text-[#555555] border border-slate-200/80 dark:border-[#2e2e2e] bg-slate-50/40 dark:bg-[#181818]/40 group-hover:text-slate-700 dark:group-hover:text-slate-300 transition-colors select-none text-[11px]">
-                      {String(rowIdx + 1).padStart(2, '0')}
+        /* 100% 纯净 10 列表格电报稿纸排版：无任何起止符侵入单元格 */
+        <table ref={tableRef} className="w-full border-collapse select-text font-mono table-fixed min-w-[700px]">
+          <colgroup>
+            <col style={{ width: '32px' }} />
+            {Array.from({ length: 10 }).map((_, i) => (
+              <col key={i} />
+            ))}
+          </colgroup>
+          <thead>
+            <tr data-skip-speech="true" className="text-[11.5px] text-slate-400 dark:text-[#888888] select-none border-b border-slate-300 dark:border-[#383838]">
+              {/* Left Line Number Gutter (Tight fixed width) */}
+              <th className="w-7 sm:w-8 pb-2 px-1 text-center font-medium select-none border-r border-slate-300 dark:border-[#383838]">
+                #
+              </th>
+              {/* 10 Column Headers: Evenly distributed across viewport */}
+              {Array.from({ length: 10 }).map((_, colIdx) => (
+                <th key={colIdx} className="pb-2 px-1 text-center font-medium tracking-wider select-none">
+                  {String(colIdx + 1).padStart(2, '0')}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-200/80 dark:divide-[#303030]">
+            {rows.map((row, rowIdx) => (
+              <tr 
+                key={rowIdx} 
+                className={`transition-colors group ${
+                  rowIdx % 2 === 1 
+                    ? 'bg-slate-100/85 dark:bg-[#262626] hover:bg-indigo-100/70 dark:hover:bg-indigo-950/60' 
+                    : 'bg-white dark:bg-[#181818] hover:bg-slate-50 dark:hover:bg-[#202020]'
+                }`}
+              >
+                {/* Left Line Number Gutter */}
+                <td 
+                  data-skip-speech="true" 
+                  className="w-7 sm:w-8 py-2 px-1 text-center text-slate-400 dark:text-[#666666] group-hover:text-slate-700 dark:group-hover:text-slate-300 transition-colors select-none text-[11px] font-medium border-r border-slate-300 dark:border-[#383838]"
+                >
+                  {String(rowIdx + 1).padStart(2, '0')}
+                </td>
+                {/* 10 Data Columns */}
+                {Array.from({ length: 10 }).map((_, colIdx) => {
+                  const token = row[colIdx];
+                  return (
+                    <td
+                      key={colIdx}
+                      className="py-2 px-1 text-center whitespace-nowrap font-normal transition-colors"
+                      style={{
+                        fontSize: `${effectiveFontSize}px`,
+                        lineHeight: 1.3,
+                        fontFamily: currentFontFamily,
+                        fontVariantLigatures: 'none',
+                        fontVariantNumeric: 'tabular-nums',
+                        fontFeatureSettings: '"liga" 0, "calt" 0, "dlig" 0'
+                      }}
+                    >
+                      {token ? (
+                        <span className="morse-word px-1.5 py-0.5 rounded-md text-slate-800 dark:text-slate-200 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors tracking-wide">
+                          {token}
+                        </span>
+                      ) : (
+                        <span className="text-transparent select-none">&nbsp;</span>
+                      )}
                     </td>
-                    {/* 10 Data Columns with subtle light gray inner borders */}
-                    {Array.from({ length: 10 }).map((_, colIdx) => {
-                      const token = row[colIdx];
-                      return (
-                        <td
-                          key={colIdx}
-                          className="border border-slate-200/80 dark:border-[#2e2e2e] py-1.5 px-2.5 text-center whitespace-nowrap font-normal hover:bg-slate-50/80 dark:hover:bg-[#222222] transition-colors"
-                          style={{
-                            fontSize: `${fontSize}px`,
-                            lineHeight: 1.25,
-                            fontFamily: 'Consolas, "Cascadia Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, "Liberation Mono", "Courier New", monospace',
-                            fontVariantLigatures: 'none',
-                            fontFeatureSettings: '"liga" 0, "calt" 0, "dlig" 0'
-                          }}
-                        >
-                          {token ? (
-                            <>
-                              <span className="morse-word hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors">{token}</span>{' '}
-                            </>
-                          ) : (
-                            <span className="text-transparent select-none">&nbsp;</span>
-                          )}
-                        </td>
-                      );
-                    })}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-
-          </div>
-        </div>
+                  );
+                })}
+              </tr>
+            ))}
+          </tbody>
+        </table>
       ) : (
-        /* Plain Text View */
+        /* 纯文本视图：展示剥离起止符后的纯净电文正文 */
         <div 
           className="w-full h-full whitespace-pre-wrap font-normal text-slate-800 dark:text-[#cccccc]"
           style={{ 
-            fontSize: `${fontSize}px`, 
+            fontSize: `${effectiveFontSize}px`, 
             lineHeight: 1.2,
-            fontFamily: 'Consolas, "Cascadia Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, "Liberation Mono", "Courier New", monospace',
+            fontFamily: currentFontFamily,
             fontVariantLigatures: 'none',
             fontFeatureSettings: '"liga" 0, "calt" 0, "dlig" 0'
           }}
         >
-          {bookData.data}
+          {cleanText || bookData?.data}
         </div>
       )}
     </div>

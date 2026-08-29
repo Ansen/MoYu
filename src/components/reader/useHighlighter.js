@@ -5,9 +5,13 @@ export default function useHighlighter(onScrollRequest) {
   const textNodesRef = useRef([]);
   const lastNodeIdxRef = useRef(0);
   const lastCharIdxRef = useRef(0);
+  const startNodeRef = useRef(null);
+  const startOffsetRef = useRef(0);
 
   const clearHighlight = useCallback(() => {
     try {
+      startNodeRef.current = null;
+      startOffsetRef.current = 0;
       if (textRootRef.current && textRootRef.current.ownerDocument) {
         const doc = textRootRef.current.ownerDocument;
         if (doc.defaultView && doc.defaultView.CSS && doc.defaultView.CSS.highlights) {
@@ -25,6 +29,8 @@ export default function useHighlighter(onScrollRequest) {
   const resetHighlightState = useCallback(() => {
     lastNodeIdxRef.current = 0;
     lastCharIdxRef.current = 0;
+    startNodeRef.current = null;
+    startOffsetRef.current = 0;
   }, []);
 
   const highlightToken = useCallback((token) => {
@@ -61,6 +67,11 @@ export default function useHighlighter(onScrollRequest) {
     }
 
     if (targetRange) {
+      if (startNodeRef.current === null) {
+        startNodeRef.current = targetNode;
+        startOffsetRef.current = targetOffset;
+      }
+
       const rect = targetRange.getBoundingClientRect();
       const char = targetNode.nodeValue[targetOffset];
 
@@ -71,10 +82,33 @@ export default function useHighlighter(onScrollRequest) {
       const hasNativeHighlight = !!(win && win.CSS && win.CSS.highlights);
       if (hasNativeHighlight && nodes.length > 0) {
         try {
-          const playedRange = doc.createRange();
-          playedRange.setStart(nodes[0].node, 0);
-          playedRange.setEnd(targetNode, targetOffset);
-          win.CSS.highlights.set('morse-played', new win.Highlight(playedRange));
+          // 采用节点离散 Range 构造：每个数据单元格独立创建 Range，绝不跨行，行号(01, 02...)100%不受高亮影响
+          const playedRanges = [];
+          const startIdx = nodes.findIndex(n => n.node === (startNodeRef.current || nodes[0]?.node));
+          const effectiveStartIdx = startIdx !== -1 ? startIdx : 0;
+          const currentTargetIdx = lastNodeIdxRef.current;
+
+          for (let nIdx = effectiveStartIdx; nIdx <= currentTargetIdx && nIdx < nodes.length; nIdx++) {
+            const n = nodes[nIdx];
+            const isStart = nIdx === effectiveStartIdx;
+            const isEnd = nIdx === currentTargetIdx;
+
+            const nStartOffset = isStart ? (startOffsetRef.current || 0) : 0;
+            const nEndOffset = isEnd ? targetOffset : n.length;
+
+            if (nEndOffset > nStartOffset) {
+              const r = doc.createRange();
+              r.setStart(n.node, nStartOffset);
+              r.setEnd(n.node, nEndOffset);
+              playedRanges.push(r);
+            }
+          }
+
+          if (playedRanges.length > 0) {
+            win.CSS.highlights.set('morse-played', new win.Highlight(...playedRanges));
+          } else {
+            win.CSS.highlights.delete('morse-played');
+          }
           
           if (char && char !== '\n' && char !== '\r') {
             win.CSS.highlights.set('morse-active', new win.Highlight(targetRange));
@@ -93,7 +127,7 @@ export default function useHighlighter(onScrollRequest) {
           overlay = doc.createElement('div');
           overlay.id = 'morse-active-overlay';
           overlay.style.position = 'absolute';
-          overlay.style.backgroundColor = '#ea580c';
+          overlay.style.backgroundColor = '#4f46e5';
           overlay.style.color = '#ffffff';
           overlay.style.borderRadius = '2px';
           overlay.style.pointerEvents = 'none';

@@ -1,8 +1,9 @@
-import React, { useEffect, useRef, useState, useCallback } from 'react';
-import { ChevronLeft, ChevronRight, Sparkles, FileText, BookOpen, Folder } from 'lucide-react';
+import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react';
+import { ChevronLeft, ChevronRight, Sparkles, FileText, BookOpen, Folder, Radio } from 'lucide-react';
 import ReaderHeader from './reader/ReaderHeader';
 import audioPlayer from '../utils/audioPlayer';
 import TxtEngine from './reader/TxtEngine';
+import { parseTelegramContent } from '../utils/telegramParser';
 import TocSidebar from './reader/TocSidebar';
 import { useI18n } from '../i18n';
 
@@ -10,8 +11,15 @@ export default function Reader({ bookData, onClose, jumpToSibling, jumpToChapter
   const { t } = useI18n();
   const engineRef = useRef(null);
   
+  const parsedTelegram = useMemo(() => {
+    return parseTelegramContent(bookData?.data || '');
+  }, [bookData?.data]);
+  
+  const isGridEligible = parsedTelegram.isGridEligible;
+  
   const [isPlaying, setIsPlaying] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
+  const [activeMarker, setActiveMarker] = useState(null); // null | { type: 'prefix' | 'suffix', text: string }
   const [toc, setToc] = useState([]);
   const [isTocOpen, setIsTocOpen] = useState(true);
   const [currentChapterTitle, setCurrentChapterTitle] = useState('');
@@ -23,11 +31,19 @@ export default function Reader({ bookData, onClose, jumpToSibling, jumpToChapter
   const [numberMode, setNumberMode] = useState(localStorage.getItem('pref_number_mode') || 'long');
   const [useHarmonics, setUseHarmonics] = useState(localStorage.getItem('pref_use_harmonics') === 'true');
   const [viewMode, setViewMode] = useState(() => localStorage.getItem('pref_reader_view_mode') || 'grid');
+  const [fontFamily, setFontFamily] = useState(() => {
+    const saved = localStorage.getItem('pref_reader_font_family');
+    const valid = ['Cascadia Mono', 'JetBrains Mono', 'Fira Code'];
+    return valid.includes(saved) ? saved : 'Cascadia Mono';
+  });
+  const [enableMarkers, setEnableMarkers] = useState(() => localStorage.getItem('pref_reader_enable_markers') !== 'false');
+  const [prefixMarker, setPrefixMarker] = useState(() => localStorage.getItem('pref_reader_prefix_marker') || '===');
+  const [suffixMarker, setSuffixMarker] = useState(() => localStorage.getItem('pref_reader_suffix_marker') || 'iii');
+  const [autoFit, setAutoFit] = useState(() => localStorage.getItem('pref_reader_auto_fit') !== 'false');
 
   const [windowSize, setWindowSize] = useState({ width: window.innerWidth, height: window.innerHeight });
 
-  // 纯算法驱动的响应式字号计算：为了保证放大/缩小窗口时，文本在屏幕中的面积占比（铺满率）恒定
-  // 使用几何平均值(面积的平方根)替代单维度的宽度线性缩放。以 800x600 为基准 1.0x
+  // 视口响应式字号计算：以 800x600 为基准 1.0x
   const currentGeo = Math.sqrt(windowSize.width * windowSize.height);
   const baseGeo = Math.sqrt(800 * 600);
   const fontScale = Math.max(0.5, currentGeo / baseGeo);
@@ -50,10 +66,10 @@ export default function Reader({ bookData, onClose, jumpToSibling, jumpToChapter
     };
   }, []);
 
-  // 进入阅读器页面时提前预热 AudioContext，避免点击播放时声卡驱动冷启动导致开头卡顿/断续
+  // 阅读器打开时提前预热并唤醒 AudioContext，消除点播放时的硬件冷启动抖动
   useEffect(() => {
     let isMounted = true;
-    audioPlayer.init()
+    audioPlayer.ensureReady()
       .then(() => { if (isMounted) setIsAudioReady(true); })
       .catch(() => { if (isMounted) setIsAudioReady(true); });
       
@@ -63,17 +79,16 @@ export default function Reader({ bookData, onClose, jumpToSibling, jumpToChapter
     };
   }, []);
 
-  // 当书籍内容更新（如切换章节、点击重新生成报底）时，彻底重置播放与高亮状态
+  // 书籍内容更新（切换章节、重新生成报底等）时重置播放状态与起止符状态
   useEffect(() => {
     audioPlayer.stop();
     setIsPlaying(false);
     setIsPaused(false);
+    setActiveMarker(null);
     if (engineRef.current) {
       engineRef.current.clearHighlight();
     }
   }, [bookData?.data, bookData?.name]);
-
-  const moreMenuRef = useRef(null);
 
   // Update localStorage when audio settings change in quick bar
   useEffect(() => {
@@ -83,6 +98,11 @@ export default function Reader({ bookData, onClose, jumpToSibling, jumpToChapter
     localStorage.setItem('pref_number_mode', numberMode);
     localStorage.setItem('pref_use_harmonics', useHarmonics);
     localStorage.setItem('pref_reader_view_mode', viewMode);
+    localStorage.setItem('pref_reader_font_family', fontFamily);
+    localStorage.setItem('pref_reader_enable_markers', enableMarkers.toString());
+    localStorage.setItem('pref_reader_prefix_marker', prefixMarker);
+    localStorage.setItem('pref_reader_suffix_marker', suffixMarker);
+    localStorage.setItem('pref_reader_auto_fit', autoFit.toString());
 
     audioPlayer.updateConfig({
       wpm: morseSpeed,
@@ -90,56 +110,73 @@ export default function Reader({ bookData, onClose, jumpToSibling, jumpToChapter
       numberMode: numberMode,
       useHarmonics: useHarmonics
     });
-  }, [baseFontSize, morseSpeed, morseFreq, numberMode, useHarmonics, viewMode]);
-
-  // Click outside to close more menu
-  useEffect(() => {
-    function handleClickOutside(e) {
-      if (moreMenuRef.current && !moreMenuRef.current.contains(e.target)) {
-        setIsMoreMenuOpen(false);
-      }
-    }
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
+  }, [baseFontSize, morseSpeed, morseFreq, numberMode, useHarmonics, viewMode, fontFamily, enableMarkers, prefixMarker, suffixMarker, autoFit]);
 
   const togglePlay = useCallback(async () => {
     if (isPlaying && !isPaused) {
+      // 1. 暂停操作：即刻响应 UI 与音频
       audioPlayer.pause();
       setIsPaused(true);
+      setActiveMarker(null);
       if (engineRef.current) engineRef.current.saveProgress();
     } else if (isPlaying && isPaused) {
-      audioPlayer.resume();
+      // 2. 继续播放操作：极速乐观更新 UI，异步确保音频引擎唤醒后发声
       setIsPaused(false);
+      await audioPlayer.resume();
     } else {
+      // 3. 开始全新播放：极速乐观更新 UI 按钮状态
       if (!engineRef.current) return;
-      const { text, startIndex } = await engineRef.current.getChapterText();
-      if (!text.trim()) return;
-
       setIsPlaying(true);
       setIsPaused(false);
-      
-      audioPlayer.playMorseText(text, {
-        wpm: morseSpeed,
-        freq: morseFreq,
-        numberMode: numberMode,
-        startIndex: startIndex,
-        onCharPlay: (token) => {
-          if (engineRef.current) engineRef.current.highlightToken(token);
-        },
-        onComplete: () => {
+      setActiveMarker(null);
+
+      try {
+        const { text, startIndex } = await engineRef.current.getChapterText();
+        if (!text || !text.trim()) {
           setIsPlaying(false);
-          setIsPaused(false);
-          if (engineRef.current) engineRef.current.clearHighlight();
+          return;
         }
-      });
+
+        // 若文档检测到特定的起止符且用户未关闭起止符，优先使用
+        const effectivePrefix = enableMarkers ? (prefixMarker || parsedTelegram.startMarker || '') : '';
+        const effectiveSuffix = enableMarkers ? (suffixMarker || parsedTelegram.endMarker || '') : '';
+
+        audioPlayer.playMorseText(text, {
+          wpm: morseSpeed,
+          freq: morseFreq,
+          numberMode: numberMode,
+          useHarmonics: useHarmonics,
+          startIndex: startIndex,
+          enableMarkers: enableMarkers,
+          prefixMarker: effectivePrefix,
+          suffixMarker: effectiveSuffix,
+          onCharPlay: (token) => {
+            if (engineRef.current) engineRef.current.highlightToken(token);
+          },
+          onMarkerPlay: (markerInfo) => {
+            setActiveMarker(markerInfo);
+          },
+          onComplete: () => {
+            setIsPlaying(false);
+            setIsPaused(false);
+            setActiveMarker(null);
+            if (engineRef.current) engineRef.current.clearHighlight();
+          }
+        });
+      } catch (e) {
+        console.error('Play error:', e);
+        setIsPlaying(false);
+        setIsPaused(false);
+        setActiveMarker(null);
+      }
     }
-  }, [isPlaying, isPaused, morseSpeed, morseFreq, numberMode]);
+  }, [isPlaying, isPaused, morseSpeed, morseFreq, numberMode, useHarmonics, enableMarkers, prefixMarker, suffixMarker, parsedTelegram]);
 
   const stopPlay = useCallback(() => {
     audioPlayer.stop();
     setIsPlaying(false);
     setIsPaused(false);
+    setActiveMarker(null);
     if (engineRef.current) {
       engineRef.current.clearHighlight();
       engineRef.current.saveProgress();
@@ -171,70 +208,17 @@ export default function Reader({ bookData, onClose, jumpToSibling, jumpToChapter
     if (engineRef.current) engineRef.current.nextPage();
   }, [stopPlay]);
 
-  // Keep latest actions in ref for stable keyboard shortcut listener
-  const actionsRef = useRef({ togglePlay, handlePrev, handleNext });
-  actionsRef.current = { togglePlay, handlePrev, handleNext };
-
-  // Keyboard Shortcuts (Space, ArrowLeft, ArrowRight) - mounted once
-  useEffect(() => {
-    const handleKeyDown = (e) => {
-      // Ignore shortcuts if the user is typing in an input or textarea
-      if (['INPUT', 'TEXTAREA'].includes(document.activeElement.tagName)) return;
-
-      if (e.key === ' ' || e.code === 'Space') {
-        e.preventDefault();
-        actionsRef.current.togglePlay();
-      } else if (e.key === 'ArrowLeft') {
-        e.preventDefault();
-        actionsRef.current.handlePrev();
-      } else if (e.key === 'ArrowRight') {
-        e.preventDefault();
-        actionsRef.current.handleNext();
-      }
-    };
-    
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
-
-  const paginationLabel = engineRef.current && typeof engineRef.current.getPaginationLabel === 'function' ? engineRef.current.getPaginationLabel() : '';
+  const paginationLabel = engineRef.current ? engineRef.current.getPaginationLabel() : '';
 
   return (
-    <div className="fixed top-8 left-0 right-0 bottom-0 z-40 bg-white dark:bg-[#1e1e1e] flex flex-col transition-colors select-none text-slate-800 dark:text-slate-200">
-      
-      {/* 注入滚动条等样式 */}
-      <style>{`
-        .custom-scrollbar::-webkit-scrollbar {
-          width: 8px;
-          height: 8px;
-        }
-        .custom-scrollbar::-webkit-scrollbar-track {
-          background: transparent;
-        }
-        .custom-scrollbar::-webkit-scrollbar-thumb {
-          background-color: rgba(156, 163, 175, 0.5);
-          border-radius: 4px;
-        }
-        .dark .custom-scrollbar::-webkit-scrollbar-thumb {
-          background-color: rgba(75, 85, 99, 0.5);
-        }
-        .hide-scrollbar-on-idle::-webkit-scrollbar-thumb {
-          background-color: transparent;
-        }
-        .hide-scrollbar-on-idle:hover::-webkit-scrollbar-thumb {
-          background-color: rgba(156, 163, 175, 0.5);
-        }
-        .dark .hide-scrollbar-on-idle:hover::-webkit-scrollbar-thumb {
-          background-color: rgba(75, 85, 99, 0.5);
-        }
-      `}</style>
-
-      {/* 原生标题栏控制区域 */}
+    <div className="fixed top-8 inset-x-0 bottom-0 z-40 flex flex-col bg-white dark:bg-[#181818] text-slate-800 dark:text-[#cccccc] select-none">
+      {/* Dynamic Unified Header Control Bar */}
       <ReaderHeader 
         bookData={bookData}
         handleClose={handleClose}
         isTocOpen={isTocOpen}
         setIsTocOpen={setIsTocOpen}
+        toc={toc}
         currentChapterTitle={currentChapterTitle}
         baseFontSize={baseFontSize}
         setBaseFontSize={setBaseFontSize}
@@ -242,40 +226,56 @@ export default function Reader({ bookData, onClose, jumpToSibling, jumpToChapter
         setMorseSpeed={setMorseSpeed}
         morseFreq={morseFreq}
         setMorseFreq={setMorseFreq}
-        useHarmonics={useHarmonics}
-        setUseHarmonics={setUseHarmonics}
         numberMode={numberMode}
         setNumberMode={setNumberMode}
+        useHarmonics={useHarmonics}
+        setUseHarmonics={setUseHarmonics}
         viewMode={viewMode}
         setViewMode={setViewMode}
+        fontFamily={fontFamily}
+        setFontFamily={setFontFamily}
+        isGridEligible={isGridEligible}
+        enableMarkers={enableMarkers}
+        setEnableMarkers={setEnableMarkers}
+        prefixMarker={prefixMarker}
+        setPrefixMarker={setPrefixMarker}
+        suffixMarker={suffixMarker}
+        setSuffixMarker={setSuffixMarker}
+        autoFit={autoFit}
+        setAutoFit={setAutoFit}
+        isAudioReady={isAudioReady}
         isPlaying={isPlaying}
         isPaused={isPaused}
         togglePlay={togglePlay}
         stopPlay={stopPlay}
-        isAudioReady={isAudioReady}
-        onRegenerate={onRegenerate}
+        onRegenerate={bookData.isGenerated ? onRegenerate : undefined}
       />
 
       {/* Main Content Area */}
-      <div className="flex-1 flex overflow-hidden">
-        
-        {/* TOC Sidebar */}
-        <TocSidebar 
-          isOpen={isTocOpen} 
-          toc={toc} 
-          bookType={bookData.type} 
-          onTocClick={handleTocClick}
-        />
+      <div className="flex-1 flex overflow-hidden relative">
+        {/* Collapsible Sidebar TOC Panel */}
+        {((bookData.type === 'epub' && toc.length > 0) || (bookData.siblings && bookData.siblings.length > 0)) && (
+          <TocSidebar 
+            isOpen={isTocOpen}
+            onClose={() => setIsTocOpen(false)}
+            toc={toc}
+            bookType={bookData.type}
+            onTocClick={handleTocClick}
+            onItemClick={handleTocClick}
+          />
+        )}
 
-        {/* Reader Core */}
-        <div className="flex-1 flex flex-col relative bg-white dark:bg-[#1e1e1e] border-l border-slate-300 dark:border-[#333333] min-w-0">
+        {/* Text Engine Viewer */}
+        <div className="flex-1 flex flex-col min-w-0 bg-white dark:bg-[#1c1c1c] relative overflow-hidden">
           <div className="flex-1 relative">
-            <div className="absolute inset-0 px-2 md:px-4">
+            <div className="absolute inset-0">
               <TxtEngine 
                 ref={engineRef}
                 bookData={bookData}
                 fontSize={displayFontSize}
+                fontFamily={fontFamily}
                 viewMode={viewMode}
+                autoFit={autoFit}
                 jumpToSibling={jumpToSibling}
                 jumpToChapter={jumpToChapter}
                 onTocLoaded={setToc}
@@ -286,66 +286,102 @@ export default function Reader({ bookData, onClose, jumpToSibling, jumpToChapter
           
           {/* Bottom Unified Status Bar */}
           <div className="h-10 border-t border-slate-200 dark:border-[#2d2d2d] bg-slate-50/90 dark:bg-[#181818]/90 backdrop-blur px-4 flex items-center justify-between shrink-0 select-none text-[12px] text-slate-500 dark:text-[#888888]">
+            {/* Left Section: Document Type / Active Marker Pulse Capsule */}
+            <div className="flex items-center gap-2 text-[12px] min-w-0">
+              {activeMarker ? (
+                activeMarker.type === 'prefix' ? (
+                  <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11.5px] font-mono font-semibold bg-indigo-50 text-indigo-600 dark:bg-indigo-950/80 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 shadow-2xs animate-pulse">
+                    <Radio size={12} className="text-indigo-500 animate-spin shrink-0" style={{ animationDuration: '3s' }} />
+                    <span className="truncate">报头起始符: <strong className="font-bold text-indigo-700 dark:text-indigo-200">{activeMarker.text}</strong> (发送中)</span>
+                  </div>
+                ) : (
+                  <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11.5px] font-mono font-semibold bg-emerald-50 text-emerald-600 dark:bg-emerald-950/80 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 shadow-2xs animate-pulse">
+                    <Radio size={12} className="text-emerald-500 animate-spin shrink-0" style={{ animationDuration: '3s' }} />
+                    <span className="truncate">报尾结束符: <strong className="font-bold text-emerald-700 dark:text-emerald-200">{activeMarker.text}</strong> (发送中)</span>
+                  </div>
+                )
+              ) : (
+                <span className="flex items-center gap-1.5 font-medium text-slate-600 dark:text-slate-300 truncate">
+                  {bookData.type === 'epub' ? (
+                    <>
+                      <BookOpen size={14} className="text-indigo-500 shrink-0" />
+                      <span>{t('reader.doc.epub')}</span>
+                    </>
+                  ) : (bookData.siblings && bookData.siblings.length > 1) ? (
+                    <>
+                      <Folder size={14} className="text-amber-500 shrink-0" />
+                      <span>{t('reader.doc.folder')}</span>
+                    </>
+                  ) : bookData.isGenerated ? (
+                    <>
+                      <Sparkles size={14} className="text-orange-600 dark:text-orange-400 shrink-0" />
+                      <span className="text-orange-600 dark:text-orange-400">{t('reader.doc.generated')}</span>
+                      <span className="text-slate-300 dark:text-slate-700">|</span>
+                      <span className="truncate">{bookData.generatorConfig ? `${bookData.generatorConfig.charsPerGroup || 4} ${t('reader.chars.unit')} · ${bookData.generatorConfig.groupCount || 100} ${t('reader.groups.unit')}` : `100 ${t('reader.groups.unit')}`}</span>
+                    </>
+                  ) : (
+                    <>
+                      <FileText size={14} className="text-blue-500 shrink-0" />
+                      <span>{t('reader.doc.txt')}</span>
+                      <span className="text-slate-300 dark:text-slate-700">|</span>
+                      <span>UTF-8</span>
+                    </>
+                  )}
+                </span>
+              )}
+            </div>
+
+            {/* Center Section: Pagination Controls for Multi-Page OR Total Stats for Single-Page */}
             {((bookData.type === 'epub' && bookData.toc && bookData.toc.length > 1) ||
               (bookData.siblings && bookData.siblings.length > 1)) ? (
-              /* Multi-Page Pagination Mode */
-              <>
-                <div className="flex items-center gap-2 text-[12px]">
-                  <span className="flex items-center gap-1.5 font-medium text-slate-600 dark:text-slate-300">
-                    {bookData.type === 'epub' ? (
-                      <>
-                        <BookOpen size={14} className="text-indigo-500" />
-                        <span>{t('reader.doc.epub')}</span>
-                      </>
-                    ) : (
-                      <>
-                        <Folder size={14} className="text-amber-500" />
-                        <span>{t('reader.doc.folder')}</span>
-                      </>
-                    )}
+              <div className="flex items-center gap-3 shrink-0">
+                <button 
+                  onClick={handlePrev}
+                  disabled={bookData.type === 'epub' ? (bookData.currentChapterIndex <= 0) : (bookData.currentIndex <= 0)}
+                  className={`h-7 px-3 rounded-lg flex items-center gap-1.5 transition-colors text-[12px] font-medium ${
+                    (bookData.type === 'epub' ? (bookData.currentChapterIndex > 0) : (bookData.currentIndex > 0))
+                      ? 'hover:bg-slate-200 dark:hover:bg-[#282828] text-slate-700 dark:text-[#cccccc] active:scale-95 cursor-pointer'
+                      : 'opacity-30 cursor-not-allowed text-slate-400 dark:text-slate-600'
+                  }`}
+                >
+                  <ChevronLeft size={14} /> {t('reader.prev')}
+                </button>
+
+                {paginationLabel && (
+                  <span className="font-mono text-slate-700 dark:text-[#dddddd] font-semibold text-[12px] px-2.5 py-1 rounded-md bg-slate-200/80 dark:bg-[#252525] border border-slate-300/60 dark:border-[#383838] shadow-2xs">
+                    {paginationLabel}
                   </span>
-                </div>
+                )}
 
-                {/* Classic Centered Pagination Group: [ < 上一页 ] [ 章节 2 / 29 ] [ 下一页 > ] */}
-                <div className="flex items-center gap-3">
-                  <button 
-                    onClick={handlePrev}
-                    disabled={bookData.type === 'epub' ? (bookData.currentChapterIndex <= 0) : (bookData.currentIndex <= 0)}
-                    className={`h-7 px-3 rounded-lg flex items-center gap-1.5 transition-colors text-[12px] font-medium ${
-                      (bookData.type === 'epub' ? (bookData.currentChapterIndex > 0) : (bookData.currentIndex > 0))
-                        ? 'hover:bg-slate-200 dark:hover:bg-[#282828] text-slate-700 dark:text-[#cccccc] active:scale-95 cursor-pointer'
-                        : 'opacity-30 cursor-not-allowed text-slate-400 dark:text-slate-600'
-                    }`}
-                  >
-                    <ChevronLeft size={14} /> {t('reader.prev')}
-                  </button>
+                <button 
+                  onClick={handleNext}
+                  disabled={
+                    bookData.type === 'epub'
+                      ? ((bookData.currentChapterIndex || 0) >= (bookData.toc?.length || 1) - 1)
+                      : (bookData.currentIndex >= (bookData.siblings?.length || 1) - 1)
+                  }
+                  className={`h-7 px-3 rounded-lg flex items-center gap-1.5 transition-colors text-[12px] font-medium ${
+                    (bookData.type === 'epub'
+                      ? ((bookData.currentChapterIndex || 0) < (bookData.toc?.length || 1) - 1)
+                      : (bookData.currentIndex < (bookData.siblings?.length || 1) - 1))
+                      ? 'hover:bg-slate-200 dark:hover:bg-[#282828] text-slate-700 dark:text-[#cccccc] active:scale-95 cursor-pointer'
+                      : 'opacity-30 cursor-not-allowed text-slate-400 dark:text-slate-600'
+                  }`}
+                >
+                  {t('reader.next')} <ChevronRight size={14} />
+                </button>
+              </div>
+            ) : (
+              <div className="font-mono text-slate-600 dark:text-slate-400 text-[12px] font-medium shrink-0">
+                {t('reader.stats.totalChars', '共 {count} 字符').replace('{count}', (parsedTelegram.cleanText ? parsedTelegram.cleanText.replace(/\s+/g, '').length : (bookData.data?.length || 0)).toLocaleString())}
+              </div>
+            )}
 
-                  {paginationLabel && (
-                    <span className="font-mono text-slate-700 dark:text-[#dddddd] font-semibold text-[12px] px-2.5 py-1 rounded-md bg-slate-200/80 dark:bg-[#252525] border border-slate-300/60 dark:border-[#383838] shadow-2xs">
-                      {paginationLabel}
-                    </span>
-                  )}
-
-                  <button 
-                    onClick={handleNext}
-                    disabled={
-                      bookData.type === 'epub'
-                        ? ((bookData.currentChapterIndex || 0) >= (bookData.toc?.length || 1) - 1)
-                        : (bookData.currentIndex >= (bookData.siblings?.length || 1) - 1)
-                    }
-                    className={`h-7 px-3 rounded-lg flex items-center gap-1.5 transition-colors text-[12px] font-medium ${
-                      (bookData.type === 'epub'
-                        ? ((bookData.currentChapterIndex || 0) < (bookData.toc?.length || 1) - 1)
-                        : (bookData.currentIndex < (bookData.siblings?.length || 1) - 1))
-                        ? 'hover:bg-slate-200 dark:hover:bg-[#282828] text-slate-700 dark:text-[#cccccc] active:scale-95 cursor-pointer'
-                        : 'opacity-30 cursor-not-allowed text-slate-400 dark:text-slate-600'
-                    }`}
-                  >
-                    {t('reader.next')} <ChevronRight size={14} />
-                  </button>
-                </div>
-
-                <div className="flex items-center gap-2.5 text-slate-400 dark:text-[#888888] text-[12px]">
+            {/* Right Section: Keyboard Shortcuts */}
+            <div className="flex items-center gap-2.5 text-slate-400 dark:text-[#888888] text-[12px] shrink-0">
+              {((bookData.type === 'epub' && bookData.toc && bookData.toc.length > 1) ||
+                (bookData.siblings && bookData.siblings.length > 1)) ? (
+                <>
                   <span className="flex items-center gap-1.5">
                     <kbd className="px-1.5 py-0.5 rounded bg-slate-200/90 dark:bg-[#252525] text-[11px] font-mono text-slate-700 dark:text-slate-300 border border-slate-300/80 dark:border-[#383838] shadow-2xs">← / →</kbd>
                     <span>{t('reader.shortcut.flip')}</span>
@@ -355,51 +391,14 @@ export default function Reader({ bookData, onClose, jumpToSibling, jumpToChapter
                     <kbd className="px-1.5 py-0.5 rounded bg-slate-200/90 dark:bg-[#252525] text-[11px] font-mono text-slate-700 dark:text-slate-300 border border-slate-300/80 dark:border-[#383838] shadow-2xs">Space</kbd>
                     <span>{t('reader.shortcut.play')}</span>
                   </span>
-                </div>
-              </>
-            ) : bookData.isGenerated ? (
-              /* Random Generated Morse Practice Mode */
-              <>
-                <div className="flex items-center gap-2 text-[12px]">
-                  <span className="flex items-center gap-1.5 font-medium text-orange-600 dark:text-orange-400">
-                    <Sparkles size={14} />
-                    <span>{t('reader.doc.generated')}</span>
-                  </span>
-                  <span className="text-slate-300 dark:text-slate-700">|</span>
-                  <span>{bookData.generatorConfig ? `${bookData.generatorConfig.charsPerGroup || 4} ${t('reader.chars.unit')} · ${bookData.generatorConfig.groupCount || 100} ${t('reader.groups.unit')}` : `100 ${t('reader.groups.unit')}`}</span>
-                </div>
-
-                <div className="font-mono text-slate-600 dark:text-slate-400 text-[12px] font-medium">
-                  {t('reader.stats.totalChars', '共 {count} 字符').replace('{count}', (bookData.data ? bookData.data.replace(/\s+/g, '').length : 0).toLocaleString())}
-                </div>
-
+                </>
+              ) : (
                 <div className="flex items-center gap-1.5 text-slate-400 dark:text-[#888888] text-[12px]">
                   <kbd className="px-1.5 py-0.5 rounded bg-slate-200/90 dark:bg-[#252525] text-[11px] font-mono text-slate-700 dark:text-slate-300 border border-slate-300/80 dark:border-[#383838] shadow-2xs">Space</kbd>
                   <span>{t('reader.shortcut.playPause')}</span>
                 </div>
-              </>
-            ) : (
-              /* Single File TXT Mode */
-              <>
-                <div className="flex items-center gap-2 text-[12px]">
-                  <span className="flex items-center gap-1.5 font-medium text-slate-600 dark:text-slate-300">
-                    <FileText size={14} className="text-blue-500" />
-                    <span>{t('reader.doc.txt')}</span>
-                  </span>
-                  <span className="text-slate-300 dark:text-slate-700">|</span>
-                  <span>UTF-8</span>
-                </div>
-
-                <div className="font-mono text-slate-600 dark:text-slate-400 text-[12px] font-medium">
-                  {t('reader.stats.totalChars', '共 {count} 字符').replace('{count}', (bookData.data ? bookData.data.length : 0).toLocaleString())}
-                </div>
-
-                <div className="flex items-center gap-1.5 text-slate-400 dark:text-[#888888] text-[12px]">
-                  <kbd className="px-1.5 py-0.5 rounded bg-slate-200/90 dark:bg-[#252525] text-[11px] font-mono text-slate-700 dark:text-slate-300 border border-slate-300/80 dark:border-[#383838] shadow-2xs">Space</kbd>
-                  <span>{t('reader.shortcut.playPause')}</span>
-                </div>
-              </>
-            )}
+              )}
+            </div>
           </div>
         </div>
 

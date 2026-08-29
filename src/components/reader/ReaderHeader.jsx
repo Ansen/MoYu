@@ -1,6 +1,26 @@
+import audioPlayer from '../../utils/audioPlayer';
 import React, { useState, useRef } from 'react';
-import { ArrowLeft, List, ChevronDown, Type, Activity, Music, Check, Radio, Hash, Pause, Play, RefreshCw, Square, Plus, Minus, LayoutGrid, FileText } from 'lucide-react';
+import { 
+  ArrowLeft, 
+  List, 
+  ChevronDown,
+  ChevronRight, 
+  Type, 
+  Activity, 
+  Music, 
+  Check, 
+  Radio, 
+  Hash, 
+  Pause, 
+  Play, 
+  RefreshCw, 
+  Square, 
+  Plus, 
+  Minus, 
+  SlidersHorizontal
+} from 'lucide-react';
 import { useI18n } from '../../i18n';
+import { FONT_OPTIONS } from '../../config/fonts';
 
 export default function ReaderHeader({
   bookData,
@@ -19,6 +39,17 @@ export default function ReaderHeader({
   setNumberMode,
   viewMode = 'grid',
   setViewMode,
+  isGridEligible = true,
+  fontFamily = 'Consolas',
+  setFontFamily,
+  enableMarkers = true,
+  setEnableMarkers,
+  prefixMarker = '===',
+  setPrefixMarker,
+  suffixMarker = 'iii',
+  setSuffixMarker,
+  autoFit = true,
+  setAutoFit,
   isPlaying,
   isPaused,
   togglePlay,
@@ -28,7 +59,24 @@ export default function ReaderHeader({
 }) {
   const { t } = useI18n();
   const [isNumberModeOpen, setIsNumberModeOpen] = useState(false);
+  const [isMoreMenuOpen, setIsMoreMenuOpen] = useState(false);
+  const [isFontSubmenuOpen, setIsFontSubmenuOpen] = useState(false);
+  
   const numberModeRef = useRef(null);
+  const moreMenuRef = useRef(null);
+  const fontSubmenuTimeoutRef = useRef(null);
+
+  const handleFontMouseEnter = () => {
+    if (fontSubmenuTimeoutRef.current) clearTimeout(fontSubmenuTimeoutRef.current);
+    setIsFontSubmenuOpen(true);
+  };
+
+  const handleFontMouseLeave = () => {
+    if (fontSubmenuTimeoutRef.current) clearTimeout(fontSubmenuTimeoutRef.current);
+    fontSubmenuTimeoutRef.current = setTimeout(() => {
+      setIsFontSubmenuOpen(false);
+    }, 200);
+  };
 
   const hasToc = Boolean(
     bookData.isFolder ||
@@ -37,29 +85,30 @@ export default function ReaderHeader({
   );
 
   return (
-    <div className="h-12 bg-slate-100 dark:bg-[#111111] border-b border-slate-300 dark:border-[#333333] flex items-center px-3.5 shrink-0 shadow-xs z-10 justify-between gap-2 select-none">
+    <div className="h-12 bg-slate-100 dark:bg-[#111111] border-b border-slate-300 dark:border-[#333333] flex items-center px-2.5 sm:px-3 shrink-0 shadow-xs z-20 justify-between gap-1.5 sm:gap-2 select-none">
+      
       {/* Left: Nav Action Buttons */}
-      <div className="flex items-center justify-start gap-2 shrink-0">
+      <div className="flex items-center justify-start gap-1.5 shrink-0">
         <button
           onClick={handleClose}
-          className="h-8 flex items-center gap-1.5 px-3 rounded-lg border border-slate-300/80 dark:border-[#383838] bg-white dark:bg-[#1f1f1f] text-slate-700 dark:text-[#cccccc] hover:bg-slate-50 dark:hover:bg-[#282828] hover:border-slate-400 text-[12px] font-medium transition-all shadow-2xs active:scale-98 cursor-pointer whitespace-nowrap shrink-0"
+          className="h-8 flex items-center gap-1.5 px-2.5 sm:px-3 rounded-lg border border-slate-300/80 dark:border-[#383838] bg-white dark:bg-[#1f1f1f] text-slate-700 dark:text-[#cccccc] hover:bg-slate-50 dark:hover:bg-[#282828] hover:border-slate-400 text-[12px] font-medium transition-all shadow-2xs active:scale-98 cursor-pointer whitespace-nowrap shrink-0"
           title={t('reader.back')}
         >
-          <ArrowLeft size={15} className="shrink-0" />
+          <ArrowLeft size={14} className="shrink-0" />
           <span className="whitespace-nowrap">{t('reader.back')}</span>
         </button>
 
         {hasToc && (
           <button
             onClick={() => setIsTocOpen(!isTocOpen)}
-            className={`h-8 flex items-center gap-1.5 px-3 rounded-lg border text-[12px] font-medium transition-all cursor-pointer shadow-2xs active:scale-98 whitespace-nowrap shrink-0 ${
+            className={`h-8 flex items-center gap-1.5 px-2.5 sm:px-3 rounded-lg border text-[12px] font-medium transition-all cursor-pointer shadow-2xs active:scale-98 whitespace-nowrap shrink-0 ${
               isTocOpen 
                 ? 'border-indigo-300 dark:border-indigo-800 bg-indigo-50/80 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 font-semibold' 
                 : 'border-slate-300/80 dark:border-[#383838] bg-white dark:bg-[#1f1f1f] text-slate-700 dark:text-[#cccccc] hover:bg-slate-50 dark:hover:bg-[#282828]'
             }`}
             title={bookData.isFolder ? t('reader.filelist') : t('reader.toc')}
           >
-            <List size={15} className="shrink-0" />
+            <List size={14} className="shrink-0" />
             <span className="whitespace-nowrap">{bookData.isFolder ? t('reader.filelist') : t('reader.toc')}</span>
           </button>
         )}
@@ -67,19 +116,19 @@ export default function ReaderHeader({
 
       {/* Center: Floating Island Parameter & Tone Console */}
       <div className="flex items-center justify-center shrink-0">
-        <div className="flex items-center gap-2 sm:gap-2.5 bg-slate-200/80 dark:bg-[#181818] px-3 py-1 rounded-xl border border-slate-300/70 dark:border-[#2d2d2d] shadow-2xs">
+        <div className="flex items-center gap-1.5 sm:gap-2 bg-slate-200/80 dark:bg-[#181818] px-2.5 py-1 rounded-xl border border-slate-300/70 dark:border-[#2d2d2d] shadow-2xs">
           
           {/* Font Size Stepper */}
           <div className="flex items-center gap-1 shrink-0" title={`${t('reader.font.size')} (支持点击+-或滚轮微调)`}>
-            <Type size={14} className="text-slate-500 shrink-0" />
+            <Type size={13} className="text-slate-500 shrink-0" />
             <div className="flex items-center bg-white dark:bg-[#252525] border border-slate-300 dark:border-[#383838] rounded-md overflow-hidden shadow-2xs h-7">
               <button
                 type="button"
                 onClick={() => setBaseFontSize(Math.max(10, Math.round(baseFontSize) - 2))}
-                className="w-5 h-full flex items-center justify-center text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-slate-100 dark:hover:bg-[#333333] transition-colors cursor-pointer select-none active:bg-slate-200 dark:active:bg-[#3a3a3a]"
+                className="w-4.5 h-full flex items-center justify-center text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-slate-100 dark:hover:bg-[#333333] transition-colors cursor-pointer select-none active:bg-slate-200 dark:active:bg-[#3a3a3a]"
                 title="减小字号 (-2)"
               >
-                <Minus size={11} className="stroke-[2.5]" />
+                <Minus size={10} className="stroke-[2.5]" />
               </button>
               <input
                 type="number"
@@ -101,32 +150,32 @@ export default function ReaderHeader({
                     setBaseFontSize(val);
                   }
                 }}
-                className="w-7 text-[12px] font-bold font-mono text-center bg-transparent focus:outline-hidden text-slate-800 dark:text-[#dddddd] [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none p-0 select-none"
+                className="w-6.5 text-[11.5px] font-bold font-mono text-center bg-transparent focus:outline-hidden text-slate-800 dark:text-[#dddddd] [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none p-0 select-none"
               />
               <button
                 type="button"
                 onClick={() => setBaseFontSize(Math.min(120, Math.round(baseFontSize) + 2))}
-                className="w-5 h-full flex items-center justify-center text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-slate-100 dark:hover:bg-[#333333] transition-colors cursor-pointer select-none active:bg-slate-200 dark:active:bg-[#3a3a3a]"
+                className="w-4.5 h-full flex items-center justify-center text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-slate-100 dark:hover:bg-[#333333] transition-colors cursor-pointer select-none active:bg-slate-200 dark:active:bg-[#3a3a3a]"
                 title="增大字号 (+2)"
               >
-                <Plus size={11} className="stroke-[2.5]" />
+                <Plus size={10} className="stroke-[2.5]" />
               </button>
             </div>
           </div>
 
-          <div className="h-3.5 w-px bg-slate-300 dark:bg-[#333333]"></div>
+          <div className="h-3 w-px bg-slate-300 dark:bg-[#333333]"></div>
 
           {/* Speed Stepper (WPM) */}
           <div className="flex items-center gap-1 shrink-0" title={`${t('reader.speed')} (支持点击+-或滚轮微调)`}>
-            <Activity size={14} className="text-slate-500 shrink-0" />
+            <Activity size={13} className="text-slate-500 shrink-0" />
             <div className="flex items-center bg-white dark:bg-[#252525] border border-slate-300 dark:border-[#383838] rounded-md overflow-hidden shadow-2xs h-7">
               <button
                 type="button"
                 onClick={() => setMorseSpeed(Math.max(5, morseSpeed - 1))}
-                className="w-5 h-full flex items-center justify-center text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-slate-100 dark:hover:bg-[#333333] transition-colors cursor-pointer select-none active:bg-slate-200 dark:active:bg-[#3a3a3a]"
+                className="w-4.5 h-full flex items-center justify-center text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-slate-100 dark:hover:bg-[#333333] transition-colors cursor-pointer select-none active:bg-slate-200 dark:active:bg-[#3a3a3a]"
                 title="减速 (-1 WPM)"
               >
-                <Minus size={11} className="stroke-[2.5]" />
+                <Minus size={10} className="stroke-[2.5]" />
               </button>
               <input
                 type="number"
@@ -142,33 +191,33 @@ export default function ReaderHeader({
                   }
                 }}
                 onChange={(e) => setMorseSpeed(Math.max(5, Math.min(60, Number(e.target.value) || 20)))}
-                className="w-6 text-[12px] font-bold font-mono text-center bg-transparent focus:outline-hidden text-slate-800 dark:text-[#dddddd] [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none p-0 select-none"
+                className="w-5.5 text-[11.5px] font-bold font-mono text-center bg-transparent focus:outline-hidden text-slate-800 dark:text-[#dddddd] [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none p-0 select-none"
               />
               <button
                 type="button"
                 onClick={() => setMorseSpeed(Math.min(60, morseSpeed + 1))}
-                className="w-5 h-full flex items-center justify-center text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-slate-100 dark:hover:bg-[#333333] transition-colors cursor-pointer select-none active:bg-slate-200 dark:active:bg-[#3a3a3a]"
+                className="w-4.5 h-full flex items-center justify-center text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-slate-100 dark:hover:bg-[#333333] transition-colors cursor-pointer select-none active:bg-slate-200 dark:active:bg-[#3a3a3a]"
                 title="加速 (+1 WPM)"
               >
-                <Plus size={11} className="stroke-[2.5]" />
+                <Plus size={10} className="stroke-[2.5]" />
               </button>
             </div>
-            <span className="text-[11px] text-slate-500 dark:text-slate-400 font-semibold select-none">WPM</span>
+            <span className="text-[10.5px] text-slate-500 dark:text-slate-400 font-semibold select-none">WPM</span>
           </div>
 
-          <div className="h-3.5 w-px bg-slate-300 dark:bg-[#333333]"></div>
+          <div className="h-3 w-px bg-slate-300 dark:bg-[#333333]"></div>
 
           {/* Frequency Stepper (Hz) */}
           <div className="flex items-center gap-1 shrink-0" title={`${t('reader.freq')} (支持点击+-或滚轮微调)`}>
-            <Music size={14} className="text-slate-500 shrink-0" />
+            <Music size={13} className="text-slate-500 shrink-0" />
             <div className="flex items-center bg-white dark:bg-[#252525] border border-slate-300 dark:border-[#383838] rounded-md overflow-hidden shadow-2xs h-7">
               <button
                 type="button"
                 onClick={() => setMorseFreq(Math.max(100, morseFreq - 20))}
-                className="w-5 h-full flex items-center justify-center text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-slate-100 dark:hover:bg-[#333333] transition-colors cursor-pointer select-none active:bg-slate-200 dark:active:bg-[#3a3a3a]"
+                className="w-4.5 h-full flex items-center justify-center text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-slate-100 dark:hover:bg-[#333333] transition-colors cursor-pointer select-none active:bg-slate-200 dark:active:bg-[#3a3a3a]"
                 title="降调 (-20 Hz)"
               >
-                <Minus size={11} className="stroke-[2.5]" />
+                <Minus size={10} className="stroke-[2.5]" />
               </button>
               <input
                 type="number"
@@ -185,27 +234,30 @@ export default function ReaderHeader({
                   }
                 }}
                 onChange={(e) => setMorseFreq(Math.max(100, Math.min(1500, Number(e.target.value) || 380)))}
-                className="w-9 text-[12px] font-bold font-mono text-center bg-transparent focus:outline-hidden text-slate-800 dark:text-[#dddddd] [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none p-0 select-none"
+                className="w-8.5 text-[11.5px] font-bold font-mono text-center bg-transparent focus:outline-hidden text-slate-800 dark:text-[#dddddd] [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none p-0 select-none"
               />
               <button
                 type="button"
                 onClick={() => setMorseFreq(Math.min(1500, morseFreq + 20))}
-                className="w-5 h-full flex items-center justify-center text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-slate-100 dark:hover:bg-[#333333] transition-colors cursor-pointer select-none active:bg-slate-200 dark:active:bg-[#3a3a3a]"
+                className="w-4.5 h-full flex items-center justify-center text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-slate-100 dark:hover:bg-[#333333] transition-colors cursor-pointer select-none active:bg-slate-200 dark:active:bg-[#3a3a3a]"
                 title="升调 (+20 Hz)"
               >
-                <Plus size={11} className="stroke-[2.5]" />
+                <Plus size={10} className="stroke-[2.5]" />
               </button>
             </div>
-            <span className="text-[11px] text-slate-500 dark:text-slate-400 font-semibold select-none">Hz</span>
+            <span className="text-[10.5px] text-slate-500 dark:text-slate-400 font-semibold select-none">Hz</span>
           </div>
 
-          <div className="h-3.5 w-px bg-slate-300 dark:bg-[#333333]"></div>
+          <div className="h-3 w-px bg-slate-300 dark:bg-[#333333]"></div>
 
-          {/* Number Mode Pill Dropdown */}
+          {/* Number Mode Pill Dropdown (Stay outside on main toolbar) */}
           <div className="relative flex items-center shrink-0" ref={numberModeRef}>
             <button
               type="button"
-              onClick={() => setIsNumberModeOpen(!isNumberModeOpen)}
+              onClick={() => {
+                setIsNumberModeOpen(!isNumberModeOpen);
+                setIsMoreMenuOpen(false);
+              }}
               className="h-7 flex items-center gap-1 px-2 rounded-md bg-white dark:bg-[#252525] border border-slate-300 dark:border-[#383838] text-slate-700 dark:text-[#cccccc] text-[11.5px] font-medium hover:border-indigo-400 dark:hover:border-indigo-500/50 hover:text-indigo-600 dark:hover:text-indigo-400 transition-all cursor-pointer whitespace-nowrap shadow-2xs"
               title={t('reader.number.mode')}
             >
@@ -252,7 +304,7 @@ export default function ReaderHeader({
             )}
           </div>
 
-          <div className="h-3.5 w-px bg-slate-300 dark:bg-[#333333]"></div>
+          <div className="h-3 w-px bg-slate-300 dark:bg-[#333333]"></div>
 
           {/* Radio Harmonics One-Click Toggle Switch */}
           <button
@@ -269,30 +321,234 @@ export default function ReaderHeader({
             <span>{t('reader.harmonics.short')}</span>
           </button>
 
-          {/* View Mode (10-Col Table vs Plain Text) */}
-          {setViewMode && (
-            <>
-              <div className="h-3.5 w-px bg-slate-300 dark:bg-[#333333]"></div>
-              <button
-                type="button"
-                onClick={() => setViewMode(viewMode === 'grid' ? 'text' : 'grid')}
-                className={`h-7 flex items-center gap-1 px-2.5 rounded-lg text-[11.5px] font-medium transition-all cursor-pointer whitespace-nowrap select-none border ${
-                  viewMode === 'grid'
-                    ? 'bg-amber-50/90 dark:bg-amber-950/50 border-amber-300 dark:border-amber-600 text-amber-700 dark:text-amber-300 font-semibold shadow-2xs'
-                    : 'bg-white dark:bg-[#252525] border-slate-300 dark:border-[#383838] text-slate-600 dark:text-slate-400 hover:border-slate-400 dark:hover:border-[#4a4a4a] hover:text-slate-800 dark:hover:text-[#dddddd] shadow-2xs'
-                }`}
-                title={viewMode === 'grid' ? t('reader.view.grid') : t('reader.view.text')}
-              >
-                {viewMode === 'grid' ? <LayoutGrid size={13} className="text-amber-600 dark:text-amber-400 shrink-0" /> : <FileText size={13} className="text-slate-400 shrink-0" />}
-                <span>{viewMode === 'grid' ? t('reader.view.grid') : t('reader.view.text')}</span>
-              </button>
-            </>
-          )}
+          <div className="h-3 w-px bg-slate-300 dark:bg-[#333333]"></div>
+
+          {/* More Settings Dropdown Menu (Contains Layout Mode & Font Selector) */}
+          <div className="relative flex items-center shrink-0" ref={moreMenuRef}>
+            <button
+              type="button"
+              onClick={() => {
+                setIsMoreMenuOpen(!isMoreMenuOpen);
+                setIsNumberModeOpen(false);
+              }}
+              className={`h-7 flex items-center gap-1.5 px-2.5 rounded-md text-[11.5px] font-medium transition-all cursor-pointer whitespace-nowrap select-none border ${
+                isMoreMenuOpen
+                  ? 'bg-indigo-50 dark:bg-indigo-950/60 border-indigo-300 dark:border-indigo-700 text-indigo-600 dark:text-indigo-300 font-semibold shadow-2xs'
+                  : 'bg-white dark:bg-[#252525] border-slate-300 dark:border-[#383838] text-slate-600 dark:text-slate-400 hover:border-slate-400 dark:hover:border-[#4a4a4a] hover:text-slate-800 dark:hover:text-[#dddddd] shadow-2xs'
+              }`}
+              title={t('reader.more')}
+            >
+              <SlidersHorizontal size={12} className={isMoreMenuOpen ? "text-indigo-500 shrink-0" : "text-slate-400 shrink-0"} />
+              <span>{t('reader.more')}</span>
+              <ChevronDown size={11} className={`opacity-60 transition-transform duration-200 ${isMoreMenuOpen ? 'rotate-180' : ''}`} />
+            </button>
+
+            {isMoreMenuOpen && (
+              <>
+                <div
+                  className="fixed inset-0 z-40"
+                  onMouseDown={() => { setIsMoreMenuOpen(false); setIsFontSubmenuOpen(false); }}
+                />
+                <div className="absolute top-full right-0 mt-2 w-64 bg-white/95 dark:bg-[#1c1c1c]/95 backdrop-blur-md border border-slate-200 dark:border-[#333333] shadow-2xl rounded-xl p-2 z-50 animate-in fade-in slide-in-from-top-1 duration-150 select-none text-slate-800 dark:text-slate-200 space-y-1">
+                  
+                  {/* Row 1: Auto-Fit Single Screen Switch */}
+                  {setAutoFit && (
+                    <div className="flex items-center justify-between py-1 px-1.5 rounded-lg hover:bg-slate-50 dark:hover:bg-[#252525]/60 transition-colors">
+                      <span className="text-[12px] text-slate-700 dark:text-slate-300 font-medium">
+                        {t('reader.more.autofit')}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setAutoFit(!autoFit)}
+                        className={`h-4.5 w-8 shrink-0 rounded-full transition-colors relative cursor-pointer ${
+                          autoFit ? 'bg-indigo-600' : 'bg-slate-300 dark:bg-[#3e3e3e]'
+                        }`}
+                      >
+                        <span
+                          className={`absolute top-0.5 left-0.5 h-3.5 w-3.5 rounded-full bg-white transition-transform shadow-xs ${
+                            autoFit ? 'translate-x-3.5' : 'translate-x-0'
+                          }`}
+                        />
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Row 2: Layout Mode Segmented Control */}
+                  {setViewMode && (
+                    <div className="flex items-center justify-between py-1 px-1.5 rounded-lg hover:bg-slate-50 dark:hover:bg-[#252525]/60 transition-colors">
+                      <span className="text-[12px] text-slate-700 dark:text-slate-300 font-medium">
+                        {t('reader.more.layout')}
+                      </span>
+                      <div className="flex items-center p-0.5 rounded-lg bg-slate-100 dark:bg-[#252525] border border-slate-200/80 dark:border-[#333333]">
+                        <button
+                          type="button"
+                          onClick={() => { if (isGridEligible) setViewMode('grid'); }}
+                          disabled={!isGridEligible}
+                          className={`px-2 py-0.5 text-[11px] font-medium rounded-md transition-all cursor-pointer ${
+                            viewMode === 'grid' && isGridEligible
+                              ? 'bg-white dark:bg-[#383838] text-indigo-600 dark:text-indigo-400 shadow-2xs font-semibold'
+                              : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
+                          } ${!isGridEligible ? 'opacity-40 cursor-not-allowed' : ''}`}
+                        >
+                          {t('reader.view.grid')}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setViewMode('text')}
+                          className={`px-2 py-0.5 text-[11px] font-medium rounded-md transition-all cursor-pointer ${
+                            viewMode === 'text'
+                              ? 'bg-white dark:bg-[#383838] text-indigo-600 dark:text-indigo-400 shadow-2xs font-semibold'
+                              : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
+                          }`}
+                        >
+                          {t('reader.view.text')}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Row 3: Font Family Flyout Submenu */}
+                  {setFontFamily && (
+                    <div 
+                      className="relative"
+                      onMouseEnter={handleFontMouseEnter}
+                      onMouseLeave={handleFontMouseLeave}
+                    >
+                      <button
+                        type="button"
+                        onClick={() => setIsFontSubmenuOpen(!isFontSubmenuOpen)}
+                        className={`w-full flex items-center justify-between py-1 px-1.5 rounded-lg transition-colors cursor-pointer ${
+                          isFontSubmenuOpen
+                            ? 'bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 font-medium'
+                            : 'hover:bg-slate-50 dark:hover:bg-[#252525]/60 text-slate-700 dark:text-slate-300'
+                        }`}
+                      >
+                        <span className="text-[12px] font-medium">
+                          {t('reader.more.font')}
+                        </span>
+                        <div className="flex items-center gap-1">
+                          <span className="text-[11px] text-slate-400 dark:text-slate-500 font-mono">
+                            {FONT_OPTIONS.find(f => f.id === fontFamily)?.shortName || fontFamily}
+                          </span>
+                          <ChevronRight size={13} className="text-slate-400 opacity-70" />
+                        </div>
+                      </button>
+
+                      {/* Font Flyout Submenu to the Left */}
+                      {isFontSubmenuOpen && (
+                        <div 
+                          className="absolute right-full top-0 mr-1.5 w-max min-w-[200px] flex flex-col gap-0.5 p-1.5 bg-white/98 dark:bg-[#1e1e1e]/98 backdrop-blur-md border border-slate-200 dark:border-[#333333] rounded-xl shadow-2xl z-50 animate-in fade-in zoom-in-95 duration-100 select-none text-slate-800 dark:text-slate-200"
+                          onMouseEnter={handleFontMouseEnter}
+                          onMouseLeave={handleFontMouseLeave}
+                        >
+                          <div className="px-2 py-1 text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
+                            {t('reader.more.font')}
+                          </div>
+                          {FONT_OPTIONS.map((font) => {
+                            const isSelected = fontFamily === font.id;
+                            return (
+                              <button
+                                key={font.id}
+                                type="button"
+                                onClick={() => {
+                                  setFontFamily(font.id);
+                                  setIsFontSubmenuOpen(false);
+                                }}
+                                className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-left transition-all cursor-pointer ${
+                                  isSelected
+                                    ? 'bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 font-semibold'
+                                    : 'text-slate-700 dark:text-slate-300 hover:bg-slate-100/80 dark:hover:bg-[#282828]'
+                                }`}
+                              >
+                                <span 
+                                  className="text-[12px]" 
+                                  style={{ fontFamily: font.fontFamily }}
+                                >
+                                  {t(font.labelKey, font.shortName)}
+                                </span>
+                                {isSelected && (
+                                  <Check size={13} className="text-indigo-600 dark:text-indigo-400 ml-2 shrink-0" />
+                                )}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Divider */}
+                  {setEnableMarkers && (
+                    <div className="h-px bg-slate-100 dark:bg-[#282828] my-1" />
+                  )}
+
+                  {/* Row 4: Transmission Markers Enable Toggle */}
+                  {setEnableMarkers && (
+                    <div className="space-y-1">
+                      <div className="flex items-center justify-between py-1 px-1.5 rounded-lg hover:bg-slate-50 dark:hover:bg-[#252525]/60 transition-colors">
+                        <span className="text-[12px] text-slate-700 dark:text-slate-300 font-medium">
+                          {t('reader.markers.title')}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setEnableMarkers(!enableMarkers)}
+                          className={`h-4.5 w-8 shrink-0 rounded-full transition-colors relative cursor-pointer ${
+                            enableMarkers ? 'bg-indigo-600' : 'bg-slate-300 dark:bg-[#3e3e3e]'
+                          }`}
+                        >
+                          <span
+                            className={`absolute top-0.5 left-0.5 h-3.5 w-3.5 rounded-full bg-white transition-transform shadow-xs ${
+                              enableMarkers ? 'translate-x-3.5' : 'translate-x-0'
+                            }`}
+                          />
+                        </button>
+                      </div>
+
+                      {/* Row 5 & 6: Prefix & Suffix Single Compact Input Rows (No Pills, 0 Horizontal Scrollbar) */}
+                      {enableMarkers && (
+                        <div className="space-y-1 pt-0.5">
+                          {/* Prefix Single Row */}
+                          <div className="flex items-center justify-between py-0.5 px-1.5 rounded-lg hover:bg-slate-50 dark:hover:bg-[#252525]/60 transition-colors">
+                            <span className="text-[11px] text-slate-500 dark:text-slate-400">
+                              {t('reader.markers.prefix')}
+                            </span>
+                            <input
+                              type="text"
+                              value={prefixMarker || ''}
+                              onChange={(e) => setPrefixMarker && setPrefixMarker(e.target.value)}
+                              placeholder="=== / KA"
+                              className="w-24 h-6 px-2 text-[11.5px] font-mono text-right rounded-md bg-slate-100 dark:bg-[#252525] border border-slate-200/80 dark:border-[#333333] text-slate-800 dark:text-slate-200 focus:outline-hidden focus:border-indigo-500 shadow-2xs transition-all"
+                            />
+                          </div>
+
+                          {/* Suffix Single Row */}
+                          <div className="flex items-center justify-between py-0.5 px-1.5 rounded-lg hover:bg-slate-50 dark:hover:bg-[#252525]/60 transition-colors">
+                            <span className="text-[11px] text-slate-500 dark:text-slate-400">
+                              {t('reader.markers.suffix')}
+                            </span>
+                            <input
+                              type="text"
+                              value={suffixMarker || ''}
+                              onChange={(e) => setSuffixMarker && setSuffixMarker(e.target.value)}
+                              placeholder="iii + / AR"
+                              className="w-24 h-6 px-2 text-[11.5px] font-mono text-right rounded-md bg-slate-100 dark:bg-[#252525] border border-slate-200/80 dark:border-[#333333] text-slate-800 dark:text-slate-200 focus:outline-hidden focus:border-indigo-500 shadow-2xs transition-all"
+                            />
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                </div>
+              </>
+            )}
+          </div>
+
         </div>
       </div>
 
-      {/* Right: Playback Controls */}
-      <div className="flex items-center justify-end gap-2 shrink-0">
+      {/* Right: Playback Controls (Protected with shrink-0, never clipped) */}
+      <div className="flex items-center justify-end gap-1.5 sm:gap-2 shrink-0">
         {onRegenerate && (
           <button
             onClick={() => { stopPlay(); onRegenerate(); }}
@@ -310,39 +566,41 @@ export default function ReaderHeader({
           disabled={!isPlaying}
           className={`h-8 w-8 rounded-lg font-medium flex items-center justify-center shrink-0 transition-all border whitespace-nowrap ${
             isPlaying 
-              ? 'border-rose-300 dark:border-rose-900/60 bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/40 dark:hover:bg-rose-900/60 text-rose-600 dark:text-rose-400 shadow-2xs active:scale-95 cursor-pointer' 
-              : 'border-slate-200 dark:border-[#2d2d2d] bg-slate-100/50 dark:bg-[#181818] text-slate-300 dark:text-[#444444] opacity-60 cursor-not-allowed pointer-events-none'
+              ? 'border-slate-300/80 dark:border-[#383838] bg-white dark:bg-[#202020] text-slate-500 dark:text-slate-400 hover:text-rose-500 dark:hover:text-rose-400 hover:border-rose-300 dark:hover:border-rose-800/60 hover:bg-rose-50/50 dark:hover:bg-rose-950/30 shadow-2xs active:scale-95 cursor-pointer' 
+              : 'border-slate-200 dark:border-[#2d2d2d] bg-slate-100/50 dark:bg-[#181818] text-slate-300 dark:text-[#444444] opacity-50 cursor-not-allowed pointer-events-none'
           }`}
           title={t('reader.stop')}
         >
-          <Square size={14} className="fill-current" />
+          <Square size={13} className="fill-current" />
         </button>
 
         {/* Primary Play / Pause / Resume Button */}
         <button
           onMouseDown={(e) => e.preventDefault()}
+          onMouseEnter={() => { if (audioPlayer?.ensureReady) audioPlayer.ensureReady(); }}
           onClick={togglePlay}
           disabled={!isAudioReady}
-          className={`h-8 px-3.5 min-w-[84px] rounded-lg font-semibold flex items-center justify-center gap-1.5 shrink-0 transition-all shadow-xs active:scale-95 cursor-pointer select-none text-[13px] whitespace-nowrap ${
+          className={`h-8 px-3 min-w-[78px] sm:min-w-[84px] rounded-lg font-medium flex items-center justify-center gap-1.5 shrink-0 transition-all shadow-xs active:scale-95 cursor-pointer select-none text-[12.5px] whitespace-nowrap ${
             !isAudioReady
-              ? 'bg-slate-300 dark:bg-[#333333] text-white cursor-not-allowed opacity-60'
+              ? 'bg-slate-200 dark:bg-[#2a2a2a] text-slate-400 dark:text-slate-500 cursor-not-allowed opacity-60'
               : (isPlaying && !isPaused
-              ? 'bg-amber-500 hover:bg-amber-600 text-white shadow-amber-500/25'
+              ? 'bg-amber-500/15 dark:bg-amber-500/20 text-amber-700 dark:text-amber-300 border border-amber-300/70 dark:border-amber-700/60 hover:bg-amber-500/25 dark:hover:bg-amber-500/30'
               : isPaused
-              ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-500/25'
-              : 'bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600 text-white shadow-indigo-500/25')
+              ? 'bg-emerald-500/15 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border border-emerald-300/70 dark:border-emerald-700/60 hover:bg-emerald-500/25 dark:hover:bg-emerald-500/30'
+              : 'bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-500/80 dark:hover:bg-indigo-500 dark:border dark:border-indigo-400/30 text-white')
           }`}
         >
           {isPlaying && !isPaused ? (
-            <Pause size={14} className="stroke-[2.5]" />
+            <Pause size={13} className="stroke-[2.5]" />
           ) : (
-            <Play size={14} className="stroke-[2.5] ml-0.5 fill-current" />
+            <Play size={13} className="stroke-[2.5] ml-0.5 fill-current" />
           )}
           <span>
             {!isAudioReady ? t('reader.initializing') : (isPlaying && !isPaused ? t('reader.pause') : isPaused ? t('reader.resume') : t('reader.play'))}
           </span>
         </button>
       </div>
+
     </div>
   );
 }
