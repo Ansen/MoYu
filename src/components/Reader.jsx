@@ -22,6 +22,7 @@ export default function Reader({ bookData, onClose, jumpToSibling, jumpToChapter
   const [morseFreq, setMorseFreq] = useState(() => Number(localStorage.getItem('pref_morse_freq')) || 380);
   const [numberMode, setNumberMode] = useState(localStorage.getItem('pref_number_mode') || 'long');
   const [useHarmonics, setUseHarmonics] = useState(localStorage.getItem('pref_use_harmonics') === 'true');
+  const [viewMode, setViewMode] = useState(() => localStorage.getItem('pref_reader_view_mode') || 'grid');
 
   const [windowSize, setWindowSize] = useState({ width: window.innerWidth, height: window.innerHeight });
 
@@ -62,6 +63,16 @@ export default function Reader({ bookData, onClose, jumpToSibling, jumpToChapter
     };
   }, []);
 
+  // 当书籍内容更新（如切换章节、点击重新生成报底）时，彻底重置播放与高亮状态
+  useEffect(() => {
+    audioPlayer.stop();
+    setIsPlaying(false);
+    setIsPaused(false);
+    if (engineRef.current) {
+      engineRef.current.clearHighlight();
+    }
+  }, [bookData?.data, bookData?.name]);
+
   const moreMenuRef = useRef(null);
 
   // Update localStorage when audio settings change in quick bar
@@ -71,6 +82,7 @@ export default function Reader({ bookData, onClose, jumpToSibling, jumpToChapter
     localStorage.setItem('pref_morse_freq', morseFreq);
     localStorage.setItem('pref_number_mode', numberMode);
     localStorage.setItem('pref_use_harmonics', useHarmonics);
+    localStorage.setItem('pref_reader_view_mode', viewMode);
 
     audioPlayer.updateConfig({
       wpm: morseSpeed,
@@ -78,7 +90,7 @@ export default function Reader({ bookData, onClose, jumpToSibling, jumpToChapter
       numberMode: numberMode,
       useHarmonics: useHarmonics
     });
-  }, [baseFontSize, morseSpeed, morseFreq, numberMode, useHarmonics]);
+  }, [baseFontSize, morseSpeed, morseFreq, numberMode, useHarmonics, viewMode]);
 
   // Click outside to close more menu
   useEffect(() => {
@@ -234,6 +246,8 @@ export default function Reader({ bookData, onClose, jumpToSibling, jumpToChapter
         setUseHarmonics={setUseHarmonics}
         numberMode={numberMode}
         setNumberMode={setNumberMode}
+        viewMode={viewMode}
+        setViewMode={setViewMode}
         isPlaying={isPlaying}
         isPaused={isPaused}
         togglePlay={togglePlay}
@@ -256,11 +270,12 @@ export default function Reader({ bookData, onClose, jumpToSibling, jumpToChapter
         {/* Reader Core */}
         <div className="flex-1 flex flex-col relative bg-white dark:bg-[#1e1e1e] border-l border-slate-300 dark:border-[#333333] min-w-0">
           <div className="flex-1 relative">
-            <div className="absolute inset-0 px-4 md:px-8">
+            <div className="absolute inset-0 px-2 md:px-4">
               <TxtEngine 
                 ref={engineRef}
                 bookData={bookData}
                 fontSize={displayFontSize}
+                viewMode={viewMode}
                 jumpToSibling={jumpToSibling}
                 jumpToChapter={jumpToChapter}
                 onTocLoaded={setToc}
@@ -270,21 +285,21 @@ export default function Reader({ bookData, onClose, jumpToSibling, jumpToChapter
           </div>
           
           {/* Bottom Unified Status Bar */}
-          <div className="h-9 border-t border-slate-200 dark:border-[#2d2d2d] bg-slate-50/90 dark:bg-[#181818]/90 backdrop-blur px-4 flex items-center justify-between shrink-0 select-none text-[12px] text-slate-500 dark:text-[#888888]">
+          <div className="h-10 border-t border-slate-200 dark:border-[#2d2d2d] bg-slate-50/90 dark:bg-[#181818]/90 backdrop-blur px-4 flex items-center justify-between shrink-0 select-none text-[12px] text-slate-500 dark:text-[#888888]">
             {((bookData.type === 'epub' && bookData.toc && bookData.toc.length > 1) ||
               (bookData.siblings && bookData.siblings.length > 1)) ? (
               /* Multi-Page Pagination Mode */
               <>
-                <div className="flex items-center gap-2 text-[11px]">
+                <div className="flex items-center gap-2 text-[12px]">
                   <span className="flex items-center gap-1.5 font-medium text-slate-600 dark:text-slate-300">
                     {bookData.type === 'epub' ? (
                       <>
-                        <BookOpen size={12} className="text-indigo-500" />
+                        <BookOpen size={14} className="text-indigo-500" />
                         <span>{t('reader.doc.epub')}</span>
                       </>
                     ) : (
                       <>
-                        <Folder size={12} className="text-amber-500" />
+                        <Folder size={14} className="text-amber-500" />
                         <span>{t('reader.doc.folder')}</span>
                       </>
                     )}
@@ -296,17 +311,17 @@ export default function Reader({ bookData, onClose, jumpToSibling, jumpToChapter
                   <button 
                     onClick={handlePrev}
                     disabled={bookData.type === 'epub' ? (bookData.currentChapterIndex <= 0) : (bookData.currentIndex <= 0)}
-                    className={`px-2.5 py-0.5 rounded flex items-center gap-1 transition-colors text-[11px] font-medium ${
+                    className={`h-7 px-3 rounded-lg flex items-center gap-1.5 transition-colors text-[12px] font-medium ${
                       (bookData.type === 'epub' ? (bookData.currentChapterIndex > 0) : (bookData.currentIndex > 0))
-                        ? 'hover:bg-slate-200 dark:hover:bg-[#282828] text-slate-700 dark:text-[#cccccc] cursor-pointer'
+                        ? 'hover:bg-slate-200 dark:hover:bg-[#282828] text-slate-700 dark:text-[#cccccc] active:scale-95 cursor-pointer'
                         : 'opacity-30 cursor-not-allowed text-slate-400 dark:text-slate-600'
                     }`}
                   >
-                    <ChevronLeft size={13} /> {t('reader.prev')}
+                    <ChevronLeft size={14} /> {t('reader.prev')}
                   </button>
 
                   {paginationLabel && (
-                    <span className="font-mono text-slate-700 dark:text-[#cccccc] font-medium text-[11px] px-2 py-0.5 rounded bg-slate-200/60 dark:bg-[#252525] border border-slate-300/40 dark:border-[#333333]">
+                    <span className="font-mono text-slate-700 dark:text-[#dddddd] font-semibold text-[12px] px-2.5 py-1 rounded-md bg-slate-200/80 dark:bg-[#252525] border border-slate-300/60 dark:border-[#383838] shadow-2xs">
                       {paginationLabel}
                     </span>
                   )}
@@ -318,26 +333,26 @@ export default function Reader({ bookData, onClose, jumpToSibling, jumpToChapter
                         ? ((bookData.currentChapterIndex || 0) >= (bookData.toc?.length || 1) - 1)
                         : (bookData.currentIndex >= (bookData.siblings?.length || 1) - 1)
                     }
-                    className={`px-2.5 py-0.5 rounded flex items-center gap-1 transition-colors text-[11px] font-medium ${
+                    className={`h-7 px-3 rounded-lg flex items-center gap-1.5 transition-colors text-[12px] font-medium ${
                       (bookData.type === 'epub'
                         ? ((bookData.currentChapterIndex || 0) < (bookData.toc?.length || 1) - 1)
                         : (bookData.currentIndex < (bookData.siblings?.length || 1) - 1))
-                        ? 'hover:bg-slate-200 dark:hover:bg-[#282828] text-slate-700 dark:text-[#cccccc] cursor-pointer'
+                        ? 'hover:bg-slate-200 dark:hover:bg-[#282828] text-slate-700 dark:text-[#cccccc] active:scale-95 cursor-pointer'
                         : 'opacity-30 cursor-not-allowed text-slate-400 dark:text-slate-600'
                     }`}
                   >
-                    {t('reader.next')} <ChevronRight size={13} />
+                    {t('reader.next')} <ChevronRight size={14} />
                   </button>
                 </div>
 
-                <div className="flex items-center gap-2 text-slate-400 dark:text-[#666666] text-[11px]">
-                  <span className="flex items-center gap-1">
-                    <kbd className="px-1 py-0.5 rounded bg-slate-200/80 dark:bg-[#252525] text-[10px] font-mono text-slate-600 dark:text-slate-300 border border-slate-300/60 dark:border-[#383838]">← / →</kbd>
+                <div className="flex items-center gap-2.5 text-slate-400 dark:text-[#888888] text-[12px]">
+                  <span className="flex items-center gap-1.5">
+                    <kbd className="px-1.5 py-0.5 rounded bg-slate-200/90 dark:bg-[#252525] text-[11px] font-mono text-slate-700 dark:text-slate-300 border border-slate-300/80 dark:border-[#383838] shadow-2xs">← / →</kbd>
                     <span>{t('reader.shortcut.flip')}</span>
                   </span>
                   <span className="text-slate-300 dark:text-slate-700">·</span>
-                  <span className="flex items-center gap-1">
-                    <kbd className="px-1 py-0.5 rounded bg-slate-200/80 dark:bg-[#252525] text-[10px] font-mono text-slate-600 dark:text-slate-300 border border-slate-300/60 dark:border-[#383838]">Space</kbd>
+                  <span className="flex items-center gap-1.5">
+                    <kbd className="px-1.5 py-0.5 rounded bg-slate-200/90 dark:bg-[#252525] text-[11px] font-mono text-slate-700 dark:text-slate-300 border border-slate-300/80 dark:border-[#383838] shadow-2xs">Space</kbd>
                     <span>{t('reader.shortcut.play')}</span>
                   </span>
                 </div>
@@ -345,42 +360,42 @@ export default function Reader({ bookData, onClose, jumpToSibling, jumpToChapter
             ) : bookData.isGenerated ? (
               /* Random Generated Morse Practice Mode */
               <>
-                <div className="flex items-center gap-2 text-[11px]">
+                <div className="flex items-center gap-2 text-[12px]">
                   <span className="flex items-center gap-1.5 font-medium text-orange-600 dark:text-orange-400">
-                    <Sparkles size={12} />
+                    <Sparkles size={14} />
                     <span>{t('reader.doc.generated')}</span>
                   </span>
                   <span className="text-slate-300 dark:text-slate-700">|</span>
                   <span>{bookData.generatorConfig ? `${bookData.generatorConfig.charsPerGroup || 4} ${t('reader.chars.unit')} · ${bookData.generatorConfig.groupCount || 100} ${t('reader.groups.unit')}` : `100 ${t('reader.groups.unit')}`}</span>
                 </div>
 
-                <div className="font-mono text-slate-500 dark:text-slate-400 text-[11px]">
+                <div className="font-mono text-slate-600 dark:text-slate-400 text-[12px] font-medium">
                   {t('reader.stats.totalChars', '共 {count} 字符').replace('{count}', (bookData.data ? bookData.data.replace(/\s+/g, '').length : 0).toLocaleString())}
                 </div>
 
-                <div className="flex items-center gap-1.5 text-slate-400 dark:text-[#666666] text-[11px]">
-                  <kbd className="px-1 py-0.5 rounded bg-slate-200/80 dark:bg-[#252525] text-[10px] font-mono text-slate-600 dark:text-slate-300 border border-slate-300/60 dark:border-[#383838]">Space</kbd>
+                <div className="flex items-center gap-1.5 text-slate-400 dark:text-[#888888] text-[12px]">
+                  <kbd className="px-1.5 py-0.5 rounded bg-slate-200/90 dark:bg-[#252525] text-[11px] font-mono text-slate-700 dark:text-slate-300 border border-slate-300/80 dark:border-[#383838] shadow-2xs">Space</kbd>
                   <span>{t('reader.shortcut.playPause')}</span>
                 </div>
               </>
             ) : (
               /* Single File TXT Mode */
               <>
-                <div className="flex items-center gap-2 text-[11px]">
+                <div className="flex items-center gap-2 text-[12px]">
                   <span className="flex items-center gap-1.5 font-medium text-slate-600 dark:text-slate-300">
-                    <FileText size={12} className="text-blue-500" />
+                    <FileText size={14} className="text-blue-500" />
                     <span>{t('reader.doc.txt')}</span>
                   </span>
                   <span className="text-slate-300 dark:text-slate-700">|</span>
                   <span>UTF-8</span>
                 </div>
 
-                <div className="font-mono text-slate-500 dark:text-slate-400 text-[11px]">
+                <div className="font-mono text-slate-600 dark:text-slate-400 text-[12px] font-medium">
                   {t('reader.stats.totalChars', '共 {count} 字符').replace('{count}', (bookData.data ? bookData.data.length : 0).toLocaleString())}
                 </div>
 
-                <div className="flex items-center gap-1.5 text-slate-400 dark:text-[#666666] text-[11px]">
-                  <kbd className="px-1 py-0.5 rounded bg-slate-200/80 dark:bg-[#252525] text-[10px] font-mono text-slate-600 dark:text-slate-300 border border-slate-300/60 dark:border-[#383838]">Space</kbd>
+                <div className="flex items-center gap-1.5 text-slate-400 dark:text-[#888888] text-[12px]">
+                  <kbd className="px-1.5 py-0.5 rounded bg-slate-200/90 dark:bg-[#252525] text-[11px] font-mono text-slate-700 dark:text-slate-300 border border-slate-300/80 dark:border-[#383838] shadow-2xs">Space</kbd>
                   <span>{t('reader.shortcut.playPause')}</span>
                 </div>
               </>

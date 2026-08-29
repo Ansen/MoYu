@@ -169,6 +169,8 @@ export const translations = {
     'reader.shortcut.flip': '翻页',
     'reader.shortcut.play': '播放',
     'reader.shortcut.playPause': '播放 / 暂停',
+    'reader.view.grid': '表格排版',
+    'reader.view.text': '文本排版',
 
     // 字典导入 & 翻译器
     'dict.import.title': '导入自定义字典',
@@ -415,6 +417,8 @@ export const translations = {
     'reader.shortcut.flip': 'Flip Page',
     'reader.shortcut.play': 'Play',
     'reader.shortcut.playPause': 'Play / Pause',
+    'reader.view.grid': 'Grid View',
+    'reader.view.text': 'Text View',
 
     // Dictionary Import & Translator
     'dict.import.title': 'Import Custom Dictionary',

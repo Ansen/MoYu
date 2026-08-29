@@ -90,8 +90,9 @@ export default function useHighlighter(onScrollRequest) {
         overlay = doc.createElement('div');
         overlay.id = 'morse-active-overlay';
         overlay.style.position = 'absolute';
-        overlay.style.backgroundColor = 'rgba(251, 146, 60, 0.4)';
+        overlay.style.backgroundColor = 'rgba(234, 88, 12, 0.4)';
         overlay.style.borderBottom = '2px solid #ea580c';
+        overlay.style.borderRadius = '2px';
         overlay.style.pointerEvents = 'none';
         overlay.style.zIndex = '50';
         overlay.style.transition = 'none';

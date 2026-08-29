@@ -147,21 +147,28 @@ class DesktopAudioPlayer {
      * @param {Object} options 
      */
     async playMorseText(text, { wpm = 20, freq = 700, numberMode = 'long', startIndex = 0, onCharPlay, onComplete }) {
-        if (!this.audioContext) await this.init()
-        
-        this.playbackState.isPlaying = true
-        this.playbackState.isPaused = false
-        this.playbackState.stopRequested = false
+        this.stop();
+        await this.init();
+        if (this.audioContext && this.audioContext.state === 'suspended') {
+            await this.audioContext.resume();
+        }
+
+        const sessionId = Date.now() + Math.random();
+        this._activeSessionId = sessionId;
+
+        this.playbackState.isPlaying = true;
+        this.playbackState.isPaused = false;
+        this.playbackState.stopRequested = false;
 
         this.playbackConfig = { wpm, freq, numberMode };
 
-        let tokens = textToMorseTokens(text, this.playbackConfig.numberMode)
-        let dotSec = (1200 / this.playbackConfig.wpm) / 1000
+        let tokens = textToMorseTokens(text, this.playbackConfig.numberMode);
+        let dotSec = (1200 / this.playbackConfig.wpm) / 1000;
 
-        let currentTime = this.audioContext.currentTime + 0.25 // 250ms 充裕缓冲区，防止冷启动/音频设备初始化卡顿
+        let currentTime = this.audioContext.currentTime + 0.25; // 250ms 充裕缓冲区，防止冷启动/音频设备初始化卡顿
 
         for (let i = 0; i < tokens.length; i++) {
-            if (this.playbackState.stopRequested) break;
+            if (this.playbackState.stopRequested || this._activeSessionId !== sessionId) break;
 
             if (this.playbackConfig) {
                 dotSec = (1200 / this.playbackConfig.wpm) / 1000;
@@ -176,18 +183,20 @@ class DesktopAudioPlayer {
             if (token.index < startIndex) continue;
             
             // Wait for pause
-            while (this.playbackState.isPaused && !this.playbackState.stopRequested) {
+            while (this.playbackState.isPaused && !this.playbackState.stopRequested && this._activeSessionId === sessionId) {
                 await new Promise(r => setTimeout(r, 100));
                 // Shift currentTime forward so we don't schedule in the past
                 currentTime = this.audioContext.currentTime + 0.1; 
             }
-            if (this.playbackState.stopRequested) break;
+            if (this.playbackState.stopRequested || this._activeSessionId !== sessionId) break;
 
             // Trigger UI callback
             const waitMs = (currentTime - this.audioContext.currentTime) * 1000;
             if (waitMs > 0 && onCharPlay) {
                 const timerId = setTimeout(() => {
-                    if (!this.playbackState.stopRequested) onCharPlay(token, i);
+                    if (!this.playbackState.stopRequested && this._activeSessionId === sessionId) {
+                        onCharPlay(token, i);
+                    }
                     this.cleanupTimers.delete(timerId);
                 }, waitMs);
                 this.cleanupTimers.add(timerId);
@@ -222,7 +231,7 @@ class DesktopAudioPlayer {
             let interruptedDuringSound = false;
             while (currentTime - this.audioContext.currentTime > 0.2) {
                 await new Promise(r => setTimeout(r, 50));
-                if (this.playbackState.isPaused || this.playbackState.stopRequested) {
+                if (this.playbackState.isPaused || this.playbackState.stopRequested || this._activeSessionId !== sessionId) {
                     const soundEndTime = token.code ? (currentTime - 3 * dotSec) : currentTime;
                     if (this.audioContext.currentTime < soundEndTime) {
                         interruptedDuringSound = true;
@@ -237,10 +246,12 @@ class DesktopAudioPlayer {
             }
         }
 
-        this.playbackState.isPlaying = false;
-        this.scheduleIdleSuspend();
-        if (onComplete && !this.playbackState.stopRequested) {
-            onComplete();
+        if (this._activeSessionId === sessionId) {
+            this.playbackState.isPlaying = false;
+            this.scheduleIdleSuspend();
+            if (onComplete && !this.playbackState.stopRequested) {
+                onComplete();
+            }
         }
     }
 

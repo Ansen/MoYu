@@ -25,7 +25,10 @@ function extractTextFromEpubDoc(doc, chapterLabel = '') {
   const brs = clone.querySelectorAll('br');
   brs.forEach(br => br.replaceWith('\n'));
 
-  const text = clone.textContent || clone.innerText || '';
+  let text = clone.textContent || clone.innerText || '';
+  // 清理可能残留在正文中的 CSS 样式代码（兼容部分非标准或旧版 EPUB）
+  text = text.replace(/body\s*\{[^}]*\}/gi, '');
+
   const lines = text
     .split('\n')
     .map(line => line.trim())
@@ -39,13 +42,26 @@ function extractTextFromEpubDoc(doc, chapterLabel = '') {
       (cleanLabel && (firstLine === cleanLabel || firstLine.includes(cleanLabel) || cleanLabel.includes(firstLine))) ||
       /^第\s*[\d一二三四五六七八九十百千万]+\s*[章节回卷集篇部]/.test(lines[0]) ||
       /^chapter\s*\d+/i.test(lines[0]) ||
+      /^page\s*\d+/i.test(lines[0]) ||
       /^p\d+$/i.test(lines[0])
     ) {
       lines.shift();
     }
   }
 
-  return lines.join('\n\n');
+  // 若首行只有等待符号（如 ===, = = = 等），与下一行合并，不单独成行
+  if (lines.length > 1 && /^(=+\s*)+$/i.test(lines[0])) {
+    lines[1] = `${lines[0]} ${lines[1]}`;
+    lines.shift();
+  }
+
+  // 若尾行只有结束等待/通联符号（如 iii, ===, ar, sk, k 等），与上一行合并，不单独成行
+  if (lines.length > 1 && (/^(=+\s*)+$/i.test(lines[lines.length - 1]) || /^[iI]{1,5}$/.test(lines[lines.length - 1]) || /^(ar|sk|ka|hh|k)$/i.test(lines[lines.length - 1]))) {
+    const last = lines.pop();
+    lines[lines.length - 1] = `${lines[lines.length - 1]} ${last}`;
+  }
+
+  return lines.join('\n');
 }
 
 export function useEbook() {

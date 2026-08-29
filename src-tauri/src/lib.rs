@@ -10,6 +10,9 @@ fn generate_epub(title: String, chapters: Vec<String>) -> Result<Vec<u8>, String
     builder.metadata("title", &title)
         .map_err(|e| e.to_string())?;
 
+    builder.stylesheet(&b"body { font-family: Consolas, 'Cascadia Mono', monospace; font-variant-ligatures: none; font-feature-settings: 'liga' 0, 'calt' 0; white-space: pre-wrap; line-height: 1.2; word-wrap: break-word; font-size: 1.2em; }"[..])
+        .map_err(|e| e.to_string())?;
+
     for (i, content) in chapters.iter().enumerate() {
         let escaped_content = content
             .replace('&', "&amp;")
@@ -20,16 +23,12 @@ fn generate_epub(title: String, chapters: Vec<String>) -> Result<Vec<u8>, String
             r#"<?xml version="1.0" encoding="UTF-8"?>
 <html xmlns="http://www.w3.org/1999/xhtml">
 <head>
-<title>Page {}</title>
-<style>
-  body {{ font-family: monospace; white-space: pre-wrap; line-height: 1.8; word-wrap: break-word; font-size: 1.2em; }}
-</style>
 </head>
 <body>
 <p>{}</p>
 </body>
 </html>"#,
-            i + 1, escaped_content
+            escaped_content
         );
         
         builder.add_content(

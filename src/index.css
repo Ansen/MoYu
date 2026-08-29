@@ -5,6 +5,12 @@
   body {
     @apply bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-200 antialiased transition-colors duration-300;
   }
+
+  .font-mono, pre, code, kbd, samp {
+    font-family: Consolas, "Cascadia Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, "Liberation Mono", "Courier New", monospace;
+    font-variant-ligatures: none;
+    font-feature-settings: "liga" 0, "calt" 0, "dlig" 0;
+  }
 }
 
 @layer utilities {
