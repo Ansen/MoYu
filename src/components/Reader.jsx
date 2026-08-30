@@ -6,7 +6,7 @@ import TxtEngine from './reader/TxtEngine';
 import { parseTelegramContent } from '../utils/telegramParser';
 import TocSidebar from './reader/TocSidebar';
 import { useI18n } from '../i18n';
-import { FONT_OPTIONS } from '../config/fonts';
+import { ALL_FONTS, getDefaultFontId } from '../config/fonts';
 
 export default function Reader({ bookData, onClose, jumpToSibling, jumpToChapter, onRegenerate }) {
   const { t } = useI18n();
@@ -34,36 +34,12 @@ export default function Reader({ bookData, onClose, jumpToSibling, jumpToChapter
   const [viewMode, setViewMode] = useState(() => localStorage.getItem('pref_reader_view_mode') || 'grid');
   const [fontFamily, setFontFamily] = useState(() => {
     const saved = localStorage.getItem('pref_reader_font_family');
-    const valid = FONT_OPTIONS.map(f => f.id);
-    return valid.includes(saved) ? saved : 'Cascadia Mono';
+    const valid = ALL_FONTS.map(f => f.id);
+    return valid.includes(saved) ? saved : getDefaultFontId();
   });
   const [enableMarkers, setEnableMarkers] = useState(() => localStorage.getItem('pref_reader_enable_markers') !== 'false');
   const [prefixMarker, setPrefixMarker] = useState(() => localStorage.getItem('pref_reader_prefix_marker') || '===');
   const [suffixMarker, setSuffixMarker] = useState(() => localStorage.getItem('pref_reader_suffix_marker') || 'iii');
-  const [autoFit, setAutoFit] = useState(() => localStorage.getItem('pref_reader_auto_fit') !== 'false');
-
-  const [windowSize, setWindowSize] = useState({ width: window.innerWidth, height: window.innerHeight });
-
-  // 视口响应式字号计算：以 800x600 为基准 1.0x
-  const currentGeo = Math.sqrt(windowSize.width * windowSize.height);
-  const baseGeo = Math.sqrt(800 * 600);
-  const fontScale = Math.max(0.5, currentGeo / baseGeo);
-  const displayFontSize = Math.round(baseFontSize * fontScale);
-
-  useEffect(() => {
-    let timeout;
-    const handleResize = () => {
-      clearTimeout(timeout);
-      timeout = setTimeout(() => {
-        setWindowSize({ width: window.innerWidth, height: window.innerHeight });
-      }, 50);
-    };
-    window.addEventListener('resize', handleResize);
-    return () => {
-      window.removeEventListener('resize', handleResize);
-      clearTimeout(timeout);
-    };
-  }, []);
 
   // 离开阅读器时清理播放器
   useEffect(() => {
@@ -95,7 +71,6 @@ export default function Reader({ bookData, onClose, jumpToSibling, jumpToChapter
     localStorage.setItem('pref_reader_enable_markers', enableMarkers.toString());
     localStorage.setItem('pref_reader_prefix_marker', prefixMarker);
     localStorage.setItem('pref_reader_suffix_marker', suffixMarker);
-    localStorage.setItem('pref_reader_auto_fit', autoFit.toString());
 
     audioPlayer.updateConfig({
       wpm: morseSpeed,
@@ -103,7 +78,7 @@ export default function Reader({ bookData, onClose, jumpToSibling, jumpToChapter
       numberMode: numberMode,
       useHarmonics: useHarmonics
     });
-  }, [baseFontSize, morseSpeed, morseFreq, numberMode, useHarmonics, viewMode, fontFamily, enableMarkers, prefixMarker, suffixMarker, autoFit]);
+  }, [baseFontSize, morseSpeed, morseFreq, numberMode, useHarmonics, viewMode, fontFamily, enableMarkers, prefixMarker, suffixMarker]);
 
   const togglePlay = useCallback(async () => {
     if (isPlaying && !isPaused) {
@@ -144,6 +119,7 @@ export default function Reader({ bookData, onClose, jumpToSibling, jumpToChapter
           prefixMarker: effectivePrefix,
           suffixMarker: effectiveSuffix,
           onCharPlay: (token) => {
+            setActiveMarker(null);
             if (engineRef.current) engineRef.current.highlightToken(token);
           },
           onMarkerPlay: (markerInfo) => {
@@ -234,8 +210,6 @@ export default function Reader({ bookData, onClose, jumpToSibling, jumpToChapter
         setPrefixMarker={setPrefixMarker}
         suffixMarker={suffixMarker}
         setSuffixMarker={setSuffixMarker}
-        autoFit={autoFit}
-        setAutoFit={setAutoFit}
         isPlaying={isPlaying}
         isPaused={isPaused}
         togglePlay={togglePlay}
@@ -264,10 +238,9 @@ export default function Reader({ bookData, onClose, jumpToSibling, jumpToChapter
               <TxtEngine 
                 ref={engineRef}
                 bookData={bookData}
-                fontSize={displayFontSize}
+                fontSize={baseFontSize}
                 fontFamily={fontFamily}
                 viewMode={viewMode}
-                autoFit={autoFit}
                 jumpToSibling={jumpToSibling}
                 jumpToChapter={jumpToChapter}
                 onTocLoaded={setToc}

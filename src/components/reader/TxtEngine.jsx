@@ -1,87 +1,33 @@
-import React, { useEffect, useState, useRef, useCallback, useMemo, forwardRef, useImperativeHandle } from 'react';
+import React, { useEffect, useRef, useCallback, useMemo, forwardRef, useImperativeHandle } from 'react';
 import useHighlighter from './useHighlighter';
 import { saveReadingProgress, loadReadingProgress } from '../../utils/store';
 import { getFontFamilyCss } from '../../config/fonts';
 import { parseTelegramContent } from '../../utils/telegramParser';
 import { useI18n } from '../../i18n';
 
-const TxtEngine = forwardRef(({ bookData, fontSize, fontFamily = 'Cascadia Mono', viewMode = 'grid', autoFit = true, onTocLoaded, onChapterChange, jumpToSibling, jumpToChapter }, ref) => {
+const TxtEngine = forwardRef(({ bookData, fontSize = 20, fontFamily = 'Cascadia Mono', viewMode = 'grid', onTocLoaded, onChapterChange, jumpToSibling, jumpToChapter }, ref) => {
   const { t } = useI18n();
   const viewerRef = useRef(null);
-  const tableRef = useRef(null);
-  const [fitFontSize, setFitFontSize] = useState(fontSize);
   const scrollTimeoutRef = useRef(null);
   const cachedDataRef = useRef({ text: '', nodes: [] });
   const currentFontFamily = useMemo(() => getFontFamilyCss(fontFamily), [fontFamily]);
-
-  // 单帧比例自适应算法 (Ratio-based Auto Scale)：彻底消除多余滚动条，0循环重绘，0闪烁
-  useEffect(() => {
-    if (!autoFit) {
-      setFitFontSize(fontSize);
-      return;
-    }
-
-    const container = viewerRef.current;
-    if (!container) return;
-
-    let timeoutId;
-    const measureAndFit = () => {
-      if (!container) return;
-      const targetEl = tableRef.current || container.firstElementChild;
-      if (!targetEl) return;
-
-      const clientH = container.clientHeight;
-      const clientW = container.clientWidth;
-      const scrollH = targetEl.scrollHeight || container.scrollHeight;
-      const scrollW = targetEl.scrollWidth || container.scrollWidth;
-
-      if (clientH <= 0 || clientW <= 0 || scrollH <= 0 || scrollW <= 0) return;
-
-      if (scrollH > clientH + 2 || scrollW > clientW + 2) {
-        const ratioH = clientH / scrollH;
-        const ratioW = clientW / scrollW;
-        const fitRatio = Math.min(ratioH, ratioW, 1.0);
-        const calculated = Math.max(10, Math.min(fontSize, Math.floor(fontSize * fitRatio)));
-        setFitFontSize(calculated);
-      } else {
-        setFitFontSize(fontSize);
-      }
-    };
-
-    // 延迟 30ms 测算，确保 DOM 布局及自定义字体包围盒计算完成
-    timeoutId = setTimeout(measureAndFit, 30);
-
-    const ro = new ResizeObserver(() => {
-      clearTimeout(timeoutId);
-      timeoutId = setTimeout(measureAndFit, 30);
-    });
-    ro.observe(container);
-
-    return () => {
-      clearTimeout(timeoutId);
-      ro.disconnect();
-    };
-  }, [autoFit, fontSize, fontFamily, viewMode, bookData?.data]);
-
-  const effectiveFontSize = autoFit ? fitFontSize : fontSize;
-
-  const handleScrollRequest = useCallback((rect) => {
-    if (autoFit) return; // In auto-fit mode, entire table is visible without scrolling
-    const container = viewerRef.current;
-    if (container) {
-      const containerRect = container.getBoundingClientRect();
-      if (rect.top < containerRect.top + 30 || rect.bottom > containerRect.bottom - 30) {
-        container.scrollTo({ top: container.scrollTop + (rect.top - containerRect.top) - containerRect.height / 2, behavior: 'auto' });
-      }
-    }
-  }, [autoFit]);
-
-  const { textRootRef, textNodesRef, clearHighlight, resetHighlightState, highlightToken } = useHighlighter(handleScrollRequest);
 
   // 解析电报内容：自动剥离报头报尾起止符，获取纯净 10 列表格数据与纯净正文
   const { rows, cleanText, isGridEligible } = useMemo(() => {
     return parseTelegramContent(bookData?.data || '');
   }, [bookData?.data]);
+
+  const handleScrollRequest = useCallback((rect) => {
+    const container = viewerRef.current;
+    if (container && container.scrollHeight > container.clientHeight + 10) {
+      const containerRect = container.getBoundingClientRect();
+      if (rect.top < containerRect.top + 30 || rect.bottom > containerRect.bottom - 30) {
+        container.scrollTo({ top: container.scrollTop + (rect.top - containerRect.top) - containerRect.height / 2, behavior: 'auto' });
+      }
+    }
+  }, []);
+
+  const { textRootRef, textNodesRef, clearHighlight, resetHighlightState, highlightToken } = useHighlighter(handleScrollRequest);
 
   const extractNodes = useCallback(() => {
     const root = viewerRef.current;
@@ -285,46 +231,50 @@ const TxtEngine = forwardRef(({ bookData, fontSize, fontFamily = 'Cascadia Mono'
       ref={viewerRef}
       onScroll={handleTxtScroll}
       className={`w-full h-full overflow-y-auto overflow-x-auto select-text relative custom-scrollbar ${
-        isGridView ? 'p-1 sm:p-2' : 'py-2 md:py-3 px-2 md:px-4'
+        isGridView ? 'p-2 sm:p-3 md:p-4' : 'p-3 sm:p-5 md:p-6'
       }`}
     >
       {isGridView ? (
-        /* 100% 纯净 10 列表格电报稿纸排版：无任何起止符侵入单元格 */
-        <table ref={tableRef} className="w-full border-collapse select-text font-mono table-fixed min-w-[700px]">
-          <colgroup>
-            <col style={{ width: '32px' }} />
-            {Array.from({ length: 10 }).map((_, i) => (
-              <col key={i} />
-            ))}
-          </colgroup>
+        /* 100% 纯净 10 列表格电报稿纸排版：紧凑字距、自然列宽、无大片空白浪费、行距与文本模式严格一致 */
+        <table 
+          className="border-collapse select-text font-mono border border-slate-200 dark:border-[#2e2e2e] shadow-2xs rounded-lg overflow-hidden"
+        >
           <thead>
-            <tr data-skip-speech="true" className="text-[11.5px] text-slate-400 dark:text-[#888888] select-none border-b border-slate-300 dark:border-[#383838]">
-              {/* Left Line Number Gutter (Tight fixed width) */}
-              <th className="w-7 sm:w-8 pb-2 px-1 text-center font-medium select-none border-r border-slate-300 dark:border-[#383838]">
+            <tr data-skip-speech="true" className="text-[11.5px] text-slate-400 dark:text-[#888888] select-none bg-slate-50/90 dark:bg-[#1a1a1a] border-b border-slate-200 dark:border-[#2e2e2e]">
+              {/* Left Line Number Gutter */}
+              <th className="py-1 px-1.5 text-center font-medium select-none border-r border-slate-200 dark:border-[#2e2e2e] min-w-[28px]">
                 #
               </th>
-              {/* 10 Column Headers: Evenly distributed across viewport */}
+              {/* 10 Column Headers: 1 space width spacing */}
               {Array.from({ length: 10 }).map((_, colIdx) => (
-                <th key={colIdx} className="pb-2 px-1 text-center font-medium tracking-wider select-none">
+                <th 
+                  key={colIdx} 
+                  className="py-1 px-1 text-center font-medium tracking-wider select-none border-r last:border-r-0 border-slate-200/60 dark:border-[#262626]"
+                >
                   {String(colIdx + 1).padStart(2, '0')}
                 </th>
               ))}
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-200/80 dark:divide-[#303030]">
+          <tbody className="divide-y divide-slate-200 dark:divide-[#303030]">
             {rows.map((row, rowIdx) => (
               <tr 
                 key={rowIdx} 
-                className={`group ${
+                className={`group transition-colors ${
                   rowIdx % 2 === 1 
-                    ? 'bg-slate-100/85 dark:bg-[#262626] hover:bg-indigo-100/70 dark:hover:bg-indigo-950/60' 
+                    ? 'bg-slate-100/90 dark:bg-[#292929] hover:bg-indigo-100/70 dark:hover:bg-indigo-950/60' 
                     : 'bg-white dark:bg-[#181818] hover:bg-slate-50 dark:hover:bg-[#202020]'
                 }`}
               >
                 {/* Left Line Number Gutter */}
                 <td 
                   data-skip-speech="true" 
-                  className="w-7 sm:w-8 py-2 px-1 text-center text-slate-400 dark:text-[#666666] group-hover:text-slate-700 dark:group-hover:text-slate-300 select-none text-[11px] font-medium border-r border-slate-300 dark:border-[#383838]"
+                  className={`py-0 px-1.5 text-center select-none text-[11px] font-medium border-r border-slate-300 dark:border-[#3a3a3a] align-middle ${
+                    rowIdx % 2 === 1
+                      ? 'bg-slate-200/60 dark:bg-[#2f2f2f] text-slate-500 dark:text-[#888888] group-hover:text-slate-800 dark:group-hover:text-slate-200'
+                      : 'bg-slate-100/50 dark:bg-[#1c1c1c] text-slate-400 dark:text-[#666666] group-hover:text-slate-700 dark:group-hover:text-slate-300'
+                  }`}
+                  style={{ lineHeight: 1.3 }}
                 >
                   {String(rowIdx + 1).padStart(2, '0')}
                 </td>
@@ -334,9 +284,9 @@ const TxtEngine = forwardRef(({ bookData, fontSize, fontFamily = 'Cascadia Mono'
                   return (
                     <td
                       key={colIdx}
-                      className="py-2 px-1 text-center whitespace-nowrap font-normal"
+                      className="py-0 px-1 text-center whitespace-nowrap font-normal align-middle border-r last:border-r-0 border-slate-200/60 dark:border-[#303030]"
                       style={{
-                        fontSize: `${effectiveFontSize}px`,
+                        fontSize: `${fontSize}px`,
                         lineHeight: 1.3,
                         fontFamily: currentFontFamily,
                         fontVariantLigatures: 'none',
@@ -345,11 +295,11 @@ const TxtEngine = forwardRef(({ bookData, fontSize, fontFamily = 'Cascadia Mono'
                       }}
                     >
                       {token ? (
-                        <span className="morse-word px-1.5 py-0.5 rounded-md text-slate-800 dark:text-slate-200 hover:text-indigo-600 dark:hover:text-indigo-400 tracking-wide">
+                        <span className="morse-word px-0.5 rounded-sm text-slate-800 dark:text-slate-200 hover:text-indigo-600 dark:hover:text-indigo-400 inline-block leading-[1.3]">
                           {token}
                         </span>
                       ) : (
-                        <span className="text-transparent select-none">&nbsp;</span>
+                        <span className="text-transparent select-none inline-block leading-[1.3]">&nbsp;</span>
                       )}
                     </td>
                   );
@@ -359,12 +309,12 @@ const TxtEngine = forwardRef(({ bookData, fontSize, fontFamily = 'Cascadia Mono'
           </tbody>
         </table>
       ) : (
-        /* 纯文本视图：展示剥离起止符后的纯净电文正文 */
+        /* 纯文本视图：铺满视口宽度自适应 (w-full)、自然折行排版、行距与字号完全由用户掌控 */
         <div 
-          className="w-full h-full whitespace-pre-wrap font-normal text-slate-800 dark:text-[#cccccc]"
+          className="w-full min-h-full whitespace-pre-wrap font-normal text-slate-800 dark:text-[#cccccc]"
           style={{ 
-            fontSize: `${effectiveFontSize}px`, 
-            lineHeight: 1.2,
+            fontSize: `${fontSize}px`, 
+            lineHeight: 1.3,
             fontFamily: currentFontFamily,
             fontVariantLigatures: 'none',
             fontFeatureSettings: '"liga" 0, "calt" 0, "dlig" 0'

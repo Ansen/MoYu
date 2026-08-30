@@ -1,71 +1,60 @@
-import { FONT_OPTIONS, getFontFamilyCss } from '../src/config/fonts.js';
+import { ALL_FONTS, getPlatform, getAvailableFonts, getDefaultFontId, getFontFamilyCss } from '../src/config/fonts.js';
 
 export function testFontOptions() {
-  console.log('--- Running Cross-Platform High-Distinction Font Options Unit Tests ---');
+  console.log('--- Running Platform-Specific Dynamic Font Availability Unit Tests ---');
   
-  // 1. Check FONT_OPTIONS length and required entries
-  if (!Array.isArray(FONT_OPTIONS) || FONT_OPTIONS.length !== 5) {
-    throw new Error(`Expected exactly 5 cross-platform font options, got ${FONT_OPTIONS?.length}`);
+  // 1. Check ALL_FONTS configuration
+  if (!Array.isArray(ALL_FONTS) || ALL_FONTS.length < 5) {
+    throw new Error(`Expected at least 5 font configurations, got ${ALL_FONTS?.length}`);
   }
-  console.log(`? FONT_OPTIONS defined with ${FONT_OPTIONS.length} cross-platform font families.`);
+  console.log(`✓ ALL_FONTS defined with ${ALL_FONTS.length} curated monospace fonts.`);
 
-  const requiredFontIds = [
-    'Cascadia Mono',
-    'SF Mono',
-    'JetBrains Mono',
-    'Fira Code',
-    'DejaVu Sans Mono'
-  ];
+  // 2. Check platform detection
+  const detectedPlatform = getPlatform();
+  if (!['windows', 'mac', 'linux'].includes(detectedPlatform)) {
+    throw new Error(`Invalid platform detected: ${detectedPlatform}`);
+  }
+  console.log(`✓ Platform detected successfully: '${detectedPlatform}'`);
 
-  for (const id of requiredFontIds) {
-    const found = FONT_OPTIONS.find(f => f.id === id);
-    if (!found) {
-      throw new Error(`Missing expected font id: ${id}`);
-    }
-    if (!found.labelKey || typeof found.labelKey !== 'string') {
-      throw new Error(`Font ${id} is missing a valid labelKey`);
-    }
-    if (!found.fontFamily || typeof found.fontFamily !== 'string') {
-      throw new Error(`Font ${id} is missing a valid fontFamily CSS string`);
-    }
-    console.log(`? Font '${id}' properly configured (labelKey: ${found.labelKey})`);
+  // 3. Test getAvailableFonts() filters out other OS fonts
+  const available = getAvailableFonts();
+  if (!Array.isArray(available) || available.length === 0) {
+    throw new Error('getAvailableFonts() returned empty list');
   }
 
-  // Verify excluded ambiguous fonts (0 vs O/o and 1 vs l/I)
-  const excludedIds = ['Consolas', 'Courier New', 'system-sans'];
-  for (const id of excludedIds) {
-    if (FONT_OPTIONS.some(f => f.id === id)) {
-      throw new Error(`Ambiguous font ${id} must be excluded`);
+  for (const font of available) {
+    if (!font.platforms.includes(detectedPlatform)) {
+      throw new Error(`Font '${font.id}' should not be available on platform '${detectedPlatform}'`);
     }
   }
-  console.log('? Verified ambiguous fonts (Consolas, Courier New, system-sans) are strictly excluded.');
+  console.log(`✓ Verified ${available.length} available fonts are strictly restricted to '${detectedPlatform}'.`);
 
-  // Verify cross-platform fallback coverage in font stacks
-  for (const font of FONT_OPTIONS) {
-    const stack = font.fontFamily;
-    const hasApple = stack.includes('SF Mono') || stack.includes('Menlo');
-    const hasLinuxOrAndroid = stack.includes('DejaVu') || stack.includes('Roboto Mono') || stack.includes('Ubuntu Mono');
-    const hasWindows = stack.includes('Cascadia Mono') || stack.includes('Cascadia Code');
-    
-    if (!hasApple || !hasLinuxOrAndroid || !hasWindows) {
-      throw new Error(`Font stack for ${font.id} lacks complete cross-platform fallbacks: ${stack}`);
-    }
+  // 4. Test getDefaultFontId()
+  const defaultFontId = getDefaultFontId();
+  if (detectedPlatform === 'windows' && defaultFontId !== 'Cascadia Mono') {
+    throw new Error(`Expected Windows default font to be 'Cascadia Mono', got '${defaultFontId}'`);
   }
-  console.log('? Verified all font stacks have complete Windows, macOS/iOS, Linux, and Android fallbacks.');
-
-  // 2. Test getFontFamilyCss resolution
-  const cascadiaCss = getFontFamilyCss('Cascadia Mono');
-  if (!cascadiaCss.includes('Cascadia Mono')) {
-    throw new Error(`getFontFamilyCss('Cascadia Mono') did not return Cascadia Mono: ${cascadiaCss}`);
+  if (detectedPlatform === 'mac' && defaultFontId !== 'SF Mono') {
+    throw new Error(`Expected macOS default font to be 'SF Mono', got '${defaultFontId}'`);
   }
-  console.log('? getFontFamilyCss resolves Cascadia Mono correctly.');
-
-  // 3. Test fallback for unknown font ID
-  const fallbackCss = getFontFamilyCss('invalid_id');
-  if (fallbackCss !== FONT_OPTIONS[0].fontFamily) {
-    throw new Error(`getFontFamilyCss with invalid ID did not fallback to default font stack`);
+  if (detectedPlatform === 'linux' && defaultFontId !== 'DejaVu Sans Mono') {
+    throw new Error(`Expected Linux default font to be 'DejaVu Sans Mono', got '${defaultFontId}'`);
   }
-  console.log('? getFontFamilyCss correctly falls back to default font stack on invalid ID.');
+  console.log(`✓ getDefaultFontId() resolved native platform default: '${defaultFontId}'`);
 
-  console.log('All Cross-Platform Font tests passed successfully!\n');
+  // 5. Test getFontFamilyCss resolution
+  const defaultCss = getFontFamilyCss(defaultFontId);
+  if (!defaultCss || typeof defaultCss !== 'string') {
+    throw new Error(`getFontFamilyCss failed for default font '${defaultFontId}'`);
+  }
+  console.log(`✓ getFontFamilyCss resolves '${defaultFontId}' correctly: ${defaultCss}`);
+
+  // 6. Test fallback for invalid font ID
+  const fallbackCss = getFontFamilyCss('invalid_nonexistent_font_id');
+  if (fallbackCss !== defaultCss) {
+    throw new Error(`getFontFamilyCss with invalid ID did not fallback to platform default stack`);
+  }
+  console.log('✓ getFontFamilyCss correctly falls back to platform default on unknown ID.');
+
+  console.log('All Platform-Specific Font tests passed successfully!\n');
 }

@@ -17,13 +17,16 @@ export function parseTelegramContent(rawText) {
   let startMarker = '';
   let endMarker = '';
 
-  // 1. 识别并剥离首组报头起始符
-  if (tokens.length > 1 && START_MARKER_REGEX.test(tokens[0])) {
+  // 1. 识别并剥离首组 1~2 组报头起始符（支持多词空格组合，如 ['===', '==='] 或 ['KA', 'BT'] 或 ['===']）
+  if (tokens.length > 2 && START_MARKER_REGEX.test(tokens[0]) && START_MARKER_REGEX.test(tokens[1])) {
+    startMarker = `${tokens[0]} ${tokens[1]}`;
+    tokens = tokens.slice(2);
+  } else if (tokens.length > 1 && START_MARKER_REGEX.test(tokens[0])) {
     startMarker = tokens[0];
     tokens = tokens.slice(1);
   }
 
-  // 2. 识别并剥离末尾 1~2 组报尾结束符（如 ['iii', '+'] 或 ['iii'] 或 ['+']）
+  // 2. 识别并剥离末尾 1~2 组报尾结束符（支持多词空格组合，如 ['iii', '+'] 或 ['AR', 'SK'] 或 ['iii'] 或 ['+']）
   if (tokens.length > 2) {
     const last1 = tokens[tokens.length - 1];
     const last2 = tokens[tokens.length - 2];

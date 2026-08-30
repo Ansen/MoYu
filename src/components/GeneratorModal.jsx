@@ -83,7 +83,7 @@ export default function GeneratorModal({ isOpen, onClose, onGenerate }) {
   }, [isCustomLength, customLengthInput, groupLength]);
 
   const maxAllowedDigits = useMemo(() => {
-    return Math.max(1, effectiveLength - 1);
+    return Math.max(1, effectiveLength - 2);
   }, [effectiveLength]);
 
   const effectiveMaxDigits = useMemo(() => {

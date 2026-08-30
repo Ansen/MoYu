@@ -65,5 +65,12 @@ export function testMarkersConfig() {
   assert.strictEqual(res100.isGridEligible, true, '100-group 4-digit telegram must be grid eligible');
   console.log('✓ 100-group telegram with === and iii + perfectly preserved 10x10 grid matrix.');
 
+  // 4. Test multi-word space-containing start and end markers
+  const res4 = parseTelegramContent('=== === 8888 9999 AR SK');
+  assert.strictEqual(res4.startMarker, '=== ===', 'Should detect multi-word start marker with space');
+  assert.strictEqual(res4.endMarker, 'AR SK', 'Should detect multi-word end marker with space');
+  assert.deepStrictEqual(res4.rawTokens, ['8888', '9999']);
+  console.log('✓ parseTelegramContent correctly stripped multi-word markers with spaces (=== === and AR SK).');
+
   console.log('All Transmission Markers tests passed successfully!\n');
 }

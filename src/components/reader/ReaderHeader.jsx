@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useMemo } from 'react';
 import { 
   ArrowLeft, 
   List, 
@@ -19,7 +19,7 @@ import {
   SlidersHorizontal
 } from 'lucide-react';
 import { useI18n } from '../../i18n';
-import { FONT_OPTIONS } from '../../config/fonts';
+import { getAvailableFonts } from '../../config/fonts';
 
 export default function ReaderHeader({
   bookData,
@@ -47,8 +47,6 @@ export default function ReaderHeader({
   setPrefixMarker,
   suffixMarker = 'iii',
   setSuffixMarker,
-  autoFit = true,
-  setAutoFit,
   isPlaying,
   isPaused,
   togglePlay,
@@ -56,6 +54,7 @@ export default function ReaderHeader({
   onRegenerate,
 }) {
   const { t } = useI18n();
+  const availableFonts = useMemo(() => getAvailableFonts(), []);
   const [isNumberModeOpen, setIsNumberModeOpen] = useState(false);
   const [isMoreMenuOpen, setIsMoreMenuOpen] = useState(false);
   const [isFontSubmenuOpen, setIsFontSubmenuOpen] = useState(false);
@@ -122,9 +121,9 @@ export default function ReaderHeader({
             <div className="flex items-center bg-white dark:bg-[#252525] border border-slate-300 dark:border-[#383838] rounded-md overflow-hidden shadow-2xs h-7">
               <button
                 type="button"
-                onClick={() => setBaseFontSize(Math.max(10, Math.round(baseFontSize) - 2))}
+                onClick={() => setBaseFontSize(Math.max(10, Math.round(baseFontSize) - 1))}
                 className="w-4.5 h-full flex items-center justify-center text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-slate-100 dark:hover:bg-[#333333] transition-colors cursor-pointer select-none active:bg-slate-200 dark:active:bg-[#3a3a3a]"
-                title={t('reader.tooltip.fontSizeDec', '减小字号 (-2)')}
+                title={t('reader.tooltip.fontSizeDec', '减小字号 (-1)')}
               >
                 <Minus size={10} className="stroke-[2.5]" />
               </button>
@@ -136,9 +135,9 @@ export default function ReaderHeader({
                 onWheel={(e) => {
                   e.currentTarget.blur();
                   if (e.deltaY < 0) {
-                    setBaseFontSize(Math.min(120, Math.round(baseFontSize) + 2));
+                    setBaseFontSize(Math.min(120, Math.round(baseFontSize) + 1));
                   } else {
-                    setBaseFontSize(Math.max(10, Math.round(baseFontSize) - 2));
+                    setBaseFontSize(Math.max(10, Math.round(baseFontSize) - 1));
                   }
                 }}
                 onChange={(e) => {
@@ -152,9 +151,9 @@ export default function ReaderHeader({
               />
               <button
                 type="button"
-                onClick={() => setBaseFontSize(Math.min(120, Math.round(baseFontSize) + 2))}
+                onClick={() => setBaseFontSize(Math.min(120, Math.round(baseFontSize) + 1))}
                 className="w-4.5 h-full flex items-center justify-center text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-slate-100 dark:hover:bg-[#333333] transition-colors cursor-pointer select-none active:bg-slate-200 dark:active:bg-[#3a3a3a]"
-                title={t('reader.tooltip.fontSizeInc', '增大字号 (+2)')}
+                title={t('reader.tooltip.fontSizeInc', '增大字号 (+1)')}
               >
                 <Plus size={10} className="stroke-[2.5]" />
               </button>
@@ -332,29 +331,7 @@ export default function ReaderHeader({
                 />
                 <div className="absolute top-full right-0 mt-2 w-64 bg-white/95 dark:bg-[#1c1c1c]/95 backdrop-blur-md border border-slate-200 dark:border-[#333333] shadow-2xl rounded-xl p-2 z-50 animate-in fade-in slide-in-from-top-1 duration-150 select-none text-slate-800 dark:text-slate-200 space-y-1">
                   
-                  {/* Row 1: Auto-Fit Single Screen Switch */}
-                  {setAutoFit && (
-                    <div className="flex items-center justify-between py-1 px-1.5 rounded-lg hover:bg-slate-50 dark:hover:bg-[#252525]/60 transition-colors">
-                      <span className="text-[12px] text-slate-700 dark:text-slate-300 font-medium">
-                        {t('reader.more.autofit')}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => setAutoFit(!autoFit)}
-                        className={`h-4.5 w-8 shrink-0 rounded-full transition-colors relative cursor-pointer ${
-                          autoFit ? 'bg-indigo-600' : 'bg-slate-300 dark:bg-[#3e3e3e]'
-                        }`}
-                      >
-                        <span
-                          className={`absolute top-0.5 left-0.5 h-3.5 w-3.5 rounded-full bg-white transition-transform shadow-xs ${
-                            autoFit ? 'translate-x-3.5' : 'translate-x-0'
-                          }`}
-                        />
-                      </button>
-                    </div>
-                  )}
-
-                  {/* Row 2: Radio Harmonics Switch */}
+                  {/* Row 1: Radio Harmonics Switch */}
                   {setUseHarmonics && (
                     <div className="flex items-center justify-between py-1 px-1.5 rounded-lg hover:bg-slate-50 dark:hover:bg-[#252525]/60 transition-colors">
                       <div className="flex items-center gap-1.5">
@@ -434,7 +411,7 @@ export default function ReaderHeader({
                         </span>
                         <div className="flex items-center gap-1">
                           <span className="text-[11px] text-slate-400 dark:text-slate-500 font-mono">
-                            {FONT_OPTIONS.find(f => f.id === fontFamily)?.shortName || fontFamily}
+                            {availableFonts.find(f => f.id === fontFamily)?.shortName || fontFamily}
                           </span>
                           <ChevronRight size={13} className="text-slate-400 opacity-70" />
                         </div>
@@ -443,14 +420,14 @@ export default function ReaderHeader({
                       {/* Font Flyout Submenu to the Left */}
                       {isFontSubmenuOpen && (
                         <div 
-                          className="absolute right-full top-0 mr-1.5 w-max min-w-[200px] flex flex-col gap-0.5 p-1.5 bg-white/98 dark:bg-[#1e1e1e]/98 backdrop-blur-md border border-slate-200 dark:border-[#333333] rounded-xl shadow-2xl z-50 animate-in fade-in zoom-in-95 duration-100 select-none text-slate-800 dark:text-slate-200"
+                          className="absolute right-full top-0 mr-1.5 w-max min-w-[180px] flex flex-col gap-0.5 p-1.5 bg-white/98 dark:bg-[#1e1e1e]/98 backdrop-blur-md border border-slate-200 dark:border-[#333333] rounded-xl shadow-2xl z-50 animate-in fade-in zoom-in-95 duration-100 select-none text-slate-800 dark:text-slate-200"
                           onMouseEnter={handleFontMouseEnter}
                           onMouseLeave={handleFontMouseLeave}
                         >
                           <div className="px-2 py-1 text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
                             {t('reader.more.font')}
                           </div>
-                          {FONT_OPTIONS.map((font) => {
+                          {availableFonts.map((font) => {
                             const isSelected = fontFamily === font.id;
                             return (
                               <button
@@ -470,7 +447,7 @@ export default function ReaderHeader({
                                   className="text-[12px]" 
                                   style={{ fontFamily: font.fontFamily }}
                                 >
-                                  {t(font.labelKey, font.shortName)}
+                                  {font.shortName}
                                 </span>
                                 {isSelected && (
                                   <Check size={13} className="text-indigo-600 dark:text-indigo-400 ml-2 shrink-0" />

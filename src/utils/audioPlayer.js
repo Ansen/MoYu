@@ -176,8 +176,7 @@ class DesktopAudioPlayer {
       item.startTime = itemStartTime;
 
       if (item.type === 'prefix' || item.type === 'suffix') {
-        // 起止符标记发声
-        if (this.callbacks.onMarkerPlay) {
+        if (this.callbacks.onMarkerPlay && item.code !== null) {
           const delayMs = Math.max(0, (itemStartTime - this.audioContext.currentTime) * 1000);
           setTimeout(() => {
             if (this.playbackState.isPlaying && !this.playbackState.isPaused && !this.playbackState.stopRequested) {
@@ -186,8 +185,7 @@ class DesktopAudioPlayer {
           }, delayMs);
         }
       } else if (item.type === 'body') {
-        // 正文 Token 高亮通知
-        if (this.callbacks.onCharPlay) {
+        if (this.callbacks.onCharPlay && item.code !== null) {
           const delayMs = Math.max(0, (itemStartTime - this.audioContext.currentTime) * 1000);
           setTimeout(() => {
             if (this.playbackState.isPlaying && !this.playbackState.isPaused && !this.playbackState.stopRequested) {
@@ -198,7 +196,7 @@ class DesktopAudioPlayer {
       }
 
       if (item.code === null) {
-        // 空格/间隔
+        // 空格/间隔: 标准 4 dots 词间间隔 (加前置字符尾部 3 dots = 标准 7 dots)
         this.nextNoteTime += 4 * dotSec;
       } else {
         // 点划发射
@@ -264,6 +262,7 @@ class DesktopAudioPlayer {
       for (const tok of pTokens) {
         queue.push({ ...tok, type: 'prefix', markerText: prefixMarker.trim() });
       }
+      queue.push({ char: ' ', code: null });
     }
 
     // 2. 正文 Tokens
@@ -276,6 +275,7 @@ class DesktopAudioPlayer {
 
     // 3. 报尾起止符
     if (enableMarkers && suffixMarker && suffixMarker.trim()) {
+      queue.push({ char: ' ', code: null });
       const sTokens = textToMorseTokens(suffixMarker.trim(), numberMode);
       for (const tok of sTokens) {
         queue.push({ ...tok, type: 'suffix', markerText: suffixMarker.trim() });
