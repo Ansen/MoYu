@@ -1,0 +1,428 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <!-- Instant Theme & Language Detection (Follow System or Saved Preference) -->
+  <script>
+    (function () {
+      try {
+        var savedTheme = localStorage.getItem('moyu_theme');
+        var systemDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+        var theme = savedTheme || (systemDark ? 'dark' : 'light');
+        document.documentElement.setAttribute('data-theme', theme);
+
+        var savedLang = localStorage.getItem('moyu_lang');
+        var navLang = (navigator.language || navigator.userLanguage || '').toLowerCase();
+        var lang = savedLang || (navLang.startsWith('zh') ? 'zh' : 'en');
+        document.documentElement.lang = lang === 'zh' ? 'zh-CN' : 'en';
+      } catch (e) {}
+    })();
+  </script>
+
+  <!-- SEO Meta Tags -->
+  <title>摩语 MoYu - 专业的摩尔斯电码与标准电码训练终端 | 官方网站</title>
+  <meta name="description"
+    content="摩语 (MoYu) 是一款基于 Tauri + React 构建的轻量、极简且专业的摩尔斯密码训练与中文电码互译桌面应用。支持中文标准电码互译、EPUB/TXT 电子书听抄训练与真实电台过载音效。">
+  <meta name="keywords" content="摩尔斯电码, 摩斯密码, 中文电码, CW听抄, 业余无线电, HAM, 电码转换, Tauri, MoYu, 摩语">
+  <meta name="author" content="BA8BAK">
+
+  <!-- Favicon -->
+  <link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
+  <link rel="apple-touch-icon" href="assets/logo.png">
+
+  <!-- Stylesheet -->
+  <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+
+  <!-- Ambient Glow Effects -->
+  <div class="glow-ambient glow-top"></div>
+  <div class="glow-ambient glow-mid"></div>
+
+  <!-- ==========================================================================
+       Header & Navigation
+       ========================================================================== -->
+  <header class="header">
+    <div class="container navbar">
+      <a href="#" class="logo-link">
+        <img src="assets/logo.png" alt="MoYu Logo" class="logo-img">
+        <span class="logo-title">MoYu <span class="gradient-text">摩语</span></span>
+      </a>
+
+      <ul class="nav-menu">
+        <li><a href="#features" class="nav-link" data-i18n="nav.features">核心特性</a></li>
+        <li><a href="#demo" class="nav-link" data-i18n="nav.demo">在线体验</a></li>
+        <li><a href="#gallery" class="nav-link" data-i18n="nav.preview">界面预览</a></li>
+        <li><a href="#downloads" class="nav-link" data-i18n="nav.downloads">立即下载</a></li>
+      </ul>
+
+      <div class="nav-actions">
+        <!-- Language Switcher -->
+        <button id="lang-toggle-btn" class="lang-switch" title="Toggle Language">
+          🌐 <span>EN</span>
+        </button>
+
+        <!-- Dark/Light Theme Switcher -->
+        <button id="theme-toggle-btn" class="icon-btn" title="Toggle Theme">
+          <span id="theme-icon">☀️</span>
+        </button>
+
+        <!-- GitHub Repository Link -->
+        <a href="https://github.com/Ansen/MoYu" target="_blank" rel="noopener noreferrer" class="icon-btn"
+          title="GitHub Repository">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+            <path
+              d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z" />
+          </svg>
+        </a>
+      </div>
+    </div>
+  </header>
+
+  <!-- ==========================================================================
+       Hero Section
+       ========================================================================== -->
+  <section class="hero">
+    <div class="container">
+      <div class="hero-badge-wrap">
+        <div class="badge">
+          <span class="badge-pulse"></span>
+          <span class="version-badge-text" data-i18n="hero.badge">v0.1.15 正式版已发布</span>
+        </div>
+      </div>
+
+      <h1 class="hero-title" id="hero-title-container">
+        专业的摩尔斯电码<br class="hero-br">
+        <span class="gradient-text">与标准中文电码训练终端</span>
+      </h1>
+
+      <p class="hero-subtitle" data-i18n="hero.subtitle">
+        基于 Tauri + React 构建的轻量、极简且专业的摩尔斯密码训练与中文电码互译桌面应用。为业余无线电爱好者与发报玩家打造沉浸式体验。
+      </p>
+
+      <div class="hero-cta">
+        <!-- Download Source Switch -->
+        <div class="cdn-switch-bar">
+          <span class="cdn-switch-label" data-i18n="hero.source_label">下载通道：</span>
+          <div class="cdn-toggle">
+            <button class="cdn-toggle-btn active" data-source="cdn" data-i18n="hero.source_cdn">🚀 国内高速 CDN</button>
+            <button class="cdn-toggle-btn" data-source="github" data-i18n="hero.source_github">🌐 GitHub 官方源</button>
+          </div>
+        </div>
+
+        <!-- Primary Auto-Detected Download Button -->
+        <a href="#downloads" id="hero-main-download-btn" class="btn-primary">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"
+            stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+            <polyline points="7 10 12 15 17 10" />
+            <line x1="12" y1="15" x2="12" y2="3" />
+          </svg>
+          <span class="btn-text" data-i18n="hero.download_auto">免费下载</span>
+        </a>
+
+        <!-- Detected OS Hint & Jump All -->
+        <div class="platform-tip">
+          <span id="detected-platform-text">正在识别操作系统...</span> ·
+          <a href="#downloads" style="color: var(--brand-primary); text-decoration: underline;"
+            data-i18n="hero.all_platforms">查看所有版本</a>
+        </div>
+      </div>
+
+      <!-- ==========================================================================
+           Hero Mockup Window (Adaptive High-Res Real Screenshot)
+           ========================================================================== -->
+      <div class="hero-mockup-wrap">
+        <div class="mockup-inner">
+          <div class="mockup-img-container">
+            <img src="screenshort/home_dark_cn.png" alt="MoYu App Interface Preview" class="mockup-img"
+              id="hero-preview-img">
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==========================================================================
+       Interactive Live Morse Audio Section
+       ========================================================================== -->
+  <section class="live-demo-section" id="demo">
+    <div class="container">
+      <div class="demo-card">
+        <div class="demo-header">
+          <div class="badge" style="margin-bottom: 12px;" data-i18n="demo.badge">互动体验</div>
+          <h2 data-i18n="demo.title">在线摩斯电码发报模拟</h2>
+          <p style="color: var(--text-secondary); font-size: 0.95rem;" data-i18n="demo.subtitle">
+            输入字符即可实时转换摩斯密码，并体验真实的 800Hz 电台侧音发报声。
+          </p>
+        </div>
+
+        <div class="demo-grid">
+          <div class="demo-box">
+            <label for="demo-input" data-i18n="demo.input_label">输入文本 (英文字母 / 数字)</label>
+            <textarea id="demo-input" class="demo-textarea"
+              placeholder="输入你想发报的内容，例如：CQ CQ CQ DE BA8BAK">CQ CQ CQ DE BA8BAK</textarea>
+          </div>
+
+          <div class="demo-box">
+            <label for="demo-output" data-i18n="demo.output_label">摩尔斯电码 (Morse Code)</label>
+            <textarea id="demo-output" class="demo-textarea"
+              readonly>-.-. --.- / -.-. --.- / -.-. --.- / -.. . / -... .- ---.. -... .- -.-</textarea>
+          </div>
+        </div>
+
+        <div class="demo-controls">
+          <div class="demo-sliders">
+            <div class="slider-group">
+              <span data-i18n="demo.wpm_label">发报速度:</span>
+              <input type="range" id="wpm-slider" min="10" max="40" value="20">
+              <span id="wpm-val"
+                style="font-family: var(--font-mono); font-weight: 700; color: var(--brand-primary);">20</span> WPM
+            </div>
+
+            <div class="slider-group">
+              <span data-i18n="demo.freq_label">频率:</span>
+              <input type="range" id="freq-slider" min="200" max="1000" step="50" value="380">
+              <span id="freq-val"
+                style="font-family: var(--font-mono); font-weight: 700; color: var(--accent-cyan);">380 Hz</span>
+            </div>
+          </div>
+
+          <button id="demo-play-btn" class="play-btn">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+              <polygon points="5 3 19 12 5 21 5 3" />
+            </svg>
+            <span data-i18n="demo.play">播放发报音</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==========================================================================
+       Features Section
+       ========================================================================== -->
+  <section class="features-section" id="features">
+    <div class="container">
+      <div class="section-header">
+        <div class="badge" style="margin-bottom: 12px;" data-i18n="feat.badge">功能亮点</div>
+        <h2 data-i18n="feat.title">匠心打造的无线电训练利器</h2>
+        <p data-i18n="feat.subtitle">打破传统摩斯工具的单一局限，将汉字标准电码与现代电子书阅读深度融合。</p>
+      </div>
+
+      <div class="features-grid">
+        <!-- Feature 1 -->
+        <div class="feature-card">
+          <div class="feature-icon icon-purple">🕵️‍♂️</div>
+          <h3 class="feature-title" data-i18n="feat.1.title">摩言密语 · 智能互译</h3>
+          <p class="feature-desc" data-i18n="feat.1.desc">
+            打破传统摩斯码只支持英文的限制，支持中文汉字、标准四位中文电码与摩尔斯电码的双向即时互译，输入自动识别。
+          </p>
+        </div>
+
+        <!-- Feature 2 -->
+        <div class="feature-card">
+          <div class="feature-icon icon-cyan">📻</div>
+          <h3 class="feature-title" data-i18n="feat.2.title">沉浸式 CW 电子书播放器</h3>
+          <p class="feature-desc" data-i18n="feat.2.desc">
+            支持导入本地 TXT 与 EPUB 电子书，自动解析章节目录，实时发报模拟并高亮追踪阅读进度。
+          </p>
+        </div>
+
+        <!-- Feature 3 -->
+        <div class="feature-card">
+          <div class="feature-icon icon-amber">🎛️</div>
+          <h3 class="feature-title" data-i18n="feat.3.title">专业电台音效仿真</h3>
+          <p class="feature-desc" data-i18n="feat.3.desc">
+            自定义 WPM 报速、侧音频偏 Hz、点划间隔比，更支持老式电子管电台过载失真 (谐波) 音效模拟，还原真实通联。
+          </p>
+        </div>
+
+        <!-- Feature 4 -->
+        <div class="feature-card">
+          <div class="feature-icon icon-indigo">⚡</div>
+          <h3 class="feature-title" data-i18n="feat.4.title">轻量极速 · 跨平台架构</h3>
+          <p class="feature-desc" data-i18n="feat.4.desc">
+            基于 Rust + Tauri 原生构建，内存占用不足百兆，秒级极速启动，全平台 Windows / macOS / Linux / Android 统一体验。
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==========================================================================
+       Gallery Showcase Section (Adaptive Theme & Lang Real Screenshots)
+       ========================================================================== -->
+  <section class="gallery-section" id="gallery">
+    <div class="container">
+      <div class="section-header">
+        <div class="badge" style="margin-bottom: 12px;" data-i18n="gallery.badge">界面设计</div>
+        <h2 data-i18n="gallery.title">极简大方，专为专注而生</h2>
+        <p data-i18n="gallery.subtitle">原生暗黑美学与交互反馈，跟随系统主题智能切换，让练习与阅读成为一种享受。</p>
+      </div>
+
+      <div class="gallery-tabs">
+        <button class="tab-btn active" data-tab="home" data-i18n="gallery.tab.home">首页导航</button>
+        <button class="tab-btn" data-tab="player" data-i18n="gallery.tab.player">电码播放器</button>
+        <button class="tab-btn" data-tab="translator" data-i18n="gallery.tab.translator">摩言密语</button>
+      </div>
+
+      <div class="gallery-display">
+        <div class="mockup-img-container">
+          <img src="screenshort/home_dark_cn.png" alt="MoYu Gallery Preview" class="gallery-img" id="gallery-img">
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==========================================================================
+       Downloads Matrix Section
+       ========================================================================== -->
+  <section class="download-section" id="downloads">
+    <div class="container">
+      <div class="section-header">
+        <div class="badge" style="margin-bottom: 12px;" data-i18n="dl.badge">多端适配</div>
+        <h2 data-i18n="dl.title">选择适合你的系统版本</h2>
+        <p data-i18n="dl.subtitle">所有版本均通过数字签名与 Hash 校验，安全、纯净、无任何广告与追踪。</p>
+      </div>
+
+      <div class="download-grid">
+        <!-- Windows -->
+        <div class="download-card highlight">
+          <div class="download-badge">Popular</div>
+          <svg class="download-icon" viewBox="0 0 24 24" fill="currentColor">
+            <path
+              d="M0 3.449L9.75 2.1v9.451H0m10.949-9.602L24 0v11.4H10.949M0 12.6h9.75v9.451L0 20.699M10.949 12.6H24V24l-12.9-1.801" />
+          </svg>
+          <h3 class="download-title">Windows</h3>
+          <p class="download-meta" data-i18n="dl.win.desc">Windows 10 / 11 (64位)</p>
+          <div class="download-links">
+            <a href="#" class="dl-btn" data-dl-target="win">
+              <span>Setup 安装包</span>
+              <span class="format">.exe</span>
+            </a>
+          </div>
+        </div>
+
+        <!-- macOS -->
+        <div class="download-card">
+          <svg class="download-icon" viewBox="0 0 24 24" fill="currentColor">
+            <path
+              d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.81-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M15.97 6.37c.62-.75 1.04-1.8 0.92-2.85-.9.04-2 0.6-2.65 1.35-.58.66-1.09 1.73-0.95 2.76 1.01.08 2.05-.51 2.68-1.26z" />
+          </svg>
+          <h3 class="download-title">macOS</h3>
+          <p class="download-meta" data-i18n="dl.mac.desc">macOS 11.0+ (Universal / Apple Silicon & Intel)</p>
+          <div class="download-links">
+            <a href="#" class="dl-btn" data-dl-target="macArm">
+              <span>Apple Silicon (M系列)</span>
+              <span class="format">.tar.gz</span>
+            </a>
+            <a href="#" class="dl-btn" data-dl-target="macIntel">
+              <span>Intel 芯片</span>
+              <span class="format">.tar.gz</span>
+            </a>
+          </div>
+        </div>
+
+        <!-- Linux -->
+        <div class="download-card">
+          <svg class="download-icon" viewBox="0 0 24 24" fill="currentColor">
+            <path
+              d="M12.012 0c-.39 0-.75.02-1.08.06-4.14.49-5.94 3.78-5.94 7.62 0 1.83.45 4.05 1.32 5.76-.75 1.32-1.89 2.58-1.89 4.29 0 2.88 2.43 4.26 5.82 4.26.81 0 1.62-.09 2.4-.24 2.19 1.5 5.16 2.25 7.35 2.25 1.35 0 2.22-.3 2.22-1.05 0-.69-.69-1.05-1.92-1.41-2.1-.63-3.63-1.53-3.63-3.63 0-1.26.69-2.31 1.47-3.48 1.02-1.53 1.77-3.39 1.77-5.61 0-5.04-3.66-8.82-9.47-8.82z" />
+          </svg>
+          <h3 class="download-title">Linux</h3>
+          <p class="download-meta" data-i18n="dl.linux.desc">Ubuntu, Debian, Fedora, Arch</p>
+          <div class="download-links">
+            <a href="#" class="dl-btn" data-dl-target="linuxDeb">
+              <span>Debian / Ubuntu 安装包</span>
+              <span class="format">.deb</span>
+            </a>
+            <a href="#" class="dl-btn" data-dl-target="linuxAppImage">
+              <span>AppImage 免安装版</span>
+              <span class="format">.AppImage</span>
+            </a>
+          </div>
+        </div>
+
+        <!-- Android -->
+        <div class="download-card">
+          <svg class="download-icon" viewBox="0 0 24 24" fill="currentColor">
+            <path
+              d="M17.523 15.3414c-.5511 0-.9993-.4486-.9993-.9997s.4482-.9993.9993-.9993c.551 0 .9993.4482.9993.9993.0001.5511-.4483.9997-.9993.9997m-11.046 0c-.5511 0-.9993-.4486-.9993-.9997s.4482-.9993.9993-.9993c.5511 0 .9993.4482.9993.9993 0 .5511-.4482.9997-.9993.9997m11.4045-6.02l1.9973-3.4592a.416.416 0 00-.1521-.5676.416.416 0 00-.5676.1521l-2.0223 3.503C15.5902 8.4111 13.8533 8.08 12 8.08s-3.5902.3311-5.1368.8697L4.8409 5.4467a.4161.4161 0 00-.5677-.1521.4157.4157 0 00-.1521.5676l1.9973 3.4592C2.6889 11.1867.3432 14.6589 0 18.761h24c-.3432-4.1021-2.6889-7.5743-6.1185-9.4396" />
+          </svg>
+          <h3 class="download-title">Android</h3>
+          <p class="download-meta" data-i18n="dl.android.desc">Android 8.0 及以上移动端</p>
+          <div class="download-links">
+            <a href="#" class="dl-btn" data-dl-target="androidArm">
+              <span>ARM64 (推荐)</span>
+              <span class="format">.apk</span>
+            </a>
+            <a href="#" class="dl-btn" data-dl-target="androidUniversal">
+              <span>通用安装包 (Universal)</span>
+              <span class="format">.apk</span>
+            </a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==========================================================================
+       Footer
+       ========================================================================== -->
+  <footer class="footer">
+    <div class="container">
+      <div class="footer-grid">
+        <div class="footer-brand">
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <img src="assets/logo.png" alt="MoYu Logo" style="width: 32px; height: 32px; border-radius: 6px;">
+            <span style="font-size: 1.2rem; font-weight: 800;">MoYu <span class="gradient-text">摩语</span></span>
+          </div>
+          <p data-i18n="footer.desc">专业的摩尔斯电码与标准电码训练终端。在无声的电波中，传递我们的专属密语。</p>
+        </div>
+
+        <div class="footer-col">
+          <h4 data-i18n="footer.links.product">产品</h4>
+          <ul>
+            <li><a href="#features" data-i18n="nav.features">核心特性</a></li>
+            <li><a href="#demo" data-i18n="nav.demo">在线体验</a></li>
+            <li><a href="#gallery" data-i18n="nav.preview">界面预览</a></li>
+            <li><a href="#downloads" data-i18n="nav.downloads">立即下载</a></li>
+          </ul>
+        </div>
+
+        <div class="footer-col">
+          <h4 data-i18n="footer.links.resources">资源与支持</h4>
+          <ul>
+            <li><a href="https://github.com/Ansen/MoYu" target="_blank" rel="noopener noreferrer"
+                data-i18n="footer.repo">GitHub 仓库</a></li>
+            <li><a href="https://github.com/Ansen/MoYu/releases" target="_blank" rel="noopener noreferrer"
+                data-i18n="footer.releases">Release 历史</a></li>
+            <li><a href="https://ba8bak.de" target="_blank" rel="noopener noreferrer" data-i18n="footer.author">作者主页
+                (BA8BAK)</a></li>
+            <li><a href="https://github.com/Ansen/MoYu/blob/main/LICENSE" target="_blank" rel="noopener noreferrer"
+                data-i18n="footer.license">GPL-3.0 开源协议</a></li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="footer-bottom">
+        <div>
+          Copyright &copy; 2024-2026 BA8BAK. <span data-i18n="footer.rights">版权所有。基于 GPL-3.0 协议开源。</span>
+        </div>
+        <div>
+          Powered by Tauri & React
+        </div>
+      </div>
+    </div>
+  </footer>
+
+  <!-- Script -->
+  <script src="script.js"></script>
+</body>
+
+</html>

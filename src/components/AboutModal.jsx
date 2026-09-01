@@ -209,12 +209,23 @@ export default function AboutModal({ isOpen, onClose }) {
                 )}
 
                 <div className="flex gap-2 w-full">
-                  <button 
-                    onClick={handleInstall}
-                    className="flex-1 px-3 py-2 text-xs font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg transition-colors text-center shadow-xs"
-                  >
-                    {t('update.install.restart')}
-                  </button>
+                  {updateObj?.isAndroid ? (
+                    <a 
+                      href={updateObj.downloadUrl || 'https://moyu-dl.wjzhx.com/Ansen/MoYu/releases/latest'}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex-1 px-3 py-2 text-xs font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg transition-colors text-center shadow-xs inline-block"
+                    >
+                      {t('update.download.apk')}
+                    </a>
+                  ) : (
+                    <button 
+                      onClick={handleInstall}
+                      className="flex-1 px-3 py-2 text-xs font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg transition-colors text-center shadow-xs"
+                    >
+                      {t('update.install.restart')}
+                    </button>
+                  )}
                 </div>
               </div>
             ) : updateStatus === 'installing' ? (

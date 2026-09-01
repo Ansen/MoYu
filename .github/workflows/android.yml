@@ -69,9 +69,71 @@ jobs:
           pnpm tauri android init
           if [ "${{ inputs.build_type }}" = "debug" ]; then
             pnpm tauri android build --apk --debug --split-per-abi
+            pnpm tauri android build --apk --debug
           else
             pnpm tauri android build --apk --split-per-abi
+            pnpm tauri android build --apk
           fi
+
+      - name: Sign & Verify Android APKs (Release Only)
+        if: inputs.build_type == 'release'
+        shell: bash
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          BUILD_TOOLS_DIR=$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -n 1)
+          APKSIGNER="$BUILD_TOOLS_DIR/apksigner"
+          ZIPALIGN="$BUILD_TOOLS_DIR/zipalign"
+          echo "Using Android build-tools from: $BUILD_TOOLS_DIR"
+
+          KEYSTORE_FILE="$RUNNER_TEMP/release.keystore"
+          if [ -n "$ANDROID_KEYSTORE_BASE64" ]; then
+            echo "正在使用 GitHub Secrets 中的正式证书进行签名..."
+            echo "$ANDROID_KEYSTORE_BASE64" | base64 -d > "$KEYSTORE_FILE"
+            SIGN_ALIAS="${ANDROID_KEY_ALIAS:-moyu}"
+            STORE_PASS="${ANDROID_KEYSTORE_PASSWORD}"
+            KEY_PASS="${ANDROID_KEY_PASSWORD:-$STORE_PASS}"
+          else
+            echo "::warning::未检测到 ANDROID_KEYSTORE_BASE64 Secret！正在生成自签名证书兜底..."
+            SIGN_ALIAS="moyu"
+            STORE_PASS="moyu_fallback_password"
+            KEY_PASS="moyu_fallback_password"
+            keytool -genkeypair -v \
+              -keystore "$KEYSTORE_FILE" \
+              -alias "$SIGN_ALIAS" \
+              -keyalg RSA \
+              -keysize 2048 \
+              -validity 10000 \
+              -storepass "$STORE_PASS" \
+              -keypass "$KEY_PASS" \
+              -dname "CN=MoYu, OU=Release, O=BA8BAK, C=CN"
+          fi
+
+          export STORE_PASS KEY_PASS
+
+          find src-tauri/gen/android/app/build/outputs/apk -type f -name "*release*.apk" | while read -r apk_path; do
+            echo "正在处理签名: $apk_path"
+            if ! "$ZIPALIGN" -c -v 4 "$apk_path" >/dev/null 2>&1; then
+              "$ZIPALIGN" -v -p 4 "$apk_path" "${apk_path}.aligned"
+              mv "${apk_path}.aligned" "$apk_path"
+            fi
+
+            "$APKSIGNER" sign \
+              --ks "$KEYSTORE_FILE" \
+              --ks-key-alias "$SIGN_ALIAS" \
+              --ks-pass "env:STORE_PASS" \
+              --key-pass "env:KEY_PASS" \
+              --v1-signing-enabled true \
+              --v2-signing-enabled true \
+              --v3-signing-enabled true \
+              "$apk_path"
+
+            echo "校验签名有效性:"
+            "$APKSIGNER" verify --verbose "$apk_path"
+          done
 
       - name: Upload Android APK
         uses: actions/upload-artifact@v4
