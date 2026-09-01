@@ -73,7 +73,10 @@ const translations = {
     "dl.win.desc": "Windows 10 / 11 (64位)",
     "dl.mac.desc": "macOS 11.0+ (Universal / Apple Silicon & Intel)",
     "dl.linux.desc": "Ubuntu, Debian, Fedora, Arch 等主流发行版",
-    "dl.android.desc": "Android 8.0 及以上系统",
+    "dl.mobile.title": "移动端 · 微信小程序",
+    "dl.mobile.desc": "免安装即开即用 · 微信扫码即刻体验「HAM百宝箱」",
+    "dl.mobile.qr_tip": "微信扫一扫 · 打开 HAM百宝箱",
+    "dl.mobile.status": "🟢 微信小程序已就绪",
 
     "footer.desc": "专业的摩尔斯电码与标准电码训练终端。在无声的电波中，传递我们的专属密语。",
     "footer.links.product": "产品",
@@ -152,7 +155,10 @@ const translations = {
     "dl.win.desc": "Windows 10 / 11 (64-bit)",
     "dl.mac.desc": "macOS 11.0+ (Universal / Apple Silicon & Intel)",
     "dl.linux.desc": "Ubuntu, Debian, Fedora, Arch Linux",
-    "dl.android.desc": "Android 8.0 and above",
+    "dl.mobile.title": "Mobile · WeChat Mini Program",
+    "dl.mobile.desc": "Zero-install, instant access · Scan QR code to launch HAM Tools",
+    "dl.mobile.qr_tip": "Scan with WeChat to open HAM Tools",
+    "dl.mobile.status": "🟢 Mini Program Ready",
 
     "footer.desc": "A professional Morse code and Chinese Telecode training terminal. Sending our secret codes across silent radio waves.",
     "footer.links.product": "Product",
@@ -181,8 +187,6 @@ function getDownloadUrls(ver = currentVersion) {
     macIntel: `${base}/v${ver}/MoYu_x64.app.tar.gz`,
     linuxDeb: `${base}/v${ver}/MoYu_${ver}_amd64.deb`,
     linuxAppImage: `${base}/v${ver}/MoYu_${ver}_amd64.AppImage`,
-    androidArm: `${base}/v${ver}/MoYu_${ver}_android_arm64-v8a.apk`,
-    androidUniversal: `${base}/v${ver}/MoYu_${ver}_android_universal.apk`,
   };
 }
 
@@ -206,7 +210,7 @@ const screenshots = {
       en: 'screenshort/cw-player-dark.png'
     },
     light: {
-      zh: 'screenshort/cw-player-light-cn.png',
+      zh: 'screenshort/cw-player-light.png',
       en: 'screenshort/cw-player-light.png'
     }
   },
@@ -341,9 +345,9 @@ function detectAndHighlightPlatform() {
   } else if (p === 'linux') {
     name = 'Linux (x86_64 .deb)';
     targetUrl = urls.linuxDeb;
-  } else if (p === 'android') {
-    name = 'Android (ARM64 .apk)';
-    targetUrl = urls.androidArm;
+  } else if (p === 'android' || p === 'ios') {
+    name = currentLang === 'zh' ? '微信小程序「HAM百宝箱」' : 'WeChat Mini Program (HAM Tools)';
+    targetUrl = '#downloads';
   }
 
   if (platformText) {
@@ -354,7 +358,11 @@ function detectAndHighlightPlatform() {
     mainBtn.href = targetUrl;
     const textSpan = mainBtn.querySelector('.btn-text');
     if (textSpan) {
-      textSpan.textContent = `${translations[currentLang]["hero.download_auto"]} (${name.split(' ')[0]})`;
+      if (p === 'android' || p === 'ios') {
+        textSpan.textContent = currentLang === 'zh' ? '移动端 · 打开「HAM百宝箱」小程序' : 'Open HAM Tools Mini Program';
+      } else {
+        textSpan.textContent = `${translations[currentLang]["hero.download_auto"]} (${name.split(' ')[0]})`;
+      }
     }
   }
 

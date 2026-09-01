@@ -136,180 +136,135 @@ jobs:
             gh release upload ${{ github.ref_name }} "$filename.sha256" --clobber
           done
 
-  publish-android:
-    needs: publish-tauri
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
+  # =========================================================================
+  # publish-android 已关停：移动端后续规划为微信小程序方案，免去繁重跨端适配与分包维护
+  # （完整配置已保留在此处注释中，若未来需重新开启原生打包，取消注释即可）
+  # =========================================================================
+  # publish-android:
+  #   needs: publish-tauri
+  #   runs-on: ubuntu-latest
+  #   permissions:
+  #     contents: write
+  #   steps:
+  #     - uses: actions/checkout@v4
+  #       with:
+  #         fetch-depth: 0
+  #     - name: Setup Java JDK
+  #       uses: actions/setup-java@v4
+  #       with:
+  #         distribution: 'zulu'
+  #         java-version: '17'
+  #     - name: Setup Android NDK
+  #       uses: nttld/setup-ndk@v1
+  #       with:
+  #         ndk-version: r26b
+  #     - name: Set NDK Environment Variable
+  #       run: echo "NDK_HOME=$ANDROID_NDK_HOME" >> $GITHUB_ENV
+  #     - name: Setup Node
+  #       uses: actions/setup-node@v4
+  #       with:
+  #         node-version: lts/*
+  #     - name: Install pnpm
+  #       run: npm install -g pnpm
+  #     - name: Install frontend dependencies
+  #       run: pnpm install
+  #     - name: Install Rust stable & Android targets
+  #       uses: dtolnay/rust-toolchain@stable
+  #       with:
+  #         targets: aarch64-linux-android,armv7-linux-androideabi,i686-linux-android,x86_64-linux-android
+  #         components: rust-src
+  #     - name: Rust cache
+  #       uses: swatinem/rust-cache@v2
+  #       with:
+  #         workspaces: './src-tauri -> target'
+  #     - name: Update version and inject cdylib
+  #       shell: bash
+  #       run: |
+  #         RAW_VERSION=${GITHUB_REF_NAME#v}
+  #         export RAW_VERSION
+  #         node -e "
+  #           const fs = require('fs');
+  #           const version = process.env.RAW_VERSION;
+  #           const tauriConf = JSON.parse(fs.readFileSync('src-tauri/tauri.conf.json', 'utf8'));
+  #           tauriConf.version = version;
+  #           fs.writeFileSync('src-tauri/tauri.conf.json', JSON.stringify(tauriConf, null, 2));
+  #           const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+  #           pkg.version = version;
+  #           fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2));
+  #           let cargo = fs.readFileSync('src-tauri/Cargo.toml', 'utf8');
+  #           cargo = cargo.replace(/version = \".*\"/, 'version = \"' + version + '\"');
+  #           cargo = cargo.replace(/crate-type = \[\"staticlib\", \"rlib\"\]/, 'crate-type = [\"staticlib\", \"cdylib\", \"rlib\"]');
+  #           fs.writeFileSync('src-tauri/Cargo.toml', cargo);
+  #         "
+  #     - name: Init Android Project & Build APK
+  #       run: |
+  #         pnpm tauri android init
+  #         pnpm tauri android build --apk --split-per-abi
+  #         pnpm tauri android build --apk
+  #     - name: Sign & Verify Android APKs
+  #       shell: bash
+  #       env:
+  #         ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+  #         ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+  #         ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+  #         ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+  #       run: |
+  #         BUILD_TOOLS_DIR=$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -n 1)
+  #         APKSIGNER="$BUILD_TOOLS_DIR/apksigner"
+  #         ZIPALIGN="$BUILD_TOOLS_DIR/zipalign"
+  #         KEYSTORE_FILE="$RUNNER_TEMP/release.keystore"
+  #         if [ -n "$ANDROID_KEYSTORE_BASE64" ]; then
+  #           echo "$ANDROID_KEYSTORE_BASE64" | base64 -d > "$KEYSTORE_FILE"
+  #           SIGN_ALIAS="${ANDROID_KEY_ALIAS:-moyu}"
+  #           STORE_PASS="${ANDROID_KEYSTORE_PASSWORD}"
+  #           KEY_PASS="${ANDROID_KEY_PASSWORD:-$STORE_PASS}"
+  #         else
+  #           SIGN_ALIAS="moyu"
+  #           STORE_PASS="moyu_fallback_password"
+  #           KEY_PASS="moyu_fallback_password"
+  #           keytool -genkeypair -v -keystore "$KEYSTORE_FILE" -alias "$SIGN_ALIAS" -keyalg RSA -keysize 2048 -validity 10000 -storepass "$STORE_PASS" -keypass "$KEY_PASS" -dname "CN=MoYu, OU=Release, O=BA8BAK, C=CN"
+  #         fi
+  #         export STORE_PASS KEY_PASS
+  #         find src-tauri/gen/android/app/build/outputs/apk -type f -name "*release*.apk" | while read -r apk_path; do
+  #           if ! "$ZIPALIGN" -c -v 4 "$apk_path" >/dev/null 2>&1; then
+  #             "$ZIPALIGN" -v -p 4 "$apk_path" "${apk_path}.aligned"
+  #             mv "${apk_path}.aligned" "$apk_path"
+  #           fi
+  #           "$APKSIGNER" sign --ks "$KEYSTORE_FILE" --ks-key-alias "$SIGN_ALIAS" --ks-pass "env:STORE_PASS" --key-pass "env:KEY_PASS" --v1-signing-enabled true --v2-signing-enabled true --v3-signing-enabled true "$apk_path"
+  #           "$APKSIGNER" verify --verbose "$apk_path"
+  #         done
+  #     - name: Upload APKs to Release
+  #       shell: bash
+  #       env:
+  #         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  #         GITHUB_REPOSITORY: ${{ github.repository }}
+  #         GITHUB_REF_NAME: ${{ github.ref_name }}
+  #       run: |
+  #         RAW_VERSION=${GITHUB_REF_NAME#v}
+  #         mkdir -p release-apks
+  #         find src-tauri/gen/android/app/build/outputs/apk -type f -name "*release*.apk" | while read -r apk_path; do
+  #           filename=$(basename "$apk_path")
+  #           clean_name=$(echo "$filename" | sed -E 's/^app-//' | sed -E 's/-release(-unsigned)?//')
+  #           new_name="MoYu_${RAW_VERSION}_android_${clean_name}"
+  #           cp "$apk_path" "release-apks/${new_name}"
+  #           if [ "$clean_name" = "arm64.apk" ]; then
+  #             cp "$apk_path" "release-apks/MoYu_${RAW_VERSION}_android_arm64-v8a.apk"
+  #           elif [ "$clean_name" = "arm.apk" ]; then
+  #             cp "$apk_path" "release-apks/MoYu_${RAW_VERSION}_android_armeabi-v7a.apk"
+  #           fi
+  #         done
+  #         cd release-apks
+  #         for file in *.apk; do
+  #           [ -f "$file" ] || continue
+  #           sha256sum "$file" > "${file}.sha256"
+  #         done
+  #         cd ..
+  #         if [ -d release-apks ] && [ "$(ls -A release-apks)" ]; then
+  #           for file in release-apks/*; do
+  #             gh release upload "$GITHUB_REF_NAME" "$file" --repo "$GITHUB_REPOSITORY" --clobber
+  #           done
+  #         fi
 
-      - name: Setup Java JDK
-        uses: actions/setup-java@v4
-        with:
-          distribution: 'zulu'
-          java-version: '17'
-
-      - name: Setup Android NDK
-        uses: nttld/setup-ndk@v1
-        with:
-          ndk-version: r26b
-
-      - name: Set NDK Environment Variable
-        run: echo "NDK_HOME=$ANDROID_NDK_HOME" >> $GITHUB_ENV
-
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: lts/*
-
-      - name: Install pnpm
-        run: npm install -g pnpm
-
-      - name: Install frontend dependencies
-        run: pnpm install
-
-      - name: Install Rust stable & Android targets
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: aarch64-linux-android,armv7-linux-androideabi,i686-linux-android,x86_64-linux-android
-          components: rust-src
-
-      - name: Rust cache
-        uses: swatinem/rust-cache@v2
-        with:
-          workspaces: './src-tauri -> target'
-
-      - name: Update version and inject cdylib
-        shell: bash
-        run: |
-          RAW_VERSION=${GITHUB_REF_NAME#v}
-          export RAW_VERSION
-          node -e "
-            const fs = require('fs');
-            const version = process.env.RAW_VERSION;
-            const tauriConf = JSON.parse(fs.readFileSync('src-tauri/tauri.conf.json', 'utf8'));
-            tauriConf.version = version;
-            fs.writeFileSync('src-tauri/tauri.conf.json', JSON.stringify(tauriConf, null, 2));
-            const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
-            pkg.version = version;
-            fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2));
-            let cargo = fs.readFileSync('src-tauri/Cargo.toml', 'utf8');
-            cargo = cargo.replace(/version = \".*\"/, 'version = \"' + version + '\"');
-            cargo = cargo.replace(/crate-type = \[\"staticlib\", \"rlib\"\]/, 'crate-type = [\"staticlib\", \"cdylib\", \"rlib\"]');
-            fs.writeFileSync('src-tauri/Cargo.toml', cargo);
-          "
-
-      - name: Init Android Project & Build APK
-        run: |
-          pnpm tauri android init
-          # 1. 构建各 CPU 架构的专用分包（体积小，适合手机）
-          pnpm tauri android build --apk --split-per-abi
-          # 2. 构建包含所有架构的 Universal 通用包（兼容所有模拟器及特殊设备）
-          pnpm tauri android build --apk
-
-      - name: Sign & Verify Android APKs
-        shell: bash
-        env:
-          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
-          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
-          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
-          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
-        run: |
-          BUILD_TOOLS_DIR=$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -n 1)
-          APKSIGNER="$BUILD_TOOLS_DIR/apksigner"
-          ZIPALIGN="$BUILD_TOOLS_DIR/zipalign"
-          echo "Using Android build-tools from: $BUILD_TOOLS_DIR"
-
-          KEYSTORE_FILE="$RUNNER_TEMP/release.keystore"
-          if [ -n "$ANDROID_KEYSTORE_BASE64" ]; then
-            echo "正在使用 GitHub Secrets 中的正式证书进行签名..."
-            echo "$ANDROID_KEYSTORE_BASE64" | base64 -d > "$KEYSTORE_FILE"
-            SIGN_ALIAS="${ANDROID_KEY_ALIAS:-moyu}"
-            STORE_PASS="${ANDROID_KEYSTORE_PASSWORD}"
-            KEY_PASS="${ANDROID_KEY_PASSWORD:-$STORE_PASS}"
-          else
-            echo "::warning::未检测到 ANDROID_KEYSTORE_BASE64 Secret！正在生成自签名证书兜底，确保 APK 具备合法签名可立即安装..."
-            SIGN_ALIAS="moyu"
-            STORE_PASS="moyu_fallback_password"
-            KEY_PASS="moyu_fallback_password"
-            keytool -genkeypair -v \
-              -keystore "$KEYSTORE_FILE" \
-              -alias "$SIGN_ALIAS" \
-              -keyalg RSA \
-              -keysize 2048 \
-              -validity 10000 \
-              -storepass "$STORE_PASS" \
-              -keypass "$KEY_PASS" \
-              -dname "CN=MoYu, OU=Release, O=BA8BAK, C=CN"
-          fi
-
-          export STORE_PASS KEY_PASS
-
-          find src-tauri/gen/android/app/build/outputs/apk -type f -name "*release*.apk" | while read -r apk_path; do
-            echo "正在处理签名: $apk_path"
-            
-            # 对齐校验
-            if ! "$ZIPALIGN" -c -v 4 "$apk_path" >/dev/null 2>&1; then
-              echo "正在对齐: $apk_path"
-              "$ZIPALIGN" -v -p 4 "$apk_path" "${apk_path}.aligned"
-              mv "${apk_path}.aligned" "$apk_path"
-            fi
-
-            # 注入 v1, v2, v3 规范数字签名
-            "$APKSIGNER" sign \
-              --ks "$KEYSTORE_FILE" \
-              --ks-key-alias "$SIGN_ALIAS" \
-              --ks-pass "env:STORE_PASS" \
-              --key-pass "env:KEY_PASS" \
-              --v1-signing-enabled true \
-              --v2-signing-enabled true \
-              --v3-signing-enabled true \
-              "$apk_path"
-
-            # 验证签名，确保符合 Android 规范
-            echo "校验签名有效性:"
-            "$APKSIGNER" verify --verbose "$apk_path"
-          done
-
-      - name: Upload APKs to Release
-        shell: bash
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GITHUB_REPOSITORY: ${{ github.repository }}
-          GITHUB_REF_NAME: ${{ github.ref_name }}
-        run: |
-          RAW_VERSION=${GITHUB_REF_NAME#v}
-          mkdir -p release-apks
-          
-          find src-tauri/gen/android/app/build/outputs/apk -type f -name "*release*.apk" | while read -r apk_path; do
-            filename=$(basename "$apk_path")
-            clean_name=$(echo "$filename" | sed -E 's/^app-//' | sed -E 's/-release(-unsigned)?//')
-            new_name="MoYu_${RAW_VERSION}_android_${clean_name}"
-            cp "$apk_path" "release-apks/${new_name}"
-            
-            # 如果是 arm64，同时提供 arm64-v8a 别名以便官网下载链接精准对应
-            if [ "$clean_name" = "arm64.apk" ]; then
-              cp "$apk_path" "release-apks/MoYu_${RAW_VERSION}_android_arm64-v8a.apk"
-            elif [ "$clean_name" = "arm.apk" ]; then
-              cp "$apk_path" "release-apks/MoYu_${RAW_VERSION}_android_armeabi-v7a.apk"
-            fi
-          done
-
-          cd release-apks
-          for file in *.apk; do
-            [ -f "$file" ] || continue
-            sha256sum "$file" > "${file}.sha256"
-          done
-          cd ..
-
-          if [ -d release-apks ] && [ "$(ls -A release-apks)" ]; then
-            for file in release-apks/*; do
-              gh release upload "$GITHUB_REF_NAME" "$file" --repo "$GITHUB_REPOSITORY" --clobber
-            done
-          fi
 
   publish-updater:
     needs: publish-tauri

@@ -32,4 +32,10 @@ data/
 *.jks
 keystore.properties
 keystore-credentials.txt
+
+# Archives
+*.zip
+*.7z
+*.tar.gz
+
 
