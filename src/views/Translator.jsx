@@ -55,6 +55,33 @@ export default function TranslatorView() {
     onFinalResult: handleFinalResult
   });
 
+  const isClearDisabled = mode === 'text' ? !inputText.trim() : conversationHistory.length === 0;
+
+  const handleClear = () => {
+    if (mode === 'text') {
+      if (!inputText) return;
+      setInputText('');
+      setChineseOutput('');
+      setCodesOutput('');
+      setInputType('none');
+      localStorage.removeItem('moyu_translator_last_input');
+    } else {
+      if (!conversationHistory.length) return;
+      if (confirm(t('translator.voice.clearConfirm'))) {
+        setConversationHistory([]);
+        localStorage.removeItem('moyu_voice_history');
+      }
+    }
+  };
+
+  const handleDeleteVoiceItem = (id) => {
+    setConversationHistory(prev => {
+      const next = prev.filter(item => item.id !== id);
+      localStorage.setItem('moyu_voice_history', JSON.stringify(next));
+      return next;
+    });
+  };
+
   useEffect(() => {
     let timeoutId;
     const handleResize = () => {
@@ -245,14 +272,14 @@ export default function TranslatorView() {
     <div className="h-full flex flex-col bg-slate-50/50 dark:bg-[#121212] p-4 md:p-6 gap-4 md:gap-6 overflow-hidden">
       
       {/* Top Header / Mode Switcher */}
-      <div className="shrink-0 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          {mode === 'text' ? <Edit3 size={20 * uiScale} className="text-indigo-500" /> : <Mic size={20 * uiScale} className="text-indigo-500" />}
-          <span style={{ fontSize: `${14 * uiScale}px` }} className="font-bold text-slate-700 dark:text-[#cccccc] tracking-wider">
+      <div className="shrink-0 flex items-center justify-between gap-2 sm:gap-4 select-none">
+        <div className="flex items-center gap-2 shrink-0 whitespace-nowrap">
+          {mode === 'text' ? <Edit3 size={18 * uiScale} className="text-indigo-500 shrink-0" /> : <Mic size={18 * uiScale} className="text-indigo-500 shrink-0" />}
+          <span style={{ fontSize: `${14 * uiScale}px` }} className="font-bold text-slate-700 dark:text-[#cccccc] tracking-wider whitespace-nowrap">
             {t('translator.editor.title')}
           </span>
         </div>
-        <div className="flex items-center gap-3 md:gap-4 flex-wrap justify-end">
+        <div className="flex items-center gap-2 sm:gap-3 shrink-0 flex-nowrap justify-end">
           {/* Dictionary Selector */}
           <div className="flex items-center bg-white dark:bg-[#1e1e1e] border border-slate-200 dark:border-[#2a2a2a] shadow-sm rounded-lg shrink-0 relative z-50" style={{ gap: `${6 * uiScale}px`, padding: `${4 * uiScale}px ${8 * uiScale}px`, height: `${28 * uiScale}px` }}>
             <div className="relative" ref={dropdownRef}>
@@ -261,7 +288,7 @@ export default function TranslatorView() {
                 style={{ gap: `${4 * uiScale}px`, padding: `0 ${4 * uiScale}px`, marginLeft: `-${4 * uiScale}px`, height: `${20 * uiScale}px` }}
                 onClick={() => setIsDictDropdownOpen(!isDictDropdownOpen)}
               >
-                <span className="font-medium text-slate-600 dark:text-[#ccc] select-none truncate" style={{ fontSize: `${11 * uiScale}px`, maxWidth: `${80 * uiScale}px` }}>
+                <span className="font-medium text-slate-600 dark:text-[#ccc] select-none truncate whitespace-nowrap" style={{ fontSize: `${11 * uiScale}px`, maxWidth: `${80 * uiScale}px` }}>
                   {prefDictionaryId === '1983_mainland' ? t('settings.dict.1983m') :
                   customDicts.find(d => d.id === prefDictionaryId)?.name || t('dict.selector.notfound')}
                 </span>
@@ -314,7 +341,7 @@ export default function TranslatorView() {
             
             <button 
               onClick={() => setIsImportModalOpen(true)}
-              className="text-indigo-500 hover:text-indigo-600 dark:text-indigo-400 flex items-center transition-colors font-medium"
+              className="text-indigo-500 hover:text-indigo-600 dark:text-indigo-400 flex items-center transition-colors font-medium whitespace-nowrap"
               style={{ gap: `${4 * uiScale}px`, fontSize: `${11 * uiScale}px` }}
               title={t('dict.import.title')}
             >
@@ -323,23 +350,36 @@ export default function TranslatorView() {
             </button>
           </div>
 
+          {/* Unified Clear Button (for both text and voice modes) */}
+          <button 
+            type="button"
+            onClick={handleClear}
+            disabled={isClearDisabled}
+            className="flex items-center bg-white dark:bg-[#1e1e1e] border border-slate-200 dark:border-[#2a2a2a] shadow-sm rounded-lg transition-all text-slate-600 dark:text-[#ccc] hover:text-rose-600 dark:hover:text-rose-400 hover:border-rose-300 dark:hover:border-rose-800/60 hover:bg-rose-50/50 dark:hover:bg-rose-950/20 disabled:opacity-40 disabled:pointer-events-none cursor-pointer active:scale-95 font-medium shrink-0 whitespace-nowrap"
+            style={{ gap: `${4 * uiScale}px`, padding: `${4 * uiScale}px ${8 * uiScale}px`, height: `${28 * uiScale}px`, fontSize: `${11 * uiScale}px` }}
+            title={mode === 'text' ? t('translator.clear.text') : t('translator.clear.voice')}
+          >
+            <Trash2 size={12 * uiScale} className="shrink-0 text-slate-400 group-hover:text-rose-500" />
+            <span>{t('translator.clear.btn')}</span>
+          </button>
+
           {/* Mode Switcher */}
-          <div className="flex items-center bg-slate-200/50 dark:bg-[#2a2a2a] p-1 rounded-lg">
+          <div className="flex items-center bg-slate-200/50 dark:bg-[#2a2a2a] p-1 rounded-lg shrink-0 flex-nowrap">
             <button 
-              className={`flex items-center gap-2 px-3 py-1.5 rounded-md transition-all ${mode === 'text' ? 'bg-white dark:bg-[#333] shadow-sm text-indigo-500 dark:text-indigo-400 font-medium' : 'text-slate-500 dark:text-[#888] hover:text-slate-700 dark:hover:text-[#ccc]'}`}
+              className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1 rounded-md transition-all whitespace-nowrap ${mode === 'text' ? 'bg-white dark:bg-[#333] shadow-sm text-indigo-500 dark:text-indigo-400 font-medium' : 'text-slate-500 dark:text-[#888] hover:text-slate-700 dark:hover:text-[#ccc]'}`}
               onClick={() => setMode('text')}
               style={{ fontSize: `${12 * uiScale}px` }}
             >
-              <Keyboard size={14 * uiScale} />
-              <span className="hidden sm:inline">{t('translator.mode.text')}</span>
+              <Keyboard size={13 * uiScale} />
+              <span>{t('translator.mode.text')}</span>
             </button>
             <button 
-              className={`flex items-center gap-2 px-3 py-1.5 rounded-md transition-all ${mode === 'voice' ? 'bg-white dark:bg-[#333] shadow-sm text-indigo-500 dark:text-indigo-400 font-medium' : 'text-slate-500 dark:text-[#888] hover:text-slate-700 dark:hover:text-[#ccc]'}`}
+              className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1 rounded-md transition-all whitespace-nowrap ${mode === 'voice' ? 'bg-white dark:bg-[#333] shadow-sm text-indigo-500 dark:text-indigo-400 font-medium' : 'text-slate-500 dark:text-[#888] hover:text-slate-700 dark:hover:text-[#ccc]'}`}
               onClick={() => setMode('voice')}
               style={{ fontSize: `${12 * uiScale}px` }}
             >
-              <Mic size={14 * uiScale} />
-              <span className="hidden sm:inline">{t('translator.mode.voice')}</span>
+              <Mic size={13 * uiScale} />
+              <span>{t('translator.mode.voice')}</span>
             </button>
           </div>
         </div>
@@ -410,9 +450,19 @@ export default function TranslatorView() {
             )}
             
             {conversationHistory.map(item => (
-              <div key={item.id} className="group flex flex-col gap-2 border-b border-slate-100 dark:border-[#2a2a2a] pb-4 last:border-0 last:pb-0 transition-opacity">
+              <div key={item.id} className="group relative flex flex-col gap-2 border-b border-slate-100 dark:border-[#2a2a2a] pb-4 last:border-0 last:pb-0 transition-opacity">
+                {/* Delete Single Item Action (Visible on Hover) */}
+                <button
+                  type="button"
+                  onClick={() => handleDeleteVoiceItem(item.id)}
+                  className="absolute top-0 right-0 opacity-0 group-hover:opacity-100 transition-all p-1 text-slate-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/30 rounded-md cursor-pointer border border-transparent hover:border-rose-200 dark:hover:border-rose-800/40"
+                  title={t('translator.voice.deleteItem')}
+                >
+                  <Trash2 size={12 * uiScale} />
+                </button>
+
                 {/* User Input (Original Text) */}
-                <div className="flex items-start gap-3">
+                <div className="flex items-start gap-3 pr-7">
                   <div className="mt-1 shrink-0 bg-slate-100 dark:bg-[#333] text-slate-400 dark:text-[#666] text-[10px] font-bold px-1.5 py-0.5 rounded uppercase tracking-widest select-none">
                     ZH
                   </div>
@@ -421,7 +471,7 @@ export default function TranslatorView() {
                   </p>
                 </div>
                 {/* Bot Translation (Codes) */}
-                <div className="flex items-start gap-3">
+                <div className="flex items-start gap-3 pr-7">
                   <div className="mt-1 shrink-0 bg-indigo-50 dark:bg-indigo-500/10 text-indigo-500 dark:text-indigo-400 text-[10px] font-bold px-1.5 py-0.5 rounded uppercase tracking-widest select-none">
                     CODE
                   </div>

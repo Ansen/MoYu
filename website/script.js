@@ -14,7 +14,7 @@ const translations = {
     "nav.preview": "终端预览",
     "nav.downloads": "立即下载",
     
-    "hero.badge": "v0.1.15 正式版已发布",
+    "hero.badge": "v0.1.16 正式版已发布",
     "hero.title_html": "专业的摩尔斯电码<br class=\"hero-br\"><span class=\"gradient-text\">与标准中文电码训练终端</span>",
     "hero.subtitle": "基于 Tauri + React 构建的轻量、极简且专业的摩尔斯密码训练与中文电码互译桌面应用。为业余无线电爱好者与发报玩家打造沉浸式体验。",
     "hero.download_auto": "免费下载",
@@ -96,7 +96,7 @@ const translations = {
     "nav.preview": "Terminal",
     "nav.downloads": "Download",
     
-    "hero.badge": "v0.1.15 is now available",
+    "hero.badge": "v0.1.16 is now available",
     "hero.title_html": "Professional Morse Code<br class=\"hero-br\"><span class=\"gradient-text\">&amp; Chinese Telecode Terminal</span>",
     "hero.subtitle": "A lightweight, modern, and professional Morse code practice and Chinese Telecode translation desktop terminal built with Tauri + React. Designed for amateur radio enthusiasts (HAM) and telegraphers.",
     "hero.download_auto": "Download Free",
@@ -173,7 +173,7 @@ const translations = {
 };
 
 // Current App Version State
-let currentVersion = '0.1.15';
+let currentVersion = '0.1.16';
 let downloadSource = 'cdn'; // 'cdn' or 'github'
 
 const CDN_BASE = `https://moyu-dl.wjzhx.com/Ansen/MoYu/releases/download`;
@@ -514,7 +514,7 @@ async function fetchLatestVersion() {
       }
     }
   } catch {
-    // Keep fallback v0.1.15
+    // Keep fallback v0.1.16
   }
 }
 

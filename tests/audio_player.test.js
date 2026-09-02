@@ -80,5 +80,35 @@ export async function testAudioPlayerLogic() {
   assert.strictEqual(audioPlayer.playbackState.isPlaying, false, 'Player stopped cleanly');
   console.log('✓ Enterprise Facade toggle() adaptive state transitions validated.');
 
+  // 9. Multi-Page Lifecycle & Pause-Resume-Stop Recovery Simulation
+  // Simulate Page 1 Complete -> Stop
+  audioPlayer.stop();
+  assert.strictEqual(audioPlayer.playbackState.isPlaying, false);
+
+  // Flip to Page 2 -> Start Play
+  const p2Play = await audioPlayer.toggle('PAGE TWO CONTENT');
+  assert.strictEqual(p2Play.action, 'started', 'Should start Page 2 cleanly');
+  assert.strictEqual(audioPlayer.playbackState.isPlaying, true);
+  assert.strictEqual(audioPlayer.playbackState.isPaused, false);
+
+  // Click Pause
+  audioPlayer.pause();
+  assert.strictEqual(audioPlayer.playbackState.isPaused, true);
+
+  // Click Resume via toggle
+  const p2Resume = await audioPlayer.toggle();
+  assert.strictEqual(p2Resume.action, 'resumed', 'Should resume Page 2 without deadlock');
+  assert.strictEqual(audioPlayer.playbackState.isPaused, false);
+
+  // Click Stop
+  audioPlayer.stop();
+  assert.strictEqual(audioPlayer.playbackState.isPlaying, false);
+
+  // Click Play again after Stop
+  const p2Restart = await audioPlayer.toggle('PAGE TWO CONTENT');
+  assert.strictEqual(p2Restart.action, 'started', 'Should be able to restart after stop');
+  audioPlayer.stop();
+  console.log('✓ Multi-page play-pause-resume-stop cycle completely validated with 0 deadlocks.');
+
   console.log('All Audio Player tests passed successfully!\n');
 }

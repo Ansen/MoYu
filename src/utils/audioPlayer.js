@@ -84,16 +84,23 @@ class DesktopAudioPlayer {
 
   /**
    * 串行命令执行器 (Mutex)
-   * 保证 play/pause/resume/seek/stop 严格排队，防止并发连击竞争
+   * 保证 play/pause/resume/seek/stop 严格排队，防止并发连击竞争，并具备异常与超时自愈熔断机制
    */
   _runCommand(cmdFn) {
     const run = async () => {
+      let timer;
+      const timeoutPromise = new Promise((_, reject) => {
+        timer = setTimeout(() => reject(new Error('Audio command timeout')), 5000);
+      });
       try {
-        return await cmdFn();
+        return await Promise.race([cmdFn(), timeoutPromise]);
       } catch (err) {
         console.error('[MorseAudioCore] Command error:', err);
+        this._commandQueue = Promise.resolve(); // 异常或超时立即解锁命令队列，确保后续指令永不死锁
         this._transitionTo(AUDIO_STATE.ERROR, { error: err });
         throw err;
+      } finally {
+        clearTimeout(timer);
       }
     };
     const next = this._commandQueue.then(run);
@@ -630,7 +637,7 @@ class DesktopAudioPlayer {
       }
 
       if (this.playbackState.isPlaying && this.playbackState.isPaused) {
-        await this.resume();
+        await this._resumeInternal();
         return { action: 'resumed' };
       }
 
@@ -669,12 +676,17 @@ class DesktopAudioPlayer {
     const now = this.audioContext ? this.audioContext.currentTime : 0;
 
     // 状态精确回退：将游标回退至实际正在发声或尚未发声的项目（消除前瞻缓冲区的时间超前）
+    let found = false;
     for (let i = 0; i < this.queue.length; i++) {
       const it = this.queue[i];
       if (it.startTime !== undefined && (it.endTime > now || it.startTime > now)) {
         this.queueIndex = i;
+        found = true;
         break;
       }
+    }
+    if (!found && this.queue.length > 0 && this.queueIndex >= this.queue.length) {
+      this.queueIndex = Math.max(0, this.queue.length - 1);
     }
 
     this._stopPlaybackEngine({ soft: true, clearQueue: false, stopRequested: false });
@@ -682,21 +694,27 @@ class DesktopAudioPlayer {
   }
 
   /**
-   * 恢复播放
+   * 恢复播放 (外部公开接口，原子排队)
    */
   async resume() {
-    if (!this.playbackState.isPlaying || !this.playbackState.isPaused) return;
-    this.playbackState.isPaused = false;
-    this.playbackState.stopRequested = false;
-    return this._runCommand(async () => {
-      await this._startPlaybackEngine({ leadTimeSec: 0.15 });
-    });
+    return this._runCommand(() => this._resumeInternal());
   }
 
   /**
-   * 彻底停止播放
+   * 恢复播放核心内部执行（供 toggle 与 resume 内部无死锁复用）
+   */
+  async _resumeInternal() {
+    if (!this.playbackState.isPlaying || !this.playbackState.isPaused) return;
+    this.playbackState.isPaused = false;
+    this.playbackState.stopRequested = false;
+    await this._startPlaybackEngine({ leadTimeSec: 0.15 });
+  }
+
+  /**
+   * 彻底停止播放 (重置锁队列，确保状态机彻底纯净复位)
    */
   stop() {
+    this._commandQueue = Promise.resolve();
     this._stopPlaybackEngine({ soft: true, clearQueue: true, stopRequested: true });
   }
 
