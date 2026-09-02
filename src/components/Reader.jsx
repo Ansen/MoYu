@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { ChevronLeft, ChevronRight, Sparkles, FileText, BookOpen, Folder, Radio } from 'lucide-react';
 import ReaderHeader from './reader/ReaderHeader';
-import audioPlayer from '../utils/audioPlayer';
+import { useMorseAudio } from '../hooks/useMorseAudio';
 import TxtEngine from './reader/TxtEngine';
 import { parseTelegramContent } from '../utils/telegramParser';
 import TocSidebar from './reader/TocSidebar';
@@ -18,9 +18,22 @@ export default function Reader({ bookData, onClose, jumpToSibling, jumpToChapter
   
   const isGridEligible = parsedTelegram.isGridEligible;
   
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [isPaused, setIsPaused] = useState(false);
-  const [activeMarker, setActiveMarker] = useState(null); // null | { type: 'prefix' | 'suffix', text: string }
+  // 接入企业级音频播放中枢 (SSOT 响应式状态与控制)
+  const {
+    isPlaying,
+    isPaused,
+    activeMarker,
+    toggle: toggleAudio,
+    stop: stopAudio,
+    warmUp,
+    updateConfig: updateAudioConfig
+  } = useMorseAudio();
+
+  // 进入播放界面解析文本的同时预热硬件声卡，消除首次发声切音
+  useEffect(() => {
+    warmUp().catch(() => {});
+  }, [warmUp]);
+
   const [toc, setToc] = useState([]);
   const [isTocOpen, setIsTocOpen] = useState(true);
   const [currentChapterTitle, setCurrentChapterTitle] = useState('');
@@ -41,23 +54,28 @@ export default function Reader({ bookData, onClose, jumpToSibling, jumpToChapter
   const [prefixMarker, setPrefixMarker] = useState(() => localStorage.getItem('pref_reader_prefix_marker') || '===');
   const [suffixMarker, setSuffixMarker] = useState(() => localStorage.getItem('pref_reader_suffix_marker') || 'iii');
 
+
   // 离开阅读器时清理播放器
   useEffect(() => {
     return () => {
-      audioPlayer.stop();
+      stopAudio();
     };
-  }, []);
+  }, [stopAudio]);
 
-  // 书籍内容更新（切换章节、重新生成报底等）时重置播放状态与起止符状态
+  const prevBookRef = useRef({ data: bookData?.data, name: bookData?.name });
+  // 书籍内容更新（切换书籍、重新生成报底等）时才重置播放状态与高亮
   useEffect(() => {
-    audioPlayer.stop();
-    setIsPlaying(false);
-    setIsPaused(false);
-    setActiveMarker(null);
-    if (engineRef.current) {
-      engineRef.current.clearHighlight();
+    const prev = prevBookRef.current;
+    const hasChanged = prev.data !== bookData?.data || prev.name !== bookData?.name;
+    prevBookRef.current = { data: bookData?.data, name: bookData?.name };
+
+    if (hasChanged) {
+      stopAudio();
+      if (engineRef.current) {
+        engineRef.current.clearHighlight();
+      }
     }
-  }, [bookData?.data, bookData?.name]);
+  }, [bookData?.data, bookData?.name, stopAudio]);
 
   // Update localStorage when audio settings change in quick bar
   useEffect(() => {
@@ -72,85 +90,53 @@ export default function Reader({ bookData, onClose, jumpToSibling, jumpToChapter
     localStorage.setItem('pref_reader_prefix_marker', prefixMarker);
     localStorage.setItem('pref_reader_suffix_marker', suffixMarker);
 
-    audioPlayer.updateConfig({
+    updateAudioConfig({
       wpm: morseSpeed,
       freq: morseFreq,
       numberMode: numberMode,
       useHarmonics: useHarmonics
     });
-  }, [baseFontSize, morseSpeed, morseFreq, numberMode, useHarmonics, viewMode, fontFamily, enableMarkers, prefixMarker, suffixMarker]);
+  }, [baseFontSize, morseSpeed, morseFreq, numberMode, useHarmonics, viewMode, fontFamily, enableMarkers, prefixMarker, suffixMarker, updateAudioConfig]);
 
+  // 统一播放/暂停控制：直接委托给中枢的自适应 toggle，杜绝业务层推演状态
   const togglePlay = useCallback(async () => {
-    if (isPlaying && !isPaused) {
-      // 1. 暂停
-      audioPlayer.pause();
-      setIsPaused(true);
-      setActiveMarker(null);
-      if (engineRef.current) engineRef.current.saveProgress();
-    } else if (isPlaying && isPaused) {
-      // 2. 继续
-      setIsPaused(false);
-      await audioPlayer.resume();
-    } else {
-      // 3. 开始全新播放
-      if (!engineRef.current) return;
-      setIsPlaying(true);
-      setIsPaused(false);
-      setActiveMarker(null);
+    // 关键：在用户原生手势同步第一行唤醒底层 AudioContext，获取操作系统授权
+    warmUp().catch(() => {});
 
-      try {
-        const { text, startIndex } = await engineRef.current.getChapterText();
-        if (!text || !text.trim()) {
-          setIsPlaying(false);
-          setIsPaused(false);
-          return;
-        }
-
-        const effectivePrefix = enableMarkers ? (prefixMarker || parsedTelegram.startMarker || '') : '';
-        const effectiveSuffix = enableMarkers ? (suffixMarker || parsedTelegram.endMarker || '') : '';
-
-        await audioPlayer.playMorseText(text, {
-          wpm: morseSpeed,
-          freq: morseFreq,
-          numberMode: numberMode,
-          useHarmonics: useHarmonics,
-          startIndex: startIndex,
-          enableMarkers: enableMarkers,
-          prefixMarker: effectivePrefix,
-          suffixMarker: effectiveSuffix,
-          onCharPlay: (token) => {
-            setActiveMarker(null);
-            if (engineRef.current) engineRef.current.highlightToken(token);
-          },
-          onMarkerPlay: (markerInfo) => {
-            setActiveMarker(markerInfo);
-          },
-          onComplete: () => {
-            setIsPlaying(false);
-            setIsPaused(false);
-            setActiveMarker(null);
-            if (engineRef.current) engineRef.current.clearHighlight();
-          }
-        });
-      } catch (e) {
-        console.error('Play error:', e);
-        setIsPlaying(false);
-        setIsPaused(false);
-        setActiveMarker(null);
-      }
+    if (isPlaying && !isPaused && engineRef.current) {
+      engineRef.current.saveProgress();
     }
-  }, [isPlaying, isPaused, morseSpeed, morseFreq, numberMode, useHarmonics, enableMarkers, prefixMarker, suffixMarker, parsedTelegram]);
+
+    const effectivePrefix = enableMarkers ? (prefixMarker || parsedTelegram.startMarker || '') : '';
+    const effectiveSuffix = enableMarkers ? (suffixMarker || parsedTelegram.endMarker || '') : '';
+
+    await toggleAudio(async () => {
+      if (!engineRef.current) return null;
+      return await engineRef.current.getChapterText();
+    }, {
+      wpm: morseSpeed,
+      freq: morseFreq,
+      numberMode: numberMode,
+      useHarmonics: useHarmonics,
+      enableMarkers: enableMarkers,
+      prefixMarker: effectivePrefix,
+      suffixMarker: effectiveSuffix,
+      onCharPlay: (token) => {
+        if (engineRef.current) engineRef.current.highlightToken(token);
+      },
+      onComplete: () => {
+        if (engineRef.current) engineRef.current.clearHighlight();
+      }
+    });
+  }, [warmUp, toggleAudio, isPlaying, isPaused, morseSpeed, morseFreq, numberMode, useHarmonics, enableMarkers, prefixMarker, suffixMarker, parsedTelegram]);
 
   const stopPlay = useCallback(() => {
-    audioPlayer.stop();
-    setIsPlaying(false);
-    setIsPaused(false);
-    setActiveMarker(null);
+    stopAudio();
     if (engineRef.current) {
       engineRef.current.clearHighlight();
       engineRef.current.saveProgress();
     }
-  }, []);
+  }, [stopAudio]);
 
   const handleClose = useCallback(() => {
     stopPlay();

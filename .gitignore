@@ -37,5 +37,6 @@ keystore-credentials.txt
 *.zip
 *.7z
 *.tar.gz
-
+# Temporary scratch scripts
+scratch/
 

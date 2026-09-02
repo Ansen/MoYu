@@ -34,7 +34,17 @@ export function testEpubExportFormatting() {
   if (!cleanHtml.includes('AAAA BBBB CCCC')) {
     throw new Error('Tokens should be joined cleanly with single space');
   }
-  console.log('✓ Empty markers cleanly rendered raw space-separated tokens.');
+  // 3. Test default arguments (no markers provided)
+  const defaultHtml = formatEpubChapterHtml({
+    groups: ['1234', '5678']
+  });
+  if (defaultHtml.includes('===') || defaultHtml.includes('iii')) {
+    throw new Error('Default formatting should not contain any markers');
+  }
+  if (!defaultHtml.includes('1234 5678')) {
+    throw new Error('Default formatting should contain clean tokens');
+  }
+  console.log('✓ Default formatting without markers verified.');
 
   console.log('All EPUB Export Formatting tests passed successfully!\n');
 }

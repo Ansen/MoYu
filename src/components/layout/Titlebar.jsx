@@ -8,7 +8,29 @@ export default function Titlebar({ theme, setTheme, openSettings, openHelp, open
   const [activeMenu, setActiveMenu] = useState(null);
   const [isMaximized, setIsMaximized] = useState(false);
   const menubarRef = useRef(null);
+  const menuTimeoutRef = useRef(null);
   const { t, langSetting, setLangSetting } = useI18n();
+
+  const handleMenuMouseEnter = () => {
+    if (menuTimeoutRef.current) {
+      clearTimeout(menuTimeoutRef.current);
+      menuTimeoutRef.current = null;
+    }
+  };
+
+  const handleMenuMouseLeave = () => {
+    if (menuTimeoutRef.current) clearTimeout(menuTimeoutRef.current);
+    menuTimeoutRef.current = setTimeout(() => {
+      setActiveMenu(null);
+    }, 250);
+  };
+
+  // 组件卸载时清理定时器
+  useEffect(() => {
+    return () => {
+      if (menuTimeoutRef.current) clearTimeout(menuTimeoutRef.current);
+    };
+  }, []);
 
   // 监听窗口最大化状态
   useEffect(() => {
@@ -89,7 +111,11 @@ export default function Titlebar({ theme, setTheme, openSettings, openHelp, open
       >
         
         {/* App Brand Menu: [logo] 摩语 ▾ */}
-        <div className="relative shrink-0">
+        <div 
+          className="relative shrink-0"
+          onMouseEnter={handleMenuMouseEnter}
+          onMouseLeave={handleMenuMouseLeave}
+        >
           <button 
             onClick={() => setActiveMenu(activeMenu === 'app' ? null : 'app')} 
             className={`px-2 py-1 rounded flex items-center gap-1.5 transition-colors ${activeMenu === 'app' ? 'bg-slate-200 dark:bg-white/10 text-black dark:text-white' : 'hover:bg-slate-100 dark:hover:bg-white/5'}`}

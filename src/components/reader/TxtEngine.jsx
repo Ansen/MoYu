@@ -13,7 +13,7 @@ const TxtEngine = forwardRef(({ bookData, fontSize = 20, fontFamily = 'Cascadia 
   const currentFontFamily = useMemo(() => getFontFamilyCss(fontFamily), [fontFamily]);
 
   // 解析电报内容：自动剥离报头报尾起止符，获取纯净 10 列表格数据与纯净正文
-  const { rows, cleanText, isGridEligible } = useMemo(() => {
+  const { rows, cleanText, rawTokens, isGridEligible } = useMemo(() => {
     return parseTelegramContent(bookData?.data || '');
   }, [bookData?.data]);
 
@@ -27,7 +27,29 @@ const TxtEngine = forwardRef(({ bookData, fontSize = 20, fontFamily = 'Cascadia 
     }
   }, []);
 
-  const { textRootRef, textNodesRef, clearHighlight, resetHighlightState, highlightToken } = useHighlighter(handleScrollRequest);
+  const lastPlayedTokenRef = useRef(null);
+  const currentPlaybackStartRef = useRef(0);
+
+  const { 
+    textRootRef, 
+    textNodesRef, 
+    clearHighlight: rawClearHighlight, 
+    resetHighlightState, 
+    highlightToken: rawHighlightToken,
+    restoreHighlight 
+  } = useHighlighter(handleScrollRequest);
+
+  const clearHighlight = useCallback(() => {
+    lastPlayedTokenRef.current = null;
+    rawClearHighlight();
+  }, [rawClearHighlight]);
+
+  const highlightToken = useCallback((token) => {
+    if (token) {
+      lastPlayedTokenRef.current = token;
+    }
+    rawHighlightToken(token);
+  }, [rawHighlightToken]);
 
   const extractNodes = useCallback(() => {
     const root = viewerRef.current;
@@ -51,10 +73,18 @@ const TxtEngine = forwardRef(({ bookData, fontSize = 20, fontFamily = 'Cascadia 
     );
 
     let node;
+    let currentOffset = 0;
     while ((node = walker.nextNode())) {
       const nodeText = node.nodeValue;
+      const len = nodeText.length;
       text += nodeText;
-      nodes.push({ node, length: nodeText.length });
+      nodes.push({ 
+        node, 
+        length: len,
+        start: currentOffset,
+        end: currentOffset + len
+      });
+      currentOffset += len;
     }
     textNodesRef.current = nodes;
     cachedDataRef.current = { text, nodes };
@@ -111,6 +141,25 @@ const TxtEngine = forwardRef(({ bookData, fontSize = 20, fontFamily = 'Cascadia 
     return () => clearTimeout(timer);
   }, [bookData, onTocLoaded, onChapterChange, clearHighlight, resetHighlightState, extractNodes]);
 
+  // 当排版模式发生切换时（如 10列网格 <-> 纯文本视图）：
+  // 1. 立即清空旧 DOM 节点引用，防止向卸载的旧 DOM 派发 Range；
+  // 2. 使用 requestAnimationFrame 等待 React 完成新 DOM 渲染挂载；
+  // 3. 重新提取全新 DOM 树的文本节点 (TextNodes)；
+  // 4. 100% 完整复原当前已播进度条（浅蓝底选区）与活动字符（深蓝高亮）！
+  useEffect(() => {
+    textNodesRef.current = [];
+    cachedDataRef.current = { text: '', nodes: [] };
+
+    const frameId = requestAnimationFrame(() => {
+      extractNodes();
+      if (lastPlayedTokenRef.current) {
+        restoreHighlight(lastPlayedTokenRef.current, currentPlaybackStartRef.current || 0);
+      }
+    });
+
+    return () => cancelAnimationFrame(frameId);
+  }, [viewMode, extractNodes, restoreHighlight, textNodesRef]);
+
   const getProgressKey = useCallback(() => {
     return bookData?.type === 'epub' 
       ? `${bookData.name}_ch_${bookData.currentChapterIndex || 0}` 
@@ -165,17 +214,16 @@ const TxtEngine = forwardRef(({ bookData, fontSize = 20, fontFamily = 'Cascadia 
       const sel = window.getSelection();
       if (sel && sel.rangeCount > 0 && !sel.isCollapsed) {
         const range = sel.getRangeAt(0);
-        let currentLength = 0;
         for (const n of nodes) {
           if (n.node === range.startContainer) {
-            startIndex = currentLength + range.startOffset;
+            startIndex = (n.start !== undefined ? n.start : 0) + range.startOffset;
             break;
           }
-          currentLength += n.length;
         }
         sel.removeAllRanges();
       }
 
+      currentPlaybackStartRef.current = startIndex;
       return { text, startIndex };
     },
     highlightToken,
@@ -281,6 +329,8 @@ const TxtEngine = forwardRef(({ bookData, fontSize = 20, fontFamily = 'Cascadia 
                 {/* 10 Data Columns */}
                 {Array.from({ length: 10 }).map((_, colIdx) => {
                   const token = row[colIdx];
+                  const globalIdx = rowIdx * 10 + colIdx;
+                  const isLastToken = globalIdx >= (rawTokens?.length || 0) - 1;
                   return (
                     <td
                       key={colIdx}
@@ -295,11 +345,21 @@ const TxtEngine = forwardRef(({ bookData, fontSize = 20, fontFamily = 'Cascadia 
                       }}
                     >
                       {token ? (
-                        <span className="morse-word px-0.5 rounded-sm text-slate-800 dark:text-slate-200 hover:text-indigo-600 dark:hover:text-indigo-400 inline-block leading-[1.3]">
-                          {token}
-                        </span>
+                        <>
+                          <span className="morse-word px-0.5 rounded-sm text-slate-800 dark:text-slate-200 hover:text-indigo-600 dark:hover:text-indigo-400 inline-block leading-[1.3]">
+                            {token}
+                          </span>
+                          {!isLastToken && (
+                            <span 
+                              className="text-transparent select-none inline-block w-0 overflow-hidden leading-none align-baseline pointer-events-none" 
+                              aria-hidden="true"
+                            >
+                              {' '}
+                            </span>
+                          )}
+                        </>
                       ) : (
-                        <span className="text-transparent select-none inline-block leading-[1.3]">&nbsp;</span>
+                        <span data-skip-speech="true" className="text-transparent select-none inline-block leading-[1.3]">&nbsp;</span>
                       )}
                     </td>
                   );

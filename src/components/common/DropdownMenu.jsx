@@ -41,7 +41,7 @@ export default function DropdownMenu({ isOpen, items, onSelect, onClose, isSubme
 
   const containerClass = isSubmenu
     ? "w-max min-w-[160px] flex flex-col gap-0.5 p-1.5 bg-white/95 dark:bg-[#1a1a1a]/95 backdrop-blur-md border border-slate-200/80 dark:border-[#333]/80 rounded-xl shadow-2xl shadow-slate-200/40 dark:shadow-black/40 animate-in fade-in zoom-in-95 duration-100"
-    : "absolute top-full left-0 mt-1.5 w-max min-w-[180px] flex flex-col gap-0.5 p-1.5 bg-white/95 dark:bg-[#1a1a1a]/95 backdrop-blur-md border border-slate-200/80 dark:border-[#333]/80 rounded-xl shadow-2xl shadow-slate-200/40 dark:shadow-black/40 z-50 animate-in fade-in slide-in-from-top-1 duration-100";
+    : "absolute top-full left-0 mt-1.5 w-max min-w-[180px] flex flex-col gap-0.5 p-1.5 bg-white/95 dark:bg-[#1a1a1a]/95 backdrop-blur-md border border-slate-200/80 dark:border-[#333]/80 rounded-xl shadow-2xl shadow-slate-200/40 dark:shadow-black/40 z-50 animate-in fade-in slide-in-from-top-1 duration-100 before:absolute before:-top-2 before:left-0 before:right-0 before:h-2";
 
   return (
     <div className={containerClass}>

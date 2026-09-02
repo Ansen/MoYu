@@ -31,8 +31,6 @@ export default function GeneratorModal({ isOpen, onClose, onGenerate }) {
 
   // Export Config
   const [exportPages, setExportPages] = useState(40);
-  const [epubStartMarker, setEpubStartMarker] = useState('===');
-  const [epubEndMarker, setEpubEndMarker] = useState('iii');
   const [isExportingPdf, setIsExportingPdf] = useState(false);
   const [isExportingEpub, setIsExportingEpub] = useState(false);
   const [exportType, setExportType] = useState('pdf'); // 'pdf' | 'epub'
@@ -201,8 +199,6 @@ export default function GeneratorModal({ isOpen, onClose, onGenerate }) {
         includeCallsignSuffix,
         pool,
         noAdjacentDup,
-        epubStartMarker,
-        epubEndMarker,
         title,
         t,
         onProgress: setExportProgress
@@ -287,11 +283,6 @@ export default function GeneratorModal({ isOpen, onClose, onGenerate }) {
           <ExportSettingsSection
             exportPages={exportPages}
             setExportPages={setExportPages}
-            effectiveLength={effectiveLength}
-            epubStartMarker={epubStartMarker}
-            setEpubStartMarker={setEpubStartMarker}
-            epubEndMarker={epubEndMarker}
-            setEpubEndMarker={setEpubEndMarker}
           />
         </div>
 

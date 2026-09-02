@@ -16,8 +16,8 @@ export async function exportEpubPractice({
   includeCallsignSuffix,
   pool,
   noAdjacentDup,
-  epubStartMarker,
-  epubEndMarker,
+  epubStartMarker = '',
+  epubEndMarker = '',
   title,
   t,
   onProgress

@@ -10,6 +10,21 @@ fn generate_epub(title: String, chapters: Vec<String>) -> Result<Vec<u8>, String
     builder.metadata("title", &title)
         .map_err(|e| e.to_string())?;
 
+    let css_content = r#"body {
+    margin: 1.5em;
+    padding: 0;
+    background-color: #ffffff;
+    color: #111111;
+    font-family: 'Cascadia Mono', 'SF Mono', 'JetBrains Mono', 'Fira Code', Consolas, monospace;
+}
+.telegram-content {
+    line-height: 1.8;
+    word-break: break-all;
+    white-space: pre-wrap;
+}"#;
+    builder.stylesheet(css_content.as_bytes())
+        .map_err(|e| e.to_string())?;
+
     for (i, content) in chapters.iter().enumerate() {
         let chapter_html = format!(
             r#"<?xml version="1.0" encoding="UTF-8"?>
@@ -17,27 +32,13 @@ fn generate_epub(title: String, chapters: Vec<String>) -> Result<Vec<u8>, String
 <html xmlns="http://www.w3.org/1999/xhtml">
 <head>
 <meta charset="utf-8"/>
-<title>Page {}</title>
-<style type="text/css">
-body {{
-    margin: 1.5em;
-    padding: 0;
-    background-color: #ffffff;
-    color: #111111;
-    font-family: 'Cascadia Mono', 'SF Mono', 'JetBrains Mono', 'Fira Code', Consolas, monospace;
-}}
-.telegram-content {{
-    line-height: 1.8;
-    word-break: break-all;
-    white-space: pre-wrap;
-}}
-</style>
+<title></title>
+<link rel="stylesheet" type="text/css" href="stylesheet.css"/>
 </head>
 <body>
 {}
 </body>
 </html>"#,
-            i + 1,
             content
         );
         

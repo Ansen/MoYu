@@ -1,4 +1,4 @@
-import React, { useState, useRef, useMemo } from 'react';
+import React, { useState, useRef, useMemo, useEffect } from 'react';
 import { 
   ArrowLeft, 
   List, 
@@ -62,9 +62,29 @@ export default function ReaderHeader({
   const numberModeRef = useRef(null);
   const moreMenuRef = useRef(null);
   const fontSubmenuTimeoutRef = useRef(null);
+  const moreMenuTimeoutRef = useRef(null);
+
+  const handleMoreMenuMouseEnter = () => {
+    if (moreMenuTimeoutRef.current) {
+      clearTimeout(moreMenuTimeoutRef.current);
+      moreMenuTimeoutRef.current = null;
+    }
+  };
+
+  const handleMoreMenuMouseLeave = () => {
+    if (moreMenuTimeoutRef.current) clearTimeout(moreMenuTimeoutRef.current);
+    moreMenuTimeoutRef.current = setTimeout(() => {
+      setIsMoreMenuOpen(false);
+      setIsFontSubmenuOpen(false);
+    }, 250);
+  };
 
   const handleFontMouseEnter = () => {
     if (fontSubmenuTimeoutRef.current) clearTimeout(fontSubmenuTimeoutRef.current);
+    if (moreMenuTimeoutRef.current) {
+      clearTimeout(moreMenuTimeoutRef.current);
+      moreMenuTimeoutRef.current = null;
+    }
     setIsFontSubmenuOpen(true);
   };
 
@@ -74,6 +94,31 @@ export default function ReaderHeader({
       setIsFontSubmenuOpen(false);
     }, 200);
   };
+
+  // 点击外部时快速关闭更多菜单
+  useEffect(() => {
+    if (!isMoreMenuOpen) return;
+
+    const handleClickOutside = (e) => {
+      if (moreMenuRef.current && !moreMenuRef.current.contains(e.target)) {
+        setIsMoreMenuOpen(false);
+        setIsFontSubmenuOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isMoreMenuOpen]);
+
+  // 组件卸载时清理定时器
+  useEffect(() => {
+    return () => {
+      if (moreMenuTimeoutRef.current) clearTimeout(moreMenuTimeoutRef.current);
+      if (fontSubmenuTimeoutRef.current) clearTimeout(fontSubmenuTimeoutRef.current);
+    };
+  }, []);
 
   const hasToc = Boolean(
     bookData.isFolder ||
@@ -304,7 +349,12 @@ export default function ReaderHeader({
           <div className="h-3 w-px bg-slate-300 dark:bg-[#333333]"></div>
 
           {/* More Settings Dropdown Menu (Contains Layout Mode, Harmonics, Font Selector & Markers) */}
-          <div className="relative flex items-center shrink-0" ref={moreMenuRef}>
+          <div 
+            className="relative flex items-center shrink-0" 
+            ref={moreMenuRef}
+            onMouseEnter={handleMoreMenuMouseEnter}
+            onMouseLeave={handleMoreMenuMouseLeave}
+          >
             <button
               type="button"
               onClick={() => {
@@ -324,12 +374,11 @@ export default function ReaderHeader({
             </button>
 
             {isMoreMenuOpen && (
-              <>
-                <div
-                  className="fixed inset-0 z-40"
-                  onMouseDown={() => { setIsMoreMenuOpen(false); setIsFontSubmenuOpen(false); }}
-                />
-                <div className="absolute top-full right-0 mt-2 w-64 bg-white/95 dark:bg-[#1c1c1c]/95 backdrop-blur-md border border-slate-200 dark:border-[#333333] shadow-2xl rounded-xl p-2 z-50 animate-in fade-in slide-in-from-top-1 duration-150 select-none text-slate-800 dark:text-slate-200 space-y-1">
+              <div 
+                className="absolute top-full right-0 mt-1.5 w-64 bg-white/95 dark:bg-[#1c1c1c]/95 backdrop-blur-md border border-slate-200 dark:border-[#333333] shadow-2xl rounded-xl p-2 z-50 animate-in fade-in slide-in-from-top-1 duration-150 select-none text-slate-800 dark:text-slate-200 space-y-1 before:absolute before:-top-2 before:left-0 before:right-0 before:h-2"
+                onMouseEnter={handleMoreMenuMouseEnter}
+                onMouseLeave={handleMoreMenuMouseLeave}
+              >
                   
                   {/* Row 1: Radio Harmonics Switch */}
                   {setUseHarmonics && (
@@ -420,9 +469,15 @@ export default function ReaderHeader({
                       {/* Font Flyout Submenu to the Left */}
                       {isFontSubmenuOpen && (
                         <div 
-                          className="absolute right-full top-0 mr-1.5 w-max min-w-[180px] flex flex-col gap-0.5 p-1.5 bg-white/98 dark:bg-[#1e1e1e]/98 backdrop-blur-md border border-slate-200 dark:border-[#333333] rounded-xl shadow-2xl z-50 animate-in fade-in zoom-in-95 duration-100 select-none text-slate-800 dark:text-slate-200"
-                          onMouseEnter={handleFontMouseEnter}
-                          onMouseLeave={handleFontMouseLeave}
+                          className="absolute right-full top-0 mr-1.5 w-max min-w-[180px] flex flex-col gap-0.5 p-1.5 bg-white/98 dark:bg-[#1e1e1e]/98 backdrop-blur-md border border-slate-200 dark:border-[#333333] rounded-xl shadow-2xl z-50 animate-in fade-in zoom-in-95 duration-100 select-none text-slate-800 dark:text-slate-200 before:absolute before:-right-2 before:top-0 before:bottom-0 before:w-2"
+                          onMouseEnter={() => {
+                            handleMoreMenuMouseEnter();
+                            handleFontMouseEnter();
+                          }}
+                          onMouseLeave={() => {
+                            handleFontMouseLeave();
+                            handleMoreMenuMouseLeave();
+                          }}
                         >
                           <div className="px-2 py-1 text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
                             {t('reader.more.font')}
@@ -523,7 +578,6 @@ export default function ReaderHeader({
                   )}
 
                 </div>
-              </>
             )}
           </div>
 

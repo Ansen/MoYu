@@ -6,12 +6,7 @@ import { useI18n } from '../../i18n';
  */
 export default function ExportSettingsSection({
   exportPages,
-  setExportPages,
-  effectiveLength,
-  epubStartMarker,
-  setEpubStartMarker,
-  epubEndMarker,
-  setEpubEndMarker
+  setExportPages
 }) {
   const { t } = useI18n();
 
@@ -43,32 +38,6 @@ export default function ExportSettingsSection({
             <span className="text-[13px] text-slate-500">{t('reader.pages.unit', '页')}</span>
           </div>
         </div>
-
-        {/* Start & End Marker inputs for non-print / paragraph mode */}
-        {effectiveLength > 5 && (
-          <div className="grid grid-cols-2 gap-3 pt-1">
-            <div className="flex flex-col gap-1.5 p-2.5 rounded-xl bg-slate-50 dark:bg-[#252525]/60 border border-slate-200/80 dark:border-[#333333]">
-              <span className="text-[13px] text-slate-500 font-medium">{t('generator.epubStartMarker')}</span>
-              <input
-                type="text"
-                value={epubStartMarker}
-                onChange={(e) => setEpubStartMarker(e.target.value)}
-                placeholder="e.g. ==="
-                className="w-full h-8 px-2 text-[14px] font-mono bg-white dark:bg-[#1a1a1a] border border-slate-300 dark:border-[#444444] rounded-lg focus:outline-hidden focus:border-indigo-400 dark:focus:border-indigo-500 transition-colors"
-              />
-            </div>
-            <div className="flex flex-col gap-1.5 p-2.5 rounded-xl bg-slate-50 dark:bg-[#252525]/60 border border-slate-200/80 dark:border-[#333333]">
-              <span className="text-[13px] text-slate-500 font-medium">{t('generator.epubEndMarker')}</span>
-              <input
-                type="text"
-                value={epubEndMarker}
-                onChange={(e) => setEpubEndMarker(e.target.value)}
-                placeholder="e.g. iii"
-                className="w-full h-8 px-2 text-[14px] font-mono bg-white dark:bg-[#1a1a1a] border border-slate-300 dark:border-[#444444] rounded-lg focus:outline-hidden focus:border-indigo-400 dark:focus:border-indigo-500 transition-colors"
-              />
-            </div>
-          </div>
-        )}
       </div>
     </div>
   );
