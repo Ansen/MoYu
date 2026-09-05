@@ -16,7 +16,7 @@ export const MORSE_DICT = {
   '<BT>': '-...-', '<SK>': '...-.-', '<AR>': '.-.-.', '<KN>': '-.--.'
 };
 
-const NUMBER_MODES = {
+export const NUMBER_MODES = {
   long: {
     '0': '-----', '1': '.----', '2': '..---', '3': '...--', '4': '....-',
     '5': '.....', '6': '-....', '7': '--...', '8': '---..', '9': '----.'
@@ -30,6 +30,21 @@ const NUMBER_MODES = {
     '6': '-...', '7': '--.', '8': '-..', '9': '-.', '0': '-'
   }
 };
+
+/**
+ * 获取指定字符在当前模式下的摩斯电码
+ * @param {string} char
+ * @param {string} numberMode - 'long', 'short5', or 'short10'
+ * @returns {string|null}
+ */
+export function getCharMorseCode(char, numberMode = 'long') {
+  if (/[0-9]/.test(char)) {
+    const modeDict = NUMBER_MODES[numberMode] || NUMBER_MODES.long;
+    return modeDict[char] || null;
+  }
+  return MORSE_DICT[char] || null;
+}
+
 
 /**
  * Convert a string to a sequence of Morse code tokens.

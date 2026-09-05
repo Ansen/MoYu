@@ -110,5 +110,39 @@ export async function testAudioPlayerLogic() {
   audioPlayer.stop();
   console.log('✓ Multi-page play-pause-resume-stop cycle completely validated with 0 deadlocks.');
 
+  // 10. Runtime Number Mode (Long -> Short5 -> Short10) Hot-Reload During Playback
+  audioPlayer.updateConfig({ numberMode: 'long' });
+  await audioPlayer.play('0123456789', { numberMode: 'long' });
+  assert.strictEqual(audioPlayer.queue[0].code, '-----', 'Initially 0 should be long code -----');
+  assert.strictEqual(audioPlayer.queue[1].code, '.----', 'Initially 1 should be long code .----');
+  assert.strictEqual(audioPlayer.queue[4].code, '....-', 'Initially 4 should be long code ....-');
+
+  // Simulate playback in progress: queueIndex is at 1
+  audioPlayer.queueIndex = 1;
+  audioPlayer.updateConfig({ numberMode: 'short5' });
+  assert.strictEqual(audioPlayer.playbackConfig.numberMode, 'short5');
+  assert.strictEqual(audioPlayer.queue[1].code, '.-', 'Runtime switch to short5 should immediately update queued 1 to .-');
+  assert.strictEqual(audioPlayer.queue[0].code, '-----', 'Past token 0 before queueIndex should remain unchanged');
+
+  // Runtime switch to short10
+  audioPlayer.updateConfig({ numberMode: 'short10' });
+  assert.strictEqual(audioPlayer.playbackConfig.numberMode, 'short10');
+  assert.strictEqual(audioPlayer.queue[4].code, '...-', 'Runtime switch to short10 should immediately update queued 4 to ...-');
+  assert.strictEqual(audioPlayer.queue[5].code, '...', 'Runtime switch to short10 should immediately update queued 5 to ...');
+
+  audioPlayer.stop();
+  console.log('✓ Runtime numberMode hot-reload (long -> short5 -> short10) during active playback validated.');
+
+  // 11. Runtime WPM Hot-Reload During Playback (Reschedule epoch verification)
+  await audioPlayer.play('ABCDEF', { wpm: 20 });
+  const initialEpoch = audioPlayer._scheduleEpoch;
+  audioPlayer.updateConfig({ wpm: 35 });
+  assert.strictEqual(audioPlayer.playbackConfig.wpm, 35, 'WPM should update to 35');
+  assert.ok(audioPlayer._scheduleEpoch > initialEpoch, 'Schedule epoch should bump on runtime WPM change to invalidate stale ahead timers');
+  audioPlayer.stop();
+  console.log('✓ Runtime WPM hot-reload & schedule epoch invalidation validated.');
+
   console.log('All Audio Player tests passed successfully!\n');
 }
+
+

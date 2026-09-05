@@ -306,7 +306,8 @@ jobs:
             const repo = process.env.GITHUB_REPOSITORY;
             const version = process.env.GITHUB_REF_NAME;
             const githubBase = \`https://github.com/\${repo}/releases/download/\${version}\`;
-            const cdnBase = \`https://moyu-dl.wjzhx.com/\${repo}/releases/download/\${version}\`;
+            const cdnBase = \`https://dl-moyu.ba8bak.de/\${repo}/releases/download/\${version}\`;
+
 
             function generateLatestJson(baseUrl) {
               let latest = {

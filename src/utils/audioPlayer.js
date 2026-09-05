@@ -1,10 +1,10 @@
 import { MORSE_AUDIO_CONFIG } from '../config/morseAudio.js';
-import { textToMorseTokens } from './morseCode.js';
+import { textToMorseTokens, getCharMorseCode } from './morseCode.js';
 
 const TONE_VOLUME = MORSE_AUDIO_CONFIG.OUTPUT.TONE_VOLUME;
 const TONE_FADE_SECONDS = 0.002;
 const LOOKAHEAD_INTERVAL_MS = 25; // 25ms 调度器轮询间隔
-const SCHEDULE_AHEAD_TIME_SEC = 0.5; // 500ms 充裕前瞻调度窗口 (覆盖 350ms 前置真实空白音频流)
+const SCHEDULE_AHEAD_TIME_SEC = 0.15; // 150ms 充裕且低延迟的前瞻调度窗口 (消除参数热切换滞后)
 
 /**
  * 统一标准状态枚举 (SSOT)
@@ -43,6 +43,7 @@ class DesktopAudioPlayer {
     this.timerId = null;
     this.isReady = false;
     this._readyPromise = null;
+    this._scheduleEpoch = 0; // 调度代数版本号，用于精准作废过期的未发声高亮回调
 
     this.state = AUDIO_STATE.IDLE;
 
@@ -298,10 +299,105 @@ class DesktopAudioPlayer {
   }
 
   updateConfig(config) {
+    const oldWpm = this.playbackConfig.wpm;
+    const oldNumberMode = this.playbackConfig.numberMode;
+
     this.playbackConfig = { ...this.playbackConfig, ...config };
     this._applyWaveformAndFrequency();
+
+    const wpmChanged = config.wpm !== undefined && Number(config.wpm) !== Number(oldWpm);
+    const numberModeChanged = config.numberMode !== undefined && config.numberMode !== oldNumberMode;
+
+    // 关键机制：若在播放过程中动态改变了发报速度 (WPM) 或数码模式 (numberMode)，
+    // 立即对音频管道执行下字符无缝热重调度，确保当前字符自然发音完毕后，从下一个字符 100% 立即采用新速率与新码表
+    if (this.playbackState.isPlaying && !this.playbackState.isPaused && (wpmChanged || numberModeChanged)) {
+      this._rescheduleFromNextChar();
+    } else if (numberModeChanged && this.queue && this.queue.length > 0) {
+      // 处于非播放状态 (停止/暂停) 时仅刷新待播队列中的数字编码
+      this._refreshQueueNumberMode(Math.max(0, this.queueIndex || 0), config.numberMode);
+    }
+
     this._emitStateChange();
   }
+
+  /**
+   * 热重调度核心：在不打断当前发声音符的前提下，精确清空未发声的硬件事件并从“下一个字符”立即生效新配置
+   */
+  _rescheduleFromNextChar() {
+    if (!this.queue || this.queue.length === 0) return;
+
+    const now = this.audioContext ? this.audioContext.currentTime : 0;
+
+    // 1. 查找当前正在发声的字符 (保留它平滑自然播完，避免任何截音或爆音)
+    let activeIndex = -1;
+    let cutOffTime = now;
+
+    if (this.audioContext) {
+      for (let i = 0; i < this.queue.length; i++) {
+        const it = this.queue[i];
+        if (it.startTime !== undefined && it.endTime !== undefined) {
+          if (it.startTime <= now && it.endTime > now) {
+            activeIndex = i;
+            cutOffTime = it.endTime;
+            break;
+          } else if (it.startTime > now) {
+            if (activeIndex === -1) {
+              activeIndex = Math.max(0, i - 1);
+              cutOffTime = Math.max(now, it.startTime);
+            }
+            break;
+          }
+        }
+      }
+    }
+
+    const nextIndex = activeIndex >= 0 ? activeIndex + 1 : Math.max(0, this.queueIndex);
+    if (nextIndex >= this.queue.length) return;
+
+    // 2. 撤销 cutOffTime 之后的所有预排硬件包络，并自增代数以作废过期的未触发高亮回调
+    this._scheduleEpoch = (this._scheduleEpoch || 0) + 1;
+    if (this.oscGain) {
+      try {
+        this.oscGain.gain.cancelScheduledValues(cutOffTime);
+        this.oscGain.gain.setValueAtTime(0, cutOffTime);
+      } catch {}
+    }
+
+    // 3. 将调度游标重新对准下一个字符，并将基准时间点对齐至当前字符结束时刻
+    this.queueIndex = nextIndex;
+    this.nextNoteTime = Math.max(now, cutOffTime);
+
+    // 4. 刷新从下一个字符开始的后续队列数字码
+    this._refreshQueueNumberMode(nextIndex, this.playbackConfig.numberMode);
+
+    // 5. 立即用最新的 WPM / 码表填充调度管道
+    this.scheduler();
+  }
+
+
+  /**
+   * 刷新队列中指定范围的数字电码 Token
+   */
+  _refreshQueueNumberMode(startIndex, newMode) {
+    if (!this.queue) return;
+    for (let i = startIndex; i < this.queue.length; i++) {
+      const item = this.queue[i];
+      if (item && /[0-9]/.test(item.char)) {
+        const newCode = getCharMorseCode(item.char, newMode);
+        if (newCode) {
+          item.code = newCode;
+          if (item.rawToken) {
+            item.rawToken.code = newCode;
+          }
+        }
+      }
+    }
+    if (this.session && this.session.options) {
+      this.session.options.numberMode = newMode;
+    }
+  }
+
+
 
   /**
    * 硬件管道发音：通过门控 GainNode 包络开关正弦波发声 (与小程序完全一致)
@@ -490,10 +586,13 @@ class DesktopAudioPlayer {
       const curStartTime = this.nextNoteTime;
       item.startTime = curStartTime;
 
+      const currentEpoch = this._scheduleEpoch;
+
       if (item.type === 'prefix' || item.type === 'suffix') {
         if (item.code !== null) {
           const delayMs = Math.max(0, (curStartTime - this.audioContext.currentTime) * 1000);
           setTimeout(() => {
+            if (currentEpoch !== this._scheduleEpoch) return;
             if (this.playbackState.isPlaying && !this.playbackState.isPaused && !this.playbackState.stopRequested) {
               const markerPayload = { type: item.type, text: item.markerText };
               this.playbackState.activeMarker = markerPayload;
@@ -508,6 +607,7 @@ class DesktopAudioPlayer {
         if (item.code !== null) {
           const delayMs = Math.max(0, (curStartTime - this.audioContext.currentTime) * 1000);
           setTimeout(() => {
+            if (currentEpoch !== this._scheduleEpoch) return;
             if (this.playbackState.isPlaying && !this.playbackState.isPaused && !this.playbackState.stopRequested) {
               if (this.playbackState.activeMarker !== null) {
                 this.playbackState.activeMarker = null;
@@ -521,12 +621,23 @@ class DesktopAudioPlayer {
         }
       }
 
+
       if (item.code === null) {
         // 空格/间隔: 标准 4 dots 词间间隔 (加前置字符尾部 3 dots = 标准 7 dots)
         this.nextNoteTime += 4 * dotSec;
       } else {
-        // 点划发射：直接调制常开单例振荡器的 oscGain
-        const symbols = item.code.split('');
+        // 点划发射：如果是数字，始终确保以最新的 numberMode 编码为准 (双重保障)
+        let activeCode = item.code;
+        if (/[0-9]/.test(item.char)) {
+          const latestCode = getCharMorseCode(item.char, this.playbackConfig.numberMode);
+          if (latestCode) {
+            activeCode = latestCode;
+            item.code = latestCode;
+            if (item.rawToken) item.rawToken.code = latestCode;
+          }
+        }
+
+        const symbols = activeCode.split('');
         for (let s = 0; s < symbols.length; s++) {
           const sym = symbols[s];
           const durSec = sym === '-' ? 3 * dotSec : 1 * dotSec;
@@ -538,6 +649,7 @@ class DesktopAudioPlayer {
         }
         this.nextNoteTime += 3 * dotSec; // 字符间间隙 3 dots
       }
+
 
       item.endTime = this.nextNoteTime;
       this.queueIndex++;
@@ -569,8 +681,10 @@ class DesktopAudioPlayer {
     // 软停上一段调度并保留资源
     this._stopPlaybackEngine({ soft: true, clearQueue: false, stopRequested: false });
 
+    const isNewText = text !== undefined && text !== null && text !== this.session.text;
     const targetText = text !== undefined && text !== null ? text : this.session.text;
-    const mergedOptions = { ...this.session.options, ...options };
+    const baseOptions = isNewText ? {} : this.session.options;
+    const mergedOptions = { ...baseOptions, ...options };
 
     const {
       wpm = this.playbackConfig.wpm,

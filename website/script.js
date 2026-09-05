@@ -14,7 +14,7 @@ const translations = {
     "nav.preview": "终端预览",
     "nav.downloads": "立即下载",
     
-    "hero.badge": "v0.1.16 正式版已发布",
+    "hero.badge": "v0.1.17 正式版已发布",
     "hero.title_html": "专业的摩尔斯电码<br class=\"hero-br\"><span class=\"gradient-text\">与标准中文电码训练终端</span>",
     "hero.subtitle": "基于 Tauri + React 构建的轻量、极简且专业的摩尔斯密码训练与中文电码互译桌面应用。为业余无线电爱好者与发报玩家打造沉浸式体验。",
     "hero.download_auto": "免费下载",
@@ -96,7 +96,7 @@ const translations = {
     "nav.preview": "Terminal",
     "nav.downloads": "Download",
     
-    "hero.badge": "v0.1.16 is now available",
+    "hero.badge": "v0.1.17 is now available",
     "hero.title_html": "Professional Morse Code<br class=\"hero-br\"><span class=\"gradient-text\">&amp; Chinese Telecode Terminal</span>",
     "hero.subtitle": "A lightweight, modern, and professional Morse code practice and Chinese Telecode translation desktop terminal built with Tauri + React. Designed for amateur radio enthusiasts (HAM) and telegraphers.",
     "hero.download_auto": "Download Free",
@@ -173,10 +173,10 @@ const translations = {
 };
 
 // Current App Version State
-let currentVersion = '0.1.16';
+let currentVersion = '0.1.17';
 let downloadSource = 'cdn'; // 'cdn' or 'github'
 
-const CDN_BASE = `https://moyu-dl.wjzhx.com/Ansen/MoYu/releases/download`;
+const CDN_BASE = `https://dl-moyu.ba8bak.de/Ansen/MoYu/releases/download`;
 const GITHUB_BASE = `https://github.com/Ansen/MoYu/releases/download`;
 
 function getDownloadUrls(ver = currentVersion) {
@@ -281,10 +281,13 @@ function setLanguage(lang, save = true) {
   const dict = translations[lang] || translations.zh;
   document.querySelectorAll('[data-i18n]').forEach(el => {
     const key = el.getAttribute('data-i18n');
-    if (dict[key]) {
+    if (key === 'hero.badge') {
+      el.textContent = formatBadgeText(lang, currentVersion);
+    } else if (dict[key]) {
       el.textContent = dict[key];
     }
   });
+
 
   const titleContainer = document.getElementById('hero-title-container');
   if (titleContainer && dict["hero.title_html"]) {
@@ -498,25 +501,43 @@ function playMorseSequence(morseStr, wpm = 20, freq = 700) {
 
 
 // ==========================================================================
-// 6. Dynamic Version Fetch from CDN
+// 6. Dynamic Version Fetch from CDN (with GitHub API Fallback)
 // ==========================================================================
+function formatBadgeText(lang = currentLang, ver = currentVersion) {
+  return lang === 'zh' ? `v${ver} 正式版已发布` : `v${ver} is now available`;
+}
+
 async function fetchLatestVersion() {
-  try {
-    const res = await fetch('https://moyu-dl.wjzhx.com/Ansen/MoYu/releases/latest/download/latest-cdn.json');
-    if (res.ok) {
+  const endpoints = [
+    'https://dl-moyu.ba8bak.de/Ansen/MoYu/releases/latest/download/latest-cdn.json',
+    'https://api.github.com/repos/Ansen/MoYu/releases/latest'
+  ];
+
+
+  for (const url of endpoints) {
+    try {
+      const res = await fetch(url);
+      if (!res.ok) continue;
       const data = await res.json();
-      if (data.version) {
-        currentVersion = data.version;
-        document.querySelectorAll('.version-badge-text').forEach(el => {
-          el.textContent = `v${currentVersion}`;
-        });
-        detectAndHighlightPlatform();
+      // latest-cdn.json has .version ('0.1.17'), GitHub API has .tag_name ('v0.1.17')
+      const rawVer = data.version || data.tag_name;
+      if (rawVer) {
+        const cleanVer = String(rawVer).replace(/^v/, '').trim();
+        if (cleanVer) {
+          currentVersion = cleanVer;
+          document.querySelectorAll('.version-badge-text').forEach(el => {
+            el.textContent = formatBadgeText(currentLang, currentVersion);
+          });
+          detectAndHighlightPlatform();
+          break;
+        }
       }
+    } catch {
+      // Fallback to next endpoint
     }
-  } catch {
-    // Keep fallback v0.1.16
   }
 }
+
 
 // ==========================================================================
 // 7. Initialization

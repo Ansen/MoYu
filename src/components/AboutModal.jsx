@@ -211,7 +211,7 @@ export default function AboutModal({ isOpen, onClose }) {
                 <div className="flex gap-2 w-full">
                   {updateObj?.isAndroid ? (
                     <a 
-                      href={updateObj.downloadUrl || 'https://moyu-dl.wjzhx.com/Ansen/MoYu/releases/latest'}
+                      href={updateObj.downloadUrl || 'https://dl-moyu.ba8bak.de/Ansen/MoYu/releases/latest'}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="flex-1 px-3 py-2 text-xs font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg transition-colors text-center shadow-xs inline-block"

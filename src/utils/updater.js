@@ -2,7 +2,7 @@ import { check } from '@tauri-apps/plugin-updater';
 import { relaunch } from '@tauri-apps/plugin-process';
 import { getVersion } from '@tauri-apps/api/app';
 
-const CDN_LATEST_URL = 'https://moyu-dl.wjzhx.com/Ansen/MoYu/releases/latest/download/latest-cdn.json';
+const CDN_LATEST_URL = 'https://dl-moyu.ba8bak.de/Ansen/MoYu/releases/latest/download/latest-cdn.json';
 const GITHUB_LATEST_URL = 'https://github.com/Ansen/MoYu/releases/latest/download/latest.json';
 
 function compareSemver(v1, v2) {
@@ -46,7 +46,7 @@ export async function checkForUpdates() {
             notes: latestData.notes,
             body: latestData.notes,
             isAndroid: true,
-            downloadUrl: 'https://moyu-dl.wjzhx.com/Ansen/MoYu/releases/latest'
+            downloadUrl: 'https://dl-moyu.ba8bak.de/Ansen/MoYu/releases/latest'
           }
         };
       }
