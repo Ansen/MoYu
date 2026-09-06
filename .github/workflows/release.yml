@@ -305,59 +305,47 @@ jobs:
             const fs = require('fs');
             const repo = process.env.GITHUB_REPOSITORY;
             const version = process.env.GITHUB_REF_NAME;
-            const githubBase = \`https://github.com/\${repo}/releases/download/\${version}\`;
-            const cdnBase = \`https://dl-moyu.ba8bak.de/\${repo}/releases/download/\${version}\`;
+            const cdnBase = \`https://moyu-dl.wjzhx.com/\${repo}/releases/download/\${version}\`;
 
+            let latest = {
+              version: version.replace(/^v/, ''),
+              notes: process.env.NOTES || \`Release \${version}\`,
+              pub_date: new Date().toISOString(),
+              platforms: {}
+            };
 
-            function generateLatestJson(baseUrl) {
-              let latest = {
-                version: version.replace(/^v/, ''),
-                notes: process.env.NOTES || \`Release \${version}\`,
-                pub_date: new Date().toISOString(),
-                platforms: {}
-              };
-
-              const files = fs.readdirSync('.');
-              const sigFiles = files.filter(f => f.endsWith('.sig'));
-              if (sigFiles.length === 0) {
-                console.warn('WARNING: No .sig files found! Check if TAURI_PRIVATE_KEY is set in GitHub Repository Secrets.');
-              }
-
-              sigFiles.forEach(sigFile => {
-                const signature = fs.readFileSync(sigFile, 'utf8').trim();
-                const assetName = sigFile.slice(0, -4);
-                const lower = assetName.toLowerCase();
-                const url = \`\${baseUrl}/\${assetName}\`;
-
-                if (lower.includes('aarch64') || lower.includes('arm64')) {
-                  latest.platforms['darwin-aarch64'] = { signature, url };
-                } else if (lower.includes('x86_64') || lower.includes('x64')) {
-                  if (lower.includes('darwin') || lower.includes('mac') || lower.endsWith('.app.tar.gz')) {
-                    latest.platforms['darwin-x86_64'] = { signature, url };
-                  } else if (lower.includes('windows') || lower.includes('setup') || lower.endsWith('.exe') || lower.endsWith('.zip')) {
-                    latest.platforms['windows-x86_64'] = { signature, url };
-                  }
-                } else if (lower.includes('universal')) {
-                  latest.platforms['darwin-x86_64'] = { signature, url };
-                  latest.platforms['darwin-aarch64'] = { signature, url };
-                } else if (lower.includes('windows') || lower.endsWith('.exe') || lower.endsWith('.zip')) {
-                  latest.platforms['windows-x86_64'] = { signature, url };
-                } else if (lower.includes('amd64') || lower.includes('linux') || lower.endsWith('.appimage')) {
-                  latest.platforms['linux-x86_64'] = { signature, url };
-                }
-              });
-
-              return latest;
+            const files = fs.readdirSync('.');
+            const sigFiles = files.filter(f => f.endsWith('.sig'));
+            if (sigFiles.length === 0) {
+              console.warn('WARNING: No .sig files found! Check if TAURI_PRIVATE_KEY is set in GitHub Repository Secrets.');
             }
 
-            const latestGithub = generateLatestJson(githubBase);
-            const latestCdn = generateLatestJson(cdnBase);
+            sigFiles.forEach(sigFile => {
+              const signature = fs.readFileSync(sigFile, 'utf8').trim();
+              const assetName = sigFile.slice(0, -4);
+              const lower = assetName.toLowerCase();
+              const url = \`\${cdnBase}/\${assetName}\`;
 
-            fs.writeFileSync('latest.json', JSON.stringify(latestGithub, null, 2));
-            fs.writeFileSync('latest-cdn.json', JSON.stringify(latestCdn, null, 2));
+              if (lower.includes('aarch64') || lower.includes('arm64')) {
+                latest.platforms['darwin-aarch64'] = { signature, url };
+              } else if (lower.includes('x86_64') || lower.includes('x64')) {
+                if (lower.includes('darwin') || lower.includes('mac') || lower.endsWith('.app.tar.gz')) {
+                  latest.platforms['darwin-x86_64'] = { signature, url };
+                } else if (lower.includes('windows') || lower.includes('setup') || lower.endsWith('.exe') || lower.endsWith('.zip')) {
+                  latest.platforms['windows-x86_64'] = { signature, url };
+                }
+              } else if (lower.includes('universal')) {
+                latest.platforms['darwin-x86_64'] = { signature, url };
+                latest.platforms['darwin-aarch64'] = { signature, url };
+              } else if (lower.includes('windows') || lower.endsWith('.exe') || lower.endsWith('.zip')) {
+                latest.platforms['windows-x86_64'] = { signature, url };
+              } else if (lower.includes('amd64') || lower.includes('linux') || lower.endsWith('.appimage')) {
+                latest.platforms['linux-x86_64'] = { signature, url };
+              }
+            });
 
-            console.log('Generated latest.json (GitHub Official):\n', JSON.stringify(latestGithub, null, 2));
-            console.log('Generated latest-cdn.json (CDN Fast Channel):\n', JSON.stringify(latestCdn, null, 2));
+            fs.writeFileSync('latest.json', JSON.stringify(latest, null, 2));
+            console.log('Generated latest.json (CDN Fast Channel):\n', JSON.stringify(latest, null, 2));
           "
 
-          gh release upload "$GITHUB_REF_NAME" latest.json latest-cdn.json --repo "$GITHUB_REPOSITORY" --clobber
+          gh release upload "$GITHUB_REF_NAME" latest.json --repo "$GITHUB_REPOSITORY" --clobber

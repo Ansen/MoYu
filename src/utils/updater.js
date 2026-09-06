@@ -2,8 +2,11 @@ import { check } from '@tauri-apps/plugin-updater';
 import { relaunch } from '@tauri-apps/plugin-process';
 import { getVersion } from '@tauri-apps/api/app';
 
-const CDN_LATEST_URL = 'https://dl-moyu.ba8bak.de/Ansen/MoYu/releases/latest/download/latest-cdn.json';
-const GITHUB_LATEST_URL = 'https://github.com/Ansen/MoYu/releases/latest/download/latest.json';
+const UPDATER_ENDPOINTS = [
+  'https://moyu-dl.wjzhx.com/Ansen/MoYu/releases/latest/download/latest.json',
+  'https://dl-moyu.ba8bak.de/Ansen/MoYu/releases/latest/download/latest.json',
+  'https://github.com/Ansen/MoYu/releases/latest/download/latest.json'
+];
 
 function compareSemver(v1, v2) {
   const p1 = (v1 || '').replace(/^v/, '').split('.').map(n => parseInt(n, 10) || 0);
@@ -28,15 +31,21 @@ export async function checkForUpdates() {
   if (isAndroid) {
     try {
       const currentVersion = await getVersion().catch(() => '0.0.0');
-      let response = null;
-      try {
-        response = await fetch(CDN_LATEST_URL);
-      } catch {
-        response = await fetch(GITHUB_LATEST_URL);
+      let latestData = null;
+
+      for (const endpoint of UPDATER_ENDPOINTS) {
+        try {
+          const response = await fetch(endpoint);
+          if (response && response.ok) {
+            latestData = await response.json();
+            break;
+          }
+        } catch {
+          // Fallback to next endpoint
+        }
       }
 
-      if (response && response.ok) {
-        const latestData = await response.json();
+      if (latestData && latestData.version) {
         const hasUpdate = compareSemver(latestData.version, currentVersion) > 0;
         return {
           hasUpdate,
@@ -46,7 +55,7 @@ export async function checkForUpdates() {
             notes: latestData.notes,
             body: latestData.notes,
             isAndroid: true,
-            downloadUrl: 'https://dl-moyu.ba8bak.de/Ansen/MoYu/releases/latest'
+            downloadUrl: 'https://moyu-dl.wjzhx.com/Ansen/MoYu/releases/latest'
           }
         };
       }
