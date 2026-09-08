@@ -52,6 +52,10 @@ export default function ReaderHeader({
   togglePlay,
   stopPlay,
   onRegenerate,
+  interferenceLevel = 0,
+  setInterferenceLevel,
+  interferenceModes,
+  toggleInterferenceMode,
 }) {
   const { t } = useI18n();
   const availableFonts = useMemo(() => getAvailableFonts(), []);
@@ -402,6 +406,145 @@ export default function ReaderHeader({
                           }`}
                         />
                       </button>
+                    </div>
+                  )}
+
+                  {/* Row 2: Radio Interference (QRN/QRM) Slider & Progress */}
+                  {setInterferenceLevel && (
+                    <div className="py-2 px-2 rounded-lg bg-slate-50/80 dark:bg-[#232323]/80 border border-slate-200/70 dark:border-[#2f2f2f] transition-all space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-1.5">
+                          <Radio size={13} className={interferenceLevel > 0 ? "text-indigo-600 dark:text-indigo-400" : "text-slate-400"} />
+                          <span className="text-[12px] text-slate-700 dark:text-slate-300 font-medium">
+                            {t('reader.interference.short', '通联干扰')}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <span className={`text-[10.5px] font-mono font-bold px-1.5 py-0.2 rounded transition-colors ${
+                            interferenceLevel === 0
+                              ? 'text-slate-400 bg-slate-100 dark:bg-[#282828]'
+                              : 'text-indigo-600 dark:text-indigo-300 bg-indigo-50 dark:bg-indigo-950/60 border border-indigo-200/60 dark:border-indigo-800/50'
+                          }`}>
+                            {interferenceLevel === 0 ? t('reader.interference.clean', '纯净') : `${interferenceLevel}%`}
+                          </span>
+                          {interferenceLevel > 0 && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setInterferenceLevel(0);
+                              }}
+                              className="text-[10px] text-slate-400 hover:text-rose-500 dark:hover:text-rose-400 px-1 rounded hover:bg-slate-200 dark:hover:bg-[#333333] transition-colors cursor-pointer"
+                              title={t('reader.interference.clean', '重置为 0%')}
+                            >
+                              ✕
+                            </button>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Custom Range Slider with dynamic progress styling */}
+                      <div className="relative flex items-center h-4">
+                        <input
+                          type="range"
+                          min="0"
+                          max="100"
+                          step="1"
+                          value={interferenceLevel}
+                          onChange={(e) => setInterferenceLevel(Number(e.target.value))}
+                          onWheel={(e) => {
+                            e.stopPropagation();
+                            if (e.deltaY < 0) {
+                              setInterferenceLevel(Math.min(100, interferenceLevel + 5));
+                            } else {
+                              setInterferenceLevel(Math.max(0, interferenceLevel - 5));
+                            }
+                          }}
+                          className="w-full h-1.5 bg-slate-200 dark:bg-[#333333] rounded-lg appearance-none cursor-pointer accent-indigo-600 dark:accent-indigo-500 focus:outline-hidden"
+                          style={{
+                            background: `linear-gradient(to right, ${
+                              interferenceLevel > 75 ? '#f43f5e' : '#6366f1'
+                            } ${interferenceLevel}%, rgba(148, 163, 184, 0.25) ${interferenceLevel}%)`
+                          }}
+                        />
+                      </div>
+
+                      {/* Subtle scale indicators */}
+                      <div className="flex justify-between items-center text-[10px] text-slate-400 dark:text-slate-500 px-0.5">
+                        <span className={interferenceLevel === 0 ? 'text-indigo-600 dark:text-indigo-400 font-bold' : ''}>
+                          0%
+                        </span>
+                        <span className={interferenceLevel >= 1 && interferenceLevel <= 30 ? 'text-indigo-600 dark:text-indigo-400 font-bold' : ''}>
+                          {t('reader.interference.light', 'S5')}
+                        </span>
+                        <span className={interferenceLevel >= 31 && interferenceLevel <= 70 ? 'text-indigo-600 dark:text-indigo-400 font-bold' : ''}>
+                          {t('reader.interference.medium', 'S7')}
+                        </span>
+                        <span className={interferenceLevel > 70 ? 'text-rose-600 dark:text-rose-400 font-bold' : ''}>
+                          {t('reader.interference.heavy', 'S9+')}
+                        </span>
+                      </div>
+
+                      {/* Sub-mode selector pills (底噪, QSB, QRH, QRM) */}
+                      {interferenceLevel > 0 && toggleInterferenceMode && (
+                        <div className="pt-1.5 grid grid-cols-2 gap-1 border-t border-slate-200/60 dark:border-[#2d2d2d] select-none">
+                          <button
+                            type="button"
+                            onClick={() => toggleInterferenceMode('noise')}
+                            className={`flex items-center justify-between px-2 py-1 rounded-md text-[11px] transition-all cursor-pointer border ${
+                              interferenceModes?.noise
+                                ? 'bg-indigo-50/80 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 border-indigo-200/80 dark:border-indigo-800/60 font-semibold shadow-2xs hover:bg-indigo-100/70 dark:hover:bg-indigo-900/50'
+                                : 'bg-slate-100/60 dark:bg-[#1e1e1e]/60 text-slate-400 dark:text-slate-500 border-slate-200/50 dark:border-[#2d2d2d] hover:bg-slate-100 dark:hover:bg-[#272727] hover:text-slate-600 dark:hover:text-slate-400'
+                            }`}
+                            title={t('reader.interference.mode.noiseDesc', '电离层窄带背景噪声与雷电瞬态')}
+                          >
+                            <span>{t('reader.interference.mode.noise', '底噪 (QRN)')}</span>
+                            <span className={`h-1.5 w-1.5 rounded-full transition-colors ${interferenceModes?.noise ? 'bg-indigo-600 dark:bg-indigo-400 shadow-xs shadow-indigo-500/50' : 'bg-slate-300 dark:bg-[#3d3d3d]'}`} />
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => toggleInterferenceMode('qsb')}
+                            className={`flex items-center justify-between px-2 py-1 rounded-md text-[11px] transition-all cursor-pointer border ${
+                              interferenceModes?.qsb
+                                ? 'bg-indigo-50/80 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 border-indigo-200/80 dark:border-indigo-800/60 font-semibold shadow-2xs hover:bg-indigo-100/70 dark:hover:bg-indigo-900/50'
+                                : 'bg-slate-100/60 dark:bg-[#1e1e1e]/60 text-slate-400 dark:text-slate-500 border-slate-200/50 dark:border-[#2d2d2d] hover:bg-slate-100 dark:hover:bg-[#272727] hover:text-slate-600 dark:hover:text-slate-400'
+                            }`}
+                            title={t('reader.interference.mode.qsbDesc', '信号周期性忽大忽小自然衰落')}
+                          >
+                            <span>{t('reader.interference.mode.qsb', '衰落 (QSB)')}</span>
+                            <span className={`h-1.5 w-1.5 rounded-full transition-colors ${interferenceModes?.qsb ? 'bg-indigo-600 dark:bg-indigo-400 shadow-xs shadow-indigo-500/50' : 'bg-slate-300 dark:bg-[#3d3d3d]'}`} />
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => toggleInterferenceMode('qrh')}
+                            className={`flex items-center justify-between px-2 py-1 rounded-md text-[11px] transition-all cursor-pointer border ${
+                              interferenceModes?.qrh
+                                ? 'bg-indigo-50/80 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 border-indigo-200/80 dark:border-indigo-800/60 font-semibold shadow-2xs hover:bg-indigo-100/70 dark:hover:bg-indigo-900/50'
+                                : 'bg-slate-100/60 dark:bg-[#1e1e1e]/60 text-slate-400 dark:text-slate-500 border-slate-200/50 dark:border-[#2d2d2d] hover:bg-slate-100 dark:hover:bg-[#272727] hover:text-slate-600 dark:hover:text-slate-400'
+                            }`}
+                            title={t('reader.interference.mode.qrhDesc', '老式发报机真空管温漂与变调')}
+                          >
+                            <span>{t('reader.interference.mode.qrh', '频漂 (QRH)')}</span>
+                            <span className={`h-1.5 w-1.5 rounded-full transition-colors ${interferenceModes?.qrh ? 'bg-indigo-600 dark:bg-indigo-400 shadow-xs shadow-indigo-500/50' : 'bg-slate-300 dark:bg-[#3d3d3d]'}`} />
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => toggleInterferenceMode('qrm')}
+                            className={`flex items-center justify-between px-2 py-1 rounded-md text-[11px] transition-all cursor-pointer border ${
+                              interferenceModes?.qrm
+                                ? 'bg-indigo-50/80 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 border-indigo-200/80 dark:border-indigo-800/60 font-semibold shadow-2xs hover:bg-indigo-100/70 dark:hover:bg-indigo-900/50'
+                                : 'bg-slate-100/60 dark:bg-[#1e1e1e]/60 text-slate-400 dark:text-slate-500 border-slate-200/50 dark:border-[#2d2d2d] hover:bg-slate-100 dark:hover:bg-[#272727] hover:text-slate-600 dark:hover:text-slate-400'
+                            }`}
+                            title={t('reader.interference.mode.qrmDesc', '邻近频点其他电台的弱呼叫干扰')}
+                          >
+                            <span>{t('reader.interference.mode.qrm', '邻台 (QRM)')}</span>
+                            <span className={`h-1.5 w-1.5 rounded-full transition-colors ${interferenceModes?.qrm ? 'bg-indigo-600 dark:bg-indigo-400 shadow-xs shadow-indigo-500/50' : 'bg-slate-300 dark:bg-[#3d3d3d]'}`} />
+                          </button>
+                        </div>
+                      )}
                     </div>
                   )}
 

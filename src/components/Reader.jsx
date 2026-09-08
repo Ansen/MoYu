@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react'
 import { ChevronLeft, ChevronRight, Sparkles, FileText, BookOpen, Folder, Radio } from 'lucide-react';
 import ReaderHeader from './reader/ReaderHeader';
 import { useMorseAudio } from '../hooks/useMorseAudio';
+import { useRadioInterference } from '../hooks/useRadioInterference';
 import TxtEngine from './reader/TxtEngine';
 import { parseTelegramContent } from '../utils/telegramParser';
 import TocSidebar from './reader/TocSidebar';
@@ -42,6 +43,14 @@ export default function Reader({ bookData, onClose, jumpToSibling, jumpToChapter
   const [baseFontSize, setBaseFontSize] = useState(() => Number(localStorage.getItem('pref_base_font_size') || 20)); // px (baseline at 800px width)
   const [morseSpeed, setMorseSpeed] = useState(() => Number(localStorage.getItem('pref_morse_speed') || 20));
   const [morseFreq, setMorseFreq] = useState(() => Number(localStorage.getItem('pref_morse_freq')) || 380);
+
+  // 接入独立短波通联干扰仿真引擎 (与主音频完全解耦，QRM 邻频干扰动态提取当前练习正文)
+  const {
+    interferenceLevel,
+    setInterferenceLevel,
+    interferenceModes,
+    toggleInterferenceMode
+  } = useRadioInterference(isPlaying && !isPaused, morseFreq, bookData?.data);
   const [numberMode, setNumberMode] = useState(localStorage.getItem('pref_number_mode') || 'long');
   const [useHarmonics, setUseHarmonics] = useState(localStorage.getItem('pref_use_harmonics') === 'true');
   const [viewMode, setViewMode] = useState(() => localStorage.getItem('pref_reader_view_mode') || 'grid');
@@ -201,6 +210,10 @@ export default function Reader({ bookData, onClose, jumpToSibling, jumpToChapter
         togglePlay={togglePlay}
         stopPlay={stopPlay}
         onRegenerate={bookData.isGenerated ? onRegenerate : undefined}
+        interferenceLevel={interferenceLevel}
+        setInterferenceLevel={setInterferenceLevel}
+        interferenceModes={interferenceModes}
+        toggleInterferenceMode={toggleInterferenceMode}
       />
 
       {/* Main Content Area */}
