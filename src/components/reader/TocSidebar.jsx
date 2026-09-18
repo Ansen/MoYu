@@ -1,10 +1,21 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { useResizable } from '../../hooks/useResizable';
 import { useI18n } from '../../i18n';
 
 export default function TocSidebar({ isOpen, toc, bookType, onTocClick, onItemClick }) {
   const { width, startResizing } = useResizable(160, 120, 400);
   const { t } = useI18n();
+  const activeItemRef = useRef(null);
+
+  // 自动将当前激活的章节/目录文件项滚动至可视区域
+  useEffect(() => {
+    if (isOpen && activeItemRef.current) {
+      activeItemRef.current.scrollIntoView({
+        block: 'nearest',
+        behavior: 'smooth'
+      });
+    }
+  }, [isOpen, toc]);
 
   if (!isOpen || !toc || toc.length === 0) return null;
 
@@ -18,22 +29,26 @@ export default function TocSidebar({ isOpen, toc, bookType, onTocClick, onItemCl
           <span className="text-[10px] font-mono opacity-60">({toc.length})</span>
         </div>
         <div className="flex-1 overflow-y-auto custom-scrollbar p-1.5 space-y-0.5">
-          {toc.map((item, idx) => (
-            <button
-              key={item.id !== undefined ? item.id : idx}
-              onClick={() => {
-                if (handleClick) handleClick(item);
-              }}
-              className={`w-full text-left px-2.5 py-1.5 text-[12.5px] rounded-md truncate transition-all cursor-pointer ${
-                item.isActive 
-                  ? 'bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300 font-semibold border border-indigo-200/80 dark:border-indigo-800/60 shadow-2xs' 
-                  : 'text-slate-600 dark:text-[#cccccc] hover:bg-slate-200/80 dark:hover:bg-[#262626] border border-transparent'
-              }`}
-              title={item.label}
-            >
-              {item.label}
-            </button>
-          ))}
+          {toc.map((item, idx) => {
+            const isActive = Boolean(item.isActive);
+            return (
+              <button
+                key={item.id !== undefined ? item.id : idx}
+                ref={isActive ? activeItemRef : null}
+                onClick={() => {
+                  if (handleClick) handleClick(item);
+                }}
+                className={`w-full text-left px-2.5 py-1.5 text-[12.5px] rounded-md truncate transition-all cursor-pointer ${
+                  isActive 
+                    ? 'bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300 font-semibold border border-indigo-200/80 dark:border-indigo-800/60 shadow-2xs' 
+                    : 'text-slate-600 dark:text-[#cccccc] hover:bg-slate-200/80 dark:hover:bg-[#262626] border border-transparent'
+                }`}
+                title={item.label}
+              >
+                {item.label}
+              </button>
+            );
+          })}
         </div>
       </div>
       {/* Resizer Handle */}

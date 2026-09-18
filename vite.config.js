@@ -19,4 +19,18 @@ export default defineConfig({
       ignored: ["**/src-tauri/**"],
     },
   },
+  build: {
+    chunkSizeWarningLimit: 1200,
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (id.includes('node_modules')) {
+            if (id.includes('epubjs')) return 'vendor-epub';
+            if (id.includes('jspdf') || id.includes('html2canvas')) return 'vendor-pdf';
+            if (id.includes('react')) return 'vendor-react';
+          }
+        },
+      },
+    },
+  },
 })

@@ -98,21 +98,35 @@ const TxtEngine = forwardRef(({ bookData, fontSize = 20, fontFamily = 'Cascadia 
     cachedDataRef.current = { text: '', nodes: [] };
 
     if (bookData?.type === 'epub') {
-      const parsedToc = (bookData.toc || []).map((t, idx) => ({
-        id: t.id !== undefined ? t.id : idx,
-        label: t.label,
-        index: idx,
-        href: t.href,
-        isActive: idx === (bookData.currentChapterIndex || 0)
-      }));
+      const currentChIdx = bookData.currentChapterIndex !== undefined ? bookData.currentChapterIndex : 0;
+      const parsedToc = (bookData.toc || []).map((t, idx) => {
+        const itemIndex = t.index !== undefined ? t.index : idx;
+        const isActive = itemIndex === currentChIdx;
+        return {
+          id: t.id !== undefined ? t.id : idx,
+          label: t.label,
+          index: itemIndex,
+          href: t.href,
+          isActive
+        };
+      });
+
+      if (parsedToc.length > 0 && !parsedToc.some(item => item.isActive)) {
+        const fallbackIdx = Math.min(Math.max(0, currentChIdx), parsedToc.length - 1);
+        if (parsedToc[fallbackIdx]) {
+          parsedToc[fallbackIdx].isActive = true;
+        }
+      }
+
       if (onTocLoaded) onTocLoaded(parsedToc);
       if (onChapterChange) onChapterChange(bookData.currentChapterLabel || '');
     } else if (bookData?.siblings && bookData.siblings.length > 0) {
+      const currentSibIdx = bookData.currentIndex !== undefined ? bookData.currentIndex : 0;
       const parsedToc = bookData.siblings.map((sib, idx) => ({
         id: idx,
         label: sib.name,
         index: idx,
-        isActive: idx === bookData.currentIndex
+        isActive: idx === currentSibIdx
       }));
       if (onTocLoaded) onTocLoaded(parsedToc);
       if (onChapterChange) onChapterChange('');
