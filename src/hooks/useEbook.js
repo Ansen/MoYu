@@ -80,14 +80,16 @@ export function useEbook() {
     }
   }, []);
 
-  const saveRecent = (item) => {
+  const saveRecent = useCallback((item) => {
     setRecentFiles(prev => {
+      const existing = prev.find(p => p.path === item.path);
+      const nextItem = { ...(existing || {}), ...item };
       const filtered = prev.filter(p => p.path !== item.path);
-      const next = [item, ...filtered].slice(0, 10);
+      const next = [nextItem, ...filtered].slice(0, 10);
       localStorage.setItem('moyu_recent_files', JSON.stringify(next));
       return next;
     });
-  };
+  }, []);
 
   const clearRecentFiles = useCallback(() => {
     setRecentFiles([]);
@@ -103,10 +105,11 @@ export function useEbook() {
     });
   }, []);
 
-  const loadFileContent = async (filePath, fileName, siblings = [], currentIndex = 0, folderName = '') => {
+  const loadFileContent = async (filePath, fileName, siblings = [], currentIndex = 0, folderName = '', folderPath = '', initialChapterIndex = null) => {
     const isEpub = filePath.toLowerCase().endsWith('.epub');
     const isFolder = Boolean(folderName || (siblings && siblings.length > 0));
     const effectiveFolderName = folderName || (isFolder ? filePath.split(/[/\\]/).filter(Boolean).slice(-2, -1)[0] : '');
+    const effectiveFolderPath = folderPath || (isFolder ? (filePath.includes('\\') ? filePath.substring(0, filePath.lastIndexOf('\\')) : filePath.substring(0, filePath.lastIndexOf('/'))) : '');
 
     if (isEpub) {
       const fileData = await readFile(filePath);
@@ -157,13 +160,25 @@ export function useEbook() {
         return { text, chapterIndex, label, href: section.href };
       };
 
-      const initial = await loadEpubChapter(0);
+      // 获取需加载的初始章节：优先取参数，否则查找最近记录
+      let targetChapter = initialChapterIndex;
+      if (targetChapter === null || targetChapter === undefined) {
+        const savedItem = recentFiles.find(r => r.path === filePath);
+        if (savedItem && typeof savedItem.lastChapterIndex === 'number') {
+          targetChapter = savedItem.lastChapterIndex;
+        } else {
+          targetChapter = 0;
+        }
+      }
+
+      const initial = await loadEpubChapter(targetChapter);
 
       setBookData({
         type: 'epub',
         data: initial.text,
         name: fileName,
         path: filePath,
+        folderPath: effectiveFolderPath,
         bookInstance: book,
         spineItems,
         toc: finalToc,
@@ -175,6 +190,17 @@ export function useEbook() {
         isFolder,
         folderName: effectiveFolderName
       });
+
+      // 如果非文件夹里的独立的 epub，记录该 epub 的章节进度
+      if (!isFolder) {
+        saveRecent({
+          type: 'file',
+          name: fileName,
+          path: filePath,
+          lastChapterIndex: initial.chapterIndex,
+          lastChapterLabel: initial.label
+        });
+      }
     } else {
       const textData = await readTextFile(filePath);
       setBookData({
@@ -182,6 +208,7 @@ export function useEbook() {
         data: textData,
         name: fileName,
         path: filePath,
+        folderPath: effectiveFolderPath,
         siblings,
         currentIndex,
         isFolder,
@@ -217,11 +244,33 @@ export function useEbook() {
           };
         });
 
-        await loadFileContent(siblings[0].path, siblings[0].name, siblings, 0, folderName);
-        saveRecent({ type: 'folder', name: folderName, path: filePath });
+        // 查找历史位置
+        let initialIndex = 0;
+        const savedItem = recentFiles.find(r => r.path === filePath);
+        if (savedItem && typeof savedItem.lastSiblingIndex === 'number' && savedItem.lastSiblingIndex >= 0 && savedItem.lastSiblingIndex < siblings.length) {
+          initialIndex = savedItem.lastSiblingIndex;
+        }
+
+        await loadFileContent(siblings[initialIndex].path, siblings[initialIndex].name, siblings, initialIndex, folderName, filePath);
+        saveRecent({
+          type: 'folder',
+          name: folderName,
+          path: filePath,
+          lastSiblingIndex: initialIndex,
+          lastSiblingName: siblings[initialIndex].name
+        });
       } else {
-        await loadFileContent(filePath, fileName, [], 0, '');
-        saveRecent({ type: 'file', name: fileName, path: filePath });
+        // 查找文件存过的章节
+        let savedChapterIndex = null;
+        const savedItem = recentFiles.find(r => r.path === filePath);
+        if (savedItem && typeof savedItem.lastChapterIndex === 'number') {
+          savedChapterIndex = savedItem.lastChapterIndex;
+        }
+
+        await loadFileContent(filePath, fileName, [], 0, '', '', savedChapterIndex);
+        if (!filePath.toLowerCase().endsWith('.epub')) {
+          saveRecent({ type: 'file', name: fileName, path: filePath });
+        }
       }
     } catch (err) {
       console.error('Failed to open file:', err);
@@ -272,13 +321,25 @@ export function useEbook() {
       if (bookData.type === 'epub' && bookData.bookInstance && typeof bookData.bookInstance.destroy === 'function') {
         try { bookData.bookInstance.destroy(); } catch {}
       }
-      await loadFileContent(target.path, target.name, bookData.siblings, index, bookData.folderName);
+      await loadFileContent(target.path, target.name, bookData.siblings, index, bookData.folderName, bookData.folderPath);
+      
+      // 保存文件夹的最新子文件进度
+      const folderPath = bookData.folderPath || (target.path.includes('\\') ? target.path.substring(0, target.path.lastIndexOf('\\')) : target.path.substring(0, target.path.lastIndexOf('/')));
+      if (folderPath && bookData.folderName) {
+        saveRecent({
+          type: 'folder',
+          name: bookData.folderName,
+          path: folderPath,
+          lastSiblingIndex: index,
+          lastSiblingName: target.name
+        });
+      }
     } catch (err) {
       console.error(err);
     } finally {
       setLoading(false);
     }
-  }, [bookData]);
+  }, [bookData, saveRecent]);
 
   const loadTextDirectly = useCallback((textData, fileName) => {
     setBookData({
@@ -344,12 +405,23 @@ export function useEbook() {
         currentChapterIndex: result.chapterIndex,
         currentChapterLabel: result.label
       }));
+
+      // 自动更新 EPUB 的最近阅读章节
+      if (bookData.path && !bookData.isFolder) {
+        saveRecent({
+          type: 'file',
+          name: bookData.name,
+          path: bookData.path,
+          lastChapterIndex: result.chapterIndex,
+          lastChapterLabel: result.label
+        });
+      }
     } catch (err) {
       console.error('Failed to jump to chapter:', err);
     } finally {
       setLoading(false);
     }
-  }, [bookData]);
+  }, [bookData, saveRecent]);
 
   const closeBook = useCallback(() => {
     if (bookData?.type === 'epub' && bookData.bookInstance && typeof bookData.bookInstance.destroy === 'function') {
