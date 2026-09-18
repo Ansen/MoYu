@@ -5,6 +5,8 @@ import Sidebar from './components/layout/Sidebar';
 import TranslatorView from './views/Translator';
 import LibraryView from './views/Library';
 import HomeView from './views/Home';
+import MorseFollowView from './views/MorseFollowView';
+import GameLobby from './views/GameLobby';
 import SettingsModal from './components/SettingsModal';
 import HelpModal from './components/HelpModal';
 import AboutModal from './components/AboutModal';
@@ -57,7 +59,7 @@ function App() {
     
     if (startupBehavior === 'restore') {
       const lastView = localStorage.getItem('moyu_last_view');
-      if (lastView && ['home', 'translator', 'library'].includes(lastView)) {
+      if (lastView && ['home', 'translator', 'library', 'game'].includes(lastView)) {
         setView(lastView);
       }
     }
@@ -165,6 +167,7 @@ function App() {
           )}
           {isReady && currentView === 'translator' && <TranslatorView />}
           {isReady && currentView === 'library' && <LibraryView ebook={ebook} />}
+          {isReady && currentView === 'game' && <MorseFollowView />}
         </main>
       </div>
 

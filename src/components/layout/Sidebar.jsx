@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Languages, Library, PanelLeftClose, PanelLeft, Home } from 'lucide-react';
+import { Languages, Library, PanelLeftClose, PanelLeft, Home, Activity } from 'lucide-react';
 import { useI18n } from '../../i18n/index';
 import { useResizable } from '../../hooks/useResizable';
 import { getVersion } from '@tauri-apps/api/app';
@@ -18,6 +18,7 @@ export default function Sidebar({ currentView, setView, openAbout }) {
     { id: 'home', icon: <Home size={20} strokeWidth={2} />, label: t('sidebar.home') },
     { id: 'translator', icon: <Languages size={20} strokeWidth={2} />, label: t('sidebar.translator') },
     { id: 'library', icon: <Library size={20} strokeWidth={2} />, label: t('sidebar.library') },
+    { id: 'game', icon: <Activity size={20} strokeWidth={2} />, label: t('sidebar.game') },
   ];
 
   return (
