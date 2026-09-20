@@ -55,7 +55,7 @@ export function parseTelegramContent(rawText) {
       for (let i = 0; i < t.length; i += chunkLen) {
         dataTokens.push(t.slice(i, i + chunkLen));
       }
-    } else if (/^[a-zA-Z]{10,}$/.test(t) && t.length % 5 === 0) {
+    } else if (/^[A-Z]{20,}$/.test(t) && t.length % 5 === 0) {
       for (let i = 0; i < t.length; i += 5) {
         dataTokens.push(t.slice(i, i + 5));
       }

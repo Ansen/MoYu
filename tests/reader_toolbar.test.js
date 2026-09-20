@@ -62,5 +62,22 @@ export function testReaderToolbarLogic() {
   }
   console.log('✓ Grid layout restriction (group length <= 5) validated.');
 
+  // 7. 确保 10 字母常规英语单词绝不被误切分为 5 字母碎片
+  const naturalEnglishSentence = "maintaining stability In response to separatist activities resolutely separatism commitment initiative Confronted especially";
+  const resNatural = parseTelegramContent(naturalEnglishSentence);
+  if (!resNatural.cleanText.includes("separatist")) {
+    throw new Error('separatist must remain intact, not split into separ atist');
+  }
+  if (!resNatural.cleanText.includes("activities")) {
+    throw new Error('activities must remain intact, not split into activ ities');
+  }
+  if (!resNatural.cleanText.includes("resolutely")) {
+    throw new Error('resolutely must remain intact, not split into resol utely');
+  }
+  if (!resNatural.cleanText.includes("commitment")) {
+    throw new Error('commitment must remain intact, not split into commi tment');
+  }
+  console.log('✓ Natural English 10-character words integrity validated (never split into 5-char fragments).');
+
   console.log('All Reader Toolbar logic tests passed successfully!\n');
 }
