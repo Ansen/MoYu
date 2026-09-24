@@ -207,10 +207,16 @@ const TxtEngine = forwardRef(({ bookData, fontSize = 20, fontFamily = 'Cascadia 
   }, [getProgressKey, clearHighlight]);
 
   useImperativeHandle(ref, () => ({
+    getCurrentText: () => {
+      if (cachedDataRef.current?.text) return cachedDataRef.current.text;
+      if (cleanText) return cleanText;
+      return bookData?.data || '';
+    },
     getChapterText: async () => {
       const root = viewerRef.current;
       if (!root) return { text: '', startIndex: 0 };
 
+      textRootRef.current = root;
       let { text, nodes } = cachedDataRef.current;
       if (!nodes || nodes.length === 0 || !text) {
         const extracted = extractNodes();

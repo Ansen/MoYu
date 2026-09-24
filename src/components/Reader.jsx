@@ -8,8 +8,9 @@ import { parseTelegramContent } from '../utils/telegramParser';
 import TocSidebar from './reader/TocSidebar';
 import { useI18n } from '../i18n';
 import { ALL_FONTS, getDefaultFontId } from '../config/fonts';
+import FollowTrainingModule from './training/FollowTrainingModule';
 
-export default function Reader({ bookData, onClose, jumpToSibling, jumpToChapter, onRegenerate }) {
+export default function Reader({ bookData, onClose, jumpToSibling, jumpToChapter, onRegenerate, isTraining: initialTraining }) {
   const { t } = useI18n();
   const engineRef = useRef(null);
   
@@ -38,6 +39,16 @@ export default function Reader({ bookData, onClose, jumpToSibling, jumpToChapter
   const [toc, setToc] = useState([]);
   const [isTocOpen, setIsTocOpen] = useState(true);
   const [currentChapterTitle, setCurrentChapterTitle] = useState('');
+  const [currentChapterText, setCurrentChapterText] = useState('');
+
+  const handleChapterChange = useCallback((title) => {
+    setCurrentChapterTitle(title);
+    setTimeout(() => {
+      if (engineRef.current?.getCurrentText) {
+        setCurrentChapterText(engineRef.current.getCurrentText());
+      }
+    }, 50);
+  }, []);
   
   // Settings
   const [baseFontSize, setBaseFontSize] = useState(() => Number(localStorage.getItem('pref_base_font_size') || 20)); // px (baseline at 800px width)
@@ -62,7 +73,18 @@ export default function Reader({ bookData, onClose, jumpToSibling, jumpToChapter
   const [enableMarkers, setEnableMarkers] = useState(() => localStorage.getItem('pref_reader_enable_markers') !== 'false');
   const [prefixMarker, setPrefixMarker] = useState(() => localStorage.getItem('pref_reader_prefix_marker') || '===');
   const [suffixMarker, setSuffixMarker] = useState(() => localStorage.getItem('pref_reader_suffix_marker') || 'iii');
+  const [isTraining, setIsTraining] = useState(() => {
+    if (typeof initialTraining === 'boolean') return initialTraining;
+    return localStorage.getItem('pref_reader_follow_training') === 'true';
+  });
 
+  const handleToggleTraining = useCallback((val) => {
+    setIsTraining(prev => {
+      const next = typeof val === 'boolean' ? val : !prev;
+      localStorage.setItem('pref_reader_follow_training', String(next));
+      return next;
+    });
+  }, []);
 
   // 离开阅读器时清理播放器
   useEffect(() => {
@@ -107,6 +129,8 @@ export default function Reader({ bookData, onClose, jumpToSibling, jumpToChapter
     });
   }, [baseFontSize, morseSpeed, morseFreq, numberMode, useHarmonics, viewMode, fontFamily, enableMarkers, prefixMarker, suffixMarker, updateAudioConfig]);
 
+  const [activePlayToken, setActivePlayToken] = useState(null);
+
   // 统一播放/暂停控制：直接委托给中枢的自适应 toggle，杜绝业务层推演状态
   const togglePlay = useCallback(async () => {
     // 关键：在用户原生手势同步第一行唤醒底层 AudioContext，获取操作系统授权
@@ -131,9 +155,11 @@ export default function Reader({ bookData, onClose, jumpToSibling, jumpToChapter
       prefixMarker: effectivePrefix,
       suffixMarker: effectiveSuffix,
       onCharPlay: (token) => {
+        setActivePlayToken(token);
         if (engineRef.current) engineRef.current.highlightToken(token);
       },
       onComplete: () => {
+        setActivePlayToken(null);
         if (engineRef.current) engineRef.current.clearHighlight();
       }
     });
@@ -141,6 +167,7 @@ export default function Reader({ bookData, onClose, jumpToSibling, jumpToChapter
 
   const stopPlay = useCallback(() => {
     stopAudio();
+    setActivePlayToken(null);
     if (engineRef.current) {
       engineRef.current.clearHighlight();
       engineRef.current.saveProgress();
@@ -171,6 +198,36 @@ export default function Reader({ bookData, onClose, jumpToSibling, jumpToChapter
     stopPlay();
     if (engineRef.current) engineRef.current.nextPage();
   }, [stopPlay]);
+
+  // 全局键盘快捷键
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+
+      if (isTraining) {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          togglePlay();
+        }
+      } else {
+        if (e.code === 'Space') {
+          e.preventDefault();
+          togglePlay();
+        }
+      }
+
+      if (e.key === 'ArrowLeft') {
+        e.preventDefault();
+        handlePrev();
+      } else if (e.key === 'ArrowRight') {
+        e.preventDefault();
+        handleNext();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isTraining, togglePlay, handlePrev, handleNext]);
 
   const paginationLabel = engineRef.current ? engineRef.current.getPaginationLabel() : '';
 
@@ -214,6 +271,8 @@ export default function Reader({ bookData, onClose, jumpToSibling, jumpToChapter
         setInterferenceLevel={setInterferenceLevel}
         interferenceModes={interferenceModes}
         toggleInterferenceMode={toggleInterferenceMode}
+        isTraining={isTraining}
+        setIsTraining={handleToggleTraining}
       />
 
       {/* Main Content Area */}
@@ -243,10 +302,29 @@ export default function Reader({ bookData, onClose, jumpToSibling, jumpToChapter
                 jumpToSibling={jumpToSibling}
                 jumpToChapter={jumpToChapter}
                 onTocLoaded={setToc}
-                onChapterChange={setCurrentChapterTitle}
+                onChapterChange={handleChapterChange}
               />
             </div>
           </div>
+
+          {/* 跟发训练独立自闭环模块 (最小改动，未来合并直接调用) */}
+          {isTraining && (
+            <FollowTrainingModule 
+              isPlaying={isPlaying}
+              isPaused={isPaused}
+              bookData={bookData}
+              chapterText={currentChapterText}
+              morseSpeed={morseSpeed}
+              morseFreq={morseFreq}
+              numberMode={numberMode}
+              enableMarkers={enableMarkers}
+              prefixMarker={enableMarkers ? (prefixMarker || parsedTelegram.startMarker || '') : ''}
+              suffixMarker={enableMarkers ? (suffixMarker || parsedTelegram.endMarker || '') : ''}
+              activeToken={activePlayToken}
+              activeMarker={activeMarker}
+              onStopRequest={stopPlay}
+            />
+          )}
           
           {/* Bottom Unified Status Bar */}
           <div className="h-10 border-t border-slate-200 dark:border-[#2d2d2d] bg-slate-50/90 dark:bg-[#181818]/90 backdrop-blur px-4 flex items-center justify-between shrink-0 select-none text-[12px] text-slate-500 dark:text-[#888888]">
@@ -343,7 +421,19 @@ export default function Reader({ bookData, onClose, jumpToSibling, jumpToChapter
 
             {/* Right Section: Keyboard Shortcuts */}
             <div className="flex items-center gap-2.5 text-slate-400 dark:text-[#888888] text-[12px] shrink-0">
-              {((bookData.type === 'epub' && bookData.toc && bookData.toc.length > 1) ||
+              {isTraining ? (
+                <>
+                  <span className="flex items-center gap-1.5">
+                    <kbd className="px-1.5 py-0.5 rounded bg-slate-200/90 dark:bg-[#252525] text-[11px] font-mono text-slate-700 dark:text-slate-300 border border-slate-300/80 dark:border-[#383838] shadow-2xs">Space</kbd>
+                    <span>{t('reader.shortcuts.keying', '发报')}</span>
+                  </span>
+                  <span className="text-slate-300 dark:text-slate-700">·</span>
+                  <span className="flex items-center gap-1.5">
+                    <kbd className="px-1.5 py-0.5 rounded bg-slate-200/90 dark:bg-[#252525] text-[11px] font-mono text-slate-700 dark:text-slate-300 border border-slate-300/80 dark:border-[#383838] shadow-2xs">Enter</kbd>
+                    <span>{isPlaying && !isPaused ? t('reader.pause') : isPaused ? t('reader.resume') : (t('training.start') || '开始')}</span>
+                  </span>
+                </>
+              ) : ((bookData.type === 'epub' && bookData.toc && bookData.toc.length > 1) ||
                 (bookData.siblings && bookData.siblings.length > 1)) ? (
                 <>
                   <span className="flex items-center gap-1.5">

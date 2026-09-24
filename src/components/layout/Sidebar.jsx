@@ -11,7 +11,11 @@ export default function Sidebar({ currentView, setView, openAbout }) {
   const { t } = useI18n();
 
   useEffect(() => {
-    getVersion().then(v => setVersion('v' + v)).catch(() => setVersion('v0.1.4'));
+    try {
+      getVersion().then(v => setVersion('v' + v)).catch(() => setVersion('v0.1.23'));
+    } catch {
+      setVersion('v0.1.23');
+    }
   }, []);
 
   const menuItems = [

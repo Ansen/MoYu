@@ -56,6 +56,8 @@ export default function ReaderHeader({
   setInterferenceLevel,
   interferenceModes,
   toggleInterferenceMode,
+  isTraining = false,
+  setIsTraining,
 }) {
   const { t } = useI18n();
   const availableFonts = useMemo(() => getAvailableFonts(), []);
@@ -349,6 +351,43 @@ export default function ReaderHeader({
               </>
             )}
           </div>
+
+          <div className="h-3 w-px bg-slate-300 dark:bg-[#333333]"></div>
+
+          {/* Follow Training Toggle Switch (跟发训练模式轻量开关: 与目录/更多一致的淡紫优雅高亮) */}
+          <button
+            type="button"
+            onClick={() => setIsTraining && setIsTraining(!isTraining)}
+            className={`h-7 flex items-center gap-1.5 px-2.5 rounded-md text-[11.5px] font-medium transition-all cursor-pointer whitespace-nowrap select-none border shrink-0 shadow-2xs ${
+              isTraining
+                ? 'bg-indigo-50/80 dark:bg-indigo-950/40 border-indigo-300 dark:border-indigo-800 text-indigo-600 dark:text-indigo-400 font-semibold'
+                : 'bg-white dark:bg-[#252525] border-slate-300 dark:border-[#383838] text-slate-700 dark:text-[#cccccc] hover:border-slate-400 dark:hover:border-[#4a4a4a] hover:text-slate-900 dark:hover:text-white'
+            }`}
+            title={t('reader.followTraining.desc')}
+          >
+            <Radio 
+              size={12} 
+              className={`shrink-0 transition-colors ${
+                isTraining ? 'text-indigo-600 dark:text-indigo-400' : 'text-slate-400'
+              }`} 
+            />
+            <span>{t('reader.followTraining.toggle')}</span>
+            
+            {/* 微型开关指示器 (Micro Switch Pill) */}
+            <span 
+              className={`inline-flex items-center w-5 h-3 rounded-full transition-colors duration-200 p-0.5 ml-0.5 shrink-0 ${
+                isTraining 
+                  ? 'bg-indigo-600 dark:bg-indigo-500' 
+                  : 'bg-slate-200 dark:bg-[#444444]'
+              }`}
+            >
+              <span 
+                className={`inline-block w-2 h-2 rounded-full bg-white shadow-2xs transition-transform duration-200 ${
+                  isTraining ? 'translate-x-2' : 'translate-x-0'
+                }`} 
+              />
+            </span>
+          </button>
 
           <div className="h-3 w-px bg-slate-300 dark:bg-[#333333]"></div>
 
@@ -773,7 +812,7 @@ export default function ReaderHeader({
             <Play size={13} className="stroke-[2.5] ml-0.5 fill-current" />
           )}
           <span>
-            {isPlaying && !isPaused ? t('reader.pause') : isPaused ? t('reader.resume') : t('reader.play')}
+            {isPlaying && !isPaused ? t('reader.pause') : isPaused ? t('reader.resume') : (isTraining ? (t('training.start') || '开始') : t('reader.play'))}
           </span>
         </button>
       </div>

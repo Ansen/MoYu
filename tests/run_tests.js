@@ -8,6 +8,7 @@ import { testEpubExportFormatting } from './epub_export.test.js';
 import { testPdfExport } from './pdf_export.test.js';
 import { testStructuredRandom } from './structured_random.test.js';
 import { testRadioInterferenceLogic } from './radio_interference.test.js';
+import { testFollowTrainingLogic } from './follow_training.test.js';
 
 console.log('========================================');
 console.log('    MoYu Reader Unit Test Suite        ');
@@ -23,6 +24,7 @@ async function main() {
     testStructuredRandom();
     await testAudioPlayerLogic();
     testRadioInterferenceLogic();
+    testFollowTrainingLogic();
     testEpubExportFormatting();
     testPdfExport();
     

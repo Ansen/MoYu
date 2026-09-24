@@ -35,12 +35,18 @@ export default function Titlebar({ theme, setTheme, openSettings, openHelp, open
   // 监听窗口最大化状态
   useEffect(() => {
     let unlisten;
-    const win = getCurrentWindow();
-    win.isMaximized().then(setIsMaximized).catch(() => {});
-    
-    win.onResized(() => {
-      win.isMaximized().then(setIsMaximized).catch(() => {});
-    }).then(u => unlisten = u).catch(() => {});
+    try {
+      const win = getCurrentWindow();
+      if (win?.isMaximized) {
+        win.isMaximized().then(setIsMaximized).catch(() => {});
+        
+        win.onResized(() => {
+          win.isMaximized().then(setIsMaximized).catch(() => {});
+        }).then(u => unlisten = u).catch(() => {});
+      }
+    } catch {
+      // 容错: 非原生 Tauri 窗口运行环境
+    }
 
     return () => {
       if (unlisten) unlisten();
@@ -187,20 +193,20 @@ export default function Titlebar({ theme, setTheme, openSettings, openHelp, open
         {/* Window Controls (Custom Native Titlebar): Protected with shrink-0 */}
         <div className="flex h-full items-center shrink-0">
           <button 
-            onClick={() => getCurrentWindow().minimize()}
+            onClick={() => { try { getCurrentWindow().minimize(); } catch {} }}
             className="h-full px-3.5 hover:bg-slate-200 dark:hover:bg-[#333] transition-colors flex items-center justify-center text-slate-600 dark:text-slate-400"
           >
             <Minus size={14} />
           </button>
           <button 
-            onClick={() => getCurrentWindow().toggleMaximize()}
+            onClick={() => { try { getCurrentWindow().toggleMaximize(); } catch {} }}
             className="h-full px-3.5 hover:bg-slate-200 dark:hover:bg-[#333] transition-colors flex items-center justify-center text-slate-600 dark:text-slate-400"
             title={isMaximized ? t('titlebar.restore') : t('titlebar.maximize')}
           >
             {isMaximized ? <Copy size={13} strokeWidth={2.5} /> : <Square size={13} strokeWidth={2.5} />}
           </button>
           <button 
-            onClick={() => getCurrentWindow().close()}
+            onClick={() => { try { getCurrentWindow().close(); } catch {} }}
             className="h-full px-4 hover:bg-red-500 hover:text-white transition-colors flex items-center justify-center text-slate-600 dark:text-slate-400"
           >
             <CloseIcon size={14} />

@@ -466,6 +466,7 @@ class DesktopAudioPlayer {
     }
     if (stopRequested) {
       this._transitionTo(AUDIO_STATE.STOPPED, { activeMarker: null });
+      this._lastPlaybackTimeMs = 0;
     }
     if (this.callbacks.onMarkerPlay) {
       this.callbacks.onMarkerPlay(null);
@@ -569,7 +570,44 @@ class DesktopAudioPlayer {
 
     this.queue = queue;
     this.queueIndex = 0;
+    this._recomputeTimelineOffsets();
     return queue;
+  }
+
+  /**
+   * 预计算队列中每一个字符在整段文本时间轴上的理论毫秒刻度 (纯只读元数据)
+   */
+  _recomputeTimelineOffsets() {
+    if (!this.queue) return;
+    const dotMs = (1200 / Math.max(5, Math.min(60, Number(this.playbackConfig.wpm) || 20)));
+    let offsetMs = 0;
+
+    for (let i = 0; i < this.queue.length; i++) {
+      const item = this.queue[i];
+      item.timelineStartMs = offsetMs;
+
+      if (item.code === null) {
+        const dur = 4 * dotMs;
+        item.timelineDurationMs = dur;
+        offsetMs += dur;
+      } else {
+        let code = item.code;
+        if (/[0-9]/.test(item.char)) {
+          const c = getCharMorseCode(item.char, this.playbackConfig.numberMode);
+          if (c) code = c;
+        }
+        let dur = 0;
+        const symbols = code.split('');
+        for (let s = 0; s < symbols.length; s++) {
+          dur += symbols[s] === '-' ? 3 * dotMs : 1 * dotMs;
+          if (s < symbols.length - 1) dur += 1 * dotMs;
+        }
+        dur += 3 * dotMs; // 字符后 3 dots 间隙
+        item.timelineDurationMs = dur;
+        offsetMs += dur;
+      }
+      item.timelineEndMs = offsetMs;
+    }
   }
 
   /**
@@ -803,6 +841,10 @@ class DesktopAudioPlayer {
       this.queueIndex = Math.max(0, this.queue.length - 1);
     }
 
+    try {
+      this._lastPlaybackTimeMs = this.getPlaybackProgress().timeMs;
+    } catch {}
+
     this._stopPlaybackEngine({ soft: true, clearQueue: false, stopRequested: false });
     this._transitionTo(AUDIO_STATE.PAUSED);
   }
@@ -868,6 +910,75 @@ class DesktopAudioPlayer {
 
   get currentTime() {
     return this.audioContext ? this.audioContext.currentTime : 0;
+  }
+
+  /**
+   * 纯只读高精度物理播放进度查询接口 (Read-Only Direct Hardware Timeline)
+   * 零侵入、零副作用，直接读取声卡 DAC 当前真实发音在全曲莫尔斯时间轴上的毫秒刻度
+   * @returns {{ isPlaying: boolean, isPaused: boolean, timeMs: number, activeToken: object|null, activeMarker: object|null }}
+   */
+  getPlaybackProgress() {
+    if (!this.audioContext || !this.playbackState.isPlaying) {
+      return {
+        isPlaying: false,
+        isPaused: this.playbackState.isPaused,
+        timeMs: this._lastPlaybackTimeMs || 0,
+        activeToken: null,
+        activeMarker: this.playbackState.activeMarker
+      };
+    }
+
+    if (this.playbackState.isPaused) {
+      return {
+        isPlaying: true,
+        isPaused: true,
+        timeMs: this._lastPlaybackTimeMs || 0,
+        activeToken: null,
+        activeMarker: this.playbackState.activeMarker
+      };
+    }
+
+    const now = this.audioContext.currentTime;
+    let currentItem = null;
+
+    if (this.queue && this.queue.length > 0) {
+      for (let i = 0; i < this.queue.length; i++) {
+        const it = this.queue[i];
+        if (it.startTime !== undefined && it.endTime !== undefined) {
+          if (now >= it.startTime && now < it.endTime) {
+            currentItem = it;
+            break;
+          } else if (now < it.startTime) {
+            currentItem = i > 0 ? this.queue[i - 1] : this.queue[0];
+            break;
+          }
+        }
+      }
+      if (!currentItem && this.queueIndex > 0) {
+        currentItem = this.queue[Math.min(this.queue.length - 1, this.queueIndex - 1)];
+      }
+    }
+
+    let calculatedMs = 0;
+    if (currentItem && currentItem.startTime !== undefined) {
+      const baseMs = currentItem.timelineStartMs !== undefined ? currentItem.timelineStartMs : 0;
+      const offsetMs = (now - currentItem.startTime) * 1000;
+      calculatedMs = Math.max(0, baseMs + offsetMs);
+    } else if (this.queue && this.queue[0] && this.queue[0].timelineStartMs !== undefined) {
+      calculatedMs = this.queue[0].timelineStartMs;
+    }
+
+    this._lastPlaybackTimeMs = calculatedMs;
+
+    return {
+      isPlaying: true,
+      isPaused: false,
+      timeMs: calculatedMs,
+      activeToken: (currentItem && currentItem.type === 'body') ? currentItem.rawToken : null,
+      activeMarker: (currentItem && (currentItem.type === 'prefix' || currentItem.type === 'suffix'))
+        ? { type: currentItem.type, text: currentItem.markerText }
+        : null
+    };
   }
 
   destroy() {
