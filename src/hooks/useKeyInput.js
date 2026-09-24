@@ -335,15 +335,10 @@ export function useKeyInput({
   }, []);
 
   // 手键模式：统一按键触发处理
-  const lastUpTimeRef = useRef(0);
-
   const handleDown = useCallback((source = 'keyboard') => {
     if (isKeyDownRef.current) return; // 防重复
-    const now = performance.now();
-    // 硬件触点软件微消抖：忽略抬键后极短时间内 (< 10ms) 的物理触点抖动 / 开关回弹杂波
-    if (source === 'serial' && (now - lastUpTimeRef.current < 10)) return;
-
     isKeyDownRef.current = true;
+    const now = performance.now();
     keyDownTimeRef.current = now;
     setIsKeyDown(true);
 
@@ -360,7 +355,6 @@ export function useKeyInput({
     if (!isKeyDownRef.current) return;
     isKeyDownRef.current = false;
     const now = performance.now();
-    lastUpTimeRef.current = now;
     const duration = Math.max(10, Math.round(now - keyDownTimeRef.current));
     setPressDuration(duration);
     setIsKeyDown(false);

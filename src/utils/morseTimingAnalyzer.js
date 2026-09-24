@@ -219,14 +219,11 @@ export function extractUserPulsesAndGaps(rawEvents = [], sessionStartTime = 0) {
           ? Number(ev.duration)
           : Math.max(10, relTime - currentDown);
         
-        // 过滤低于 15ms 的物理触点抖动杂波 (Debounce / Glitch filter)
-        if (pulseDuration >= 15) {
-          pulses.push({
-            start: currentDown,
-            end: currentDown + pulseDuration,
-            duration: pulseDuration
-          });
-        }
+        pulses.push({
+          start: currentDown,
+          end: currentDown + pulseDuration,
+          duration: pulseDuration
+        });
         currentDown = null;
       }
     }
