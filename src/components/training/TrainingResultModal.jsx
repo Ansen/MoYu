@@ -1,5 +1,5 @@
 import React from 'react';
-import { Award, CheckCircle2, RotateCcw, X, Activity, Zap, BarChart2 } from 'lucide-react';
+import { Award, CheckCircle2, RotateCcw, X, Activity, Zap, BarChart2, Lightbulb } from 'lucide-react';
 import { useI18n } from '../../i18n';
 
 export default function TrainingResultModal({ isOpen, onClose, onRetry, result, wpm }) {
@@ -14,6 +14,8 @@ export default function TrainingResultModal({ isOpen, onClose, onRetry, result, 
     unitMs = 60,
     avgDot = 60,
     avgDash = 180,
+    avgElementGap = null,
+    avgCharGap = null,
     dotDashRatio = 3.0,
     dotDeviation = 0,
     dashDeviation = 0,
@@ -23,6 +25,28 @@ export default function TrainingResultModal({ isOpen, onClose, onRetry, result, 
     totalTargetPulses = 0,
     totalUserPulses = 0
   } = result;
+
+  // 教练诊断建议生成逻辑
+  const diagnosticTips = [];
+  if (dotDeviation < -25) {
+    diagnosticTips.push(t('training.result.adviceDotShort', '点 (DOT) 明显偏短（实际仅为标准的一半），打键稍显发飘，建议下压时手腕下沉按实，送足单基准时长。'));
+  } else if (dotDeviation > 25) {
+    diagnosticTips.push(t('training.result.adviceDotLong', '点 (DOT) 持续偏长，提手略有粘连，可加快断开节奏。'));
+  }
+
+  if (dotDashRatio > 3.8) {
+    diagnosticTips.push(t('training.result.adviceRatioHigh', '点划比例偏大（划较长或点过短），注意保持 1:3 黄金比例。'));
+  } else if (dotDashRatio < 2.2 && dotDashRatio > 0) {
+    diagnosticTips.push(t('training.result.adviceRatioLow', '划 (DASH) 长度偏短，容易被误听为点，长划请按足 3 个单基准时间。'));
+  }
+
+  if (timingConsistency < 60) {
+    diagnosticTips.push(t('training.result.adviceConsistency', '点划识别率良好，节奏略有起伏，建议跟随系统节拍保持均匀呼吸与敲击惯性。'));
+  }
+
+  if (diagnosticTips.length === 0) {
+    diagnosticTips.push(t('training.result.adviceGood', '节奏稳健、点划比例标准，发挥出色，继续保持！'));
+  }
 
   // 评级颜色体系
   const gradeColors = {
@@ -137,7 +161,7 @@ export default function TrainingResultModal({ isOpen, onClose, onRetry, result, 
                   <tr>
                     <td className="p-2.5 font-sans">{t('training.result.elementGap', '字符内间隔 (Element Gap)')}</td>
                     <td className="p-2.5">{unitMs} ms</td>
-                    <td className="p-2.5">-</td>
+                    <td className="p-2.5">{avgElementGap !== null ? `${avgElementGap} ms` : '-'}</td>
                     <td className={`p-2.5 text-right font-bold ${Math.abs(elementGapDeviation) <= 20 ? 'text-emerald-500' : 'text-amber-500'}`}>
                       {elementGapDeviation >= 0 ? `+${elementGapDeviation}%` : `${elementGapDeviation}%`}
                     </td>
@@ -145,7 +169,7 @@ export default function TrainingResultModal({ isOpen, onClose, onRetry, result, 
                   <tr>
                     <td className="p-2.5 font-sans">{t('training.result.charGap', '字符间间隔 (Char Gap)')}</td>
                     <td className="p-2.5">{unitMs * 3} ms</td>
-                    <td className="p-2.5">-</td>
+                    <td className="p-2.5">{avgCharGap !== null ? `${avgCharGap} ms` : '-'}</td>
                     <td className={`p-2.5 text-right font-bold ${Math.abs(charGapDeviation) <= 20 ? 'text-emerald-500' : 'text-amber-500'}`}>
                       {charGapDeviation >= 0 ? `+${charGapDeviation}%` : `${charGapDeviation}%`}
                     </td>
@@ -153,6 +177,19 @@ export default function TrainingResultModal({ isOpen, onClose, onRetry, result, 
                 </tbody>
               </table>
             </div>
+          </div>
+
+          {/* Coaching Diagnostics Box */}
+          <div className="p-3.5 rounded-xl bg-indigo-50/70 dark:bg-indigo-950/20 border border-indigo-100 dark:border-indigo-900/40 text-xs space-y-1.5">
+            <div className="flex items-center gap-1.5 font-bold text-indigo-700 dark:text-indigo-300">
+              <Lightbulb size={14} className="text-amber-500" />
+              <span>{t('training.result.diagnostics', '教练诊断建议：')}</span>
+            </div>
+            <ul className="list-disc list-inside space-y-1 text-slate-600 dark:text-slate-300 leading-relaxed pl-0.5">
+              {diagnosticTips.map((tip, idx) => (
+                <li key={idx} className="marker:text-indigo-400">{tip}</li>
+              ))}
+            </ul>
           </div>
 
         </div>

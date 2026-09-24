@@ -8,7 +8,8 @@ import {
   ChevronUp, 
   BarChart2, 
   Cpu, 
-  Keyboard
+  Keyboard,
+  Clock
 } from 'lucide-react';
 import MorseTimelineCanvas from './MorseTimelineCanvas';
 import { useI18n } from '../../i18n';
@@ -20,6 +21,14 @@ export default function TrainingScopePanel({
   setTrainingMode,
   inputDevice = 'keyboard',
   setInputDevice,
+  keyType = 'straight',
+  setKeyType,
+  paddleReverse = false,
+  setPaddleReverse,
+  playheadPosition = 'right',
+  setPlayheadPosition,
+  timeWindowSec = 8,
+  setTimeWindowSec,
   onConnectSerial,
   isSerialConnected = false,
   isKeyDown = false,
@@ -31,7 +40,7 @@ export default function TrainingScopePanel({
   isFinished = false,
   onOpenResult,
   hasResult = false,
-  height = 68,
+  height = 30,
   sidetoneOffset = 80,
   setSidetoneOffset,
   effectiveSidetoneFreq = 480,
@@ -91,6 +100,8 @@ export default function TrainingScopePanel({
                 if (!isSerialConnected && onConnectSerial) {
                   onConnectSerial();
                 }
+              } else if (!isSerialConnected) {
+                if (onConnectSerial) onConnectSerial();
               } else {
                 setInputDevice?.('keyboard');
               }
@@ -115,6 +126,47 @@ export default function TrainingScopePanel({
               <span className="text-[10px] font-mono font-bold">{isSerialConnected ? 'USB' : 'OFF'}</span>
             )}
           </button>
+
+          {/* 电键模式切换胶囊: 手键 (直键) ↔ 自动键 (双桨) */}
+          <div className="flex items-center bg-slate-200/80 dark:bg-[#222222] p-0.5 rounded-lg border border-slate-300/60 dark:border-[#333333] shrink-0 h-6 text-[10.5px]">
+            <button
+              type="button"
+              onClick={() => setKeyType?.('straight')}
+              className={`h-full px-1.5 rounded-md flex items-center justify-center font-medium transition-colors cursor-pointer select-none ${
+                keyType === 'straight'
+                  ? 'bg-white dark:bg-[#181818] text-indigo-600 dark:text-indigo-400 font-semibold shadow-2xs'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+              }`}
+              title={t('training.scope.keyTypeStraightTooltip', '手键模式（直键/大二芯）：单触点发报，忽略 P15 引脚防短路误触')}
+            >
+              <span>{t('training.scope.keyTypeStraight', '手键')}</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setKeyType?.('paddle')}
+              className={`h-full px-1.5 rounded-md flex items-center justify-center font-medium transition-colors cursor-pointer select-none ${
+                keyType === 'paddle'
+                  ? 'bg-white dark:bg-[#181818] text-indigo-600 dark:text-indigo-400 font-semibold shadow-2xs'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+              }`}
+              title={t('training.scope.keyTypePaddleTooltip', '自动键模式（双桨/大三芯）：支持点划双触点独立采集')}
+            >
+              <span>{t('training.scope.keyTypePaddle', '自动键')}</span>
+            </button>
+
+            {keyType === 'paddle' && (
+              <button
+                type="button"
+                onClick={() => setPaddleReverse?.((prev) => !prev)}
+                className="h-full px-1.5 border-l border-slate-300/80 dark:border-[#333333] ml-0.5 flex items-center justify-center font-mono text-[9.5px] font-semibold text-slate-500 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors cursor-pointer select-none"
+                title={paddleReverse 
+                  ? t('training.scope.paddleReverseTooltip', '自动键极性反转：P14=点(Dit) / P15=划(Dah) [点击切换为标准]') 
+                  : t('training.scope.paddleNormalTooltip', '自动键标准极性：P14=划(Dah) / P15=点(Dit) [点击切换为反转]')}
+              >
+                <span>{paddleReverse ? '点/划' : '划/点'}</span>
+              </button>
+            )}
+          </div>
 
           {/* 模式选择胶囊 (纯图标切换: 实时 / 盲跟 / 静音) */}
           <div className="flex items-center bg-slate-200/80 dark:bg-[#222222] p-0.5 rounded-lg border border-slate-300/60 dark:border-[#333333] shrink-0 h-6">
@@ -151,6 +203,67 @@ export default function TrainingScopePanel({
             >
               <VolumeX size={13} />
             </button>
+          </div>
+
+          {/* 示波器走纸视角模式: 走纸 (右侧 85%) ↔ 前瞻 (左侧 20%) */}
+          <div className="flex items-center bg-slate-200/80 dark:bg-[#222222] p-0.5 rounded-lg border border-slate-300/60 dark:border-[#333333] shrink-0 h-6 text-[10.5px]">
+            <button
+              type="button"
+              onClick={() => setPlayheadPosition?.('right')}
+              className={`h-full px-1.5 rounded-md flex items-center justify-center font-medium transition-colors cursor-pointer select-none ${
+                playheadPosition === 'right'
+                  ? 'bg-white dark:bg-[#181818] text-indigo-600 dark:text-indigo-400 font-semibold shadow-2xs'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+              }`}
+              title={t('training.scope.playheadRightTooltip', '走纸记录仪模式：当前时刻线位于右侧(85%)，点划在右端实时产生并向左沉淀流淌')}
+            >
+              <span>{t('training.scope.playheadRight', '走纸')}</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setPlayheadPosition?.('left')}
+              className={`h-full px-1.5 rounded-md flex items-center justify-center font-medium transition-colors cursor-pointer select-none ${
+                playheadPosition === 'left'
+                  ? 'bg-white dark:bg-[#181818] text-indigo-600 dark:text-indigo-400 font-semibold shadow-2xs'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+              }`}
+              title={t('training.scope.playheadLeftTooltip', '前瞻领跑模式：当前时刻线位于左侧(20%)，留出宽幅前瞻视野提前看谱')}
+            >
+              <span>{t('training.scope.playheadLeft', '前瞻')}</span>
+            </button>
+          </div>
+
+          {/* 示波器时基窗口微调: 控制流淌速度 (4s-16s，默认8s，大幅降低20~30 WPM视觉流速) */}
+          <div 
+            className="flex items-center bg-slate-200/80 dark:bg-[#222222] px-2 py-0.5 rounded-lg border border-slate-300/60 dark:border-[#333333] text-[11px] font-mono shrink-0 gap-1.5 h-6"
+            title={t('training.scope.timeWindowTooltip', { sec: timeWindowSec }, `示波器时基窗口: ${timeWindowSec}秒 (数值越大波形流速越慢，20~30 WPM更清晰)`)}
+          >
+            <span className="flex items-center gap-1 text-slate-700 dark:text-slate-300 font-semibold">
+              <Clock size={12} className="text-indigo-500 dark:text-indigo-400 shrink-0" />
+              <span>{timeWindowSec}s</span>
+            </span>
+            {setTimeWindowSec && (
+              <div className="flex items-center border-l border-slate-300/80 dark:border-[#333333] pl-1 gap-0.5">
+                <button
+                  type="button"
+                  onClick={() => setTimeWindowSec((prev) => Math.max(4, prev - 2))}
+                  disabled={timeWindowSec <= 4}
+                  className="w-3.5 h-3.5 flex items-center justify-center rounded hover:bg-white dark:hover:bg-[#333] text-slate-600 dark:text-slate-300 font-bold transition-colors cursor-pointer text-[10px] disabled:opacity-30 disabled:cursor-not-allowed"
+                  title={t('training.scope.timeWindowDec', '缩短时基 (-2秒，拉长波形/加快流速)')}
+                >
+                  -
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setTimeWindowSec((prev) => Math.min(16, prev + 2))}
+                  disabled={timeWindowSec >= 16}
+                  className="w-3.5 h-3.5 flex items-center justify-center rounded hover:bg-white dark:hover:bg-[#333] text-slate-600 dark:text-slate-300 font-bold transition-colors cursor-pointer text-[10px] disabled:opacity-30 disabled:cursor-not-allowed"
+                  title={t('training.scope.timeWindowInc', '放宽时基 (+2秒，放缓流速/更易看清高WPM)')}
+                >
+                  +
+                </button>
+              </div>
+            )}
           </div>
 
           {/* 侧音频率微调 (纯图标+Hz数值) */}
@@ -226,14 +339,16 @@ export default function TrainingScopePanel({
 
       {/* 示波器主体 Canvas 渲染区 */}
       {!isCollapsed && (
-        <div className="p-2">
+        <div className="px-3 py-1">
           <MorseTimelineCanvas
             targetTimeline={targetTimeline}
             userEvents={userEvents}
             currentTime={currentTime}
             isPlaying={isPlaying}
             mode={trainingMode}
+            playheadPosition={playheadPosition}
             height={height}
+            windowDurationMs={(timeWindowSec || 8) * 1000}
             isFinished={isFinished}
           />
         </div>

@@ -28,8 +28,66 @@ export default function FollowTrainingModule({
 }) {
   // 核心模式与输入设备状态
   const [trainingMode, setTrainingMode] = useState('live'); // 'live' | 'blind' | 'silent'
-  const [inputDevice, setInputDevice] = useState('keyboard'); // 'keyboard' | 'ch552g'
+  const [inputDevice, setInputDevice] = useState(() => {
+    try {
+      return localStorage.getItem('moyu_cw_input_device') || 'keyboard';
+    } catch {
+      return 'keyboard';
+    }
+  }); // 'keyboard' | 'ch552g'
+
+  const handleSetInputDevice = useCallback((dev) => {
+    setInputDevice(dev);
+    try {
+      localStorage.setItem('moyu_cw_input_device', dev);
+    } catch {}
+  }, []);
+  const [keyType, setKeyType] = useState(() => {
+    try {
+      return localStorage.getItem('moyu_cw_key_type') || 'straight';
+    } catch {
+      return 'straight';
+    }
+  }); // 'straight' (手键) | 'paddle' (自动键)
+  const [paddleReverse, setPaddleReverse] = useState(() => {
+    try {
+      return localStorage.getItem('moyu_cw_paddle_reverse') === 'true';
+    } catch {
+      return false;
+    }
+  });
+  const [playheadPosition, setPlayheadPosition] = useState(() => {
+    try {
+      return localStorage.getItem('moyu_cw_playhead_pos') || 'right';
+    } catch {
+      return 'right';
+    }
+  }); // 'right' (85% 实时走纸记录仪模式) | 'left' (20% 前瞻领跑模式)
   const [isScopeCollapsed, setIsScopeCollapsed] = useState(false);
+
+  const handleSetPlayheadPosition = useCallback((pos) => {
+    setPlayheadPosition(pos);
+    try {
+      localStorage.setItem('moyu_cw_playhead_pos', pos);
+    } catch {}
+  }, []);
+
+  const handleSetKeyType = useCallback((type) => {
+    setKeyType(type);
+    try {
+      localStorage.setItem('moyu_cw_key_type', type);
+    } catch {}
+  }, []);
+
+  const handleSetPaddleReverse = useCallback((updaterOrVal) => {
+    setPaddleReverse((prev) => {
+      const next = typeof updaterOrVal === 'function' ? updaterOrVal(prev) : updaterOrVal;
+      try {
+        localStorage.setItem('moyu_cw_paddle_reverse', String(next));
+      } catch {}
+      return next;
+    });
+  }, []);
 
   // 记录静音前播放器原始音量，确保切换或退出时精准还原
   const prevPlayerVolRef = useRef(audioPlayer.volume > 0 ? audioPlayer.volume : 100);
@@ -79,6 +137,29 @@ export default function FollowTrainingModule({
   }, []);
 
   const effectiveSidetoneFreq = Math.max(100, Math.min(2000, Number(morseFreq || 400) + sidetoneOffset));
+
+  // 示波器时基窗口状态（秒）：默认 8 秒 (8000ms)，大幅降低高速 WPM 下的视觉流速，使 20~30 WPM 能够从容看清
+  const [timeWindowSec, setTimeWindowSec] = useState(() => {
+    try {
+      const saved = localStorage.getItem('moyu_cw_time_window');
+      if (saved !== null) {
+        const val = parseInt(saved, 10);
+        if (!isNaN(val) && val >= 4 && val <= 16) return val;
+      }
+    } catch {}
+    return 8;
+  });
+
+  const handleSetTimeWindowSec = useCallback((updaterOrVal) => {
+    setTimeWindowSec((prev) => {
+      const next = typeof updaterOrVal === 'function' ? updaterOrVal(prev) : updaterOrVal;
+      const clamped = Math.max(4, Math.min(16, next));
+      try {
+        localStorage.setItem('moyu_cw_time_window', String(clamped));
+      } catch {}
+      return clamped;
+    });
+  }, []);
 
   // 当前真实章节正文（优先取当前章节 text，次取 audioPlayer.session.text，次取 bookData.data）
   const activeChapterContent = chapterText || audioPlayer.session?.text || bookData?.data || '';
@@ -152,6 +233,9 @@ export default function FollowTrainingModule({
   } = useKeyInput({
     enabled: true,
     device: inputDevice,
+    keyType: keyType,
+    paddleReverse: paddleReverse,
+    wpm: morseSpeed,
     frequency: effectiveSidetoneFreq,
     volume: 0.8,
     onKeyEvent: handleRawKeyEvent
@@ -206,7 +290,13 @@ export default function FollowTrainingModule({
         trainingMode={trainingMode}
         setTrainingMode={setTrainingMode}
         inputDevice={inputDevice}
-        setInputDevice={setInputDevice}
+        setInputDevice={handleSetInputDevice}
+        keyType={keyType}
+        setKeyType={handleSetKeyType}
+        paddleReverse={paddleReverse}
+        setPaddleReverse={handleSetPaddleReverse}
+        playheadPosition={playheadPosition}
+        setPlayheadPosition={handleSetPlayheadPosition}
         onConnectSerial={connectSerial}
         isSerialConnected={serialConnected}
         isKeyDown={isKeyDown}
@@ -219,7 +309,9 @@ export default function FollowTrainingModule({
         isFinished={!isPlaying && !!analysisResult}
         onOpenResult={() => setIsResultOpen(true)}
         hasResult={!!analysisResult}
-        height={46}
+        timeWindowSec={timeWindowSec}
+        setTimeWindowSec={handleSetTimeWindowSec}
+        height={30}
         sidetoneOffset={sidetoneOffset}
         setSidetoneOffset={handleSetSidetoneOffset}
         effectiveSidetoneFreq={effectiveSidetoneFreq}

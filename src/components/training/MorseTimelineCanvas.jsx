@@ -19,7 +19,9 @@ export default function MorseTimelineCanvas({
   isPaused = false,
   isFinished = false,
   mode = 'live', // 'live' | 'blind' | 'silent'
-  height = 46
+  playheadPosition = 'right', // 'right' (85% 实时走纸记录仪模式) | 'left' (20% 前瞻领跑模式)
+  height = 30,
+  windowDurationMs = 8000
 }) {
   const { t } = useI18n();
   const containerRef = useRef(null);
@@ -125,21 +127,25 @@ export default function MorseTimelineCanvas({
     ctx.stroke();
     ctx.setLineDash([]);
 
-    // 3. 设定时间视窗与物理映射：显示 4000ms (4秒)
-    const windowDurationMs = 4000;
-    const pxPerMs = width / windowDurationMs;
-    const playheadX = width * 0.2; // 播放基准线居于左侧 20%，留出 80% 视野前瞻
+    // 3. 设定时间视窗与物理映射：默认 8000ms (大幅降低视觉流速，避免 20~30 WPM 晃眼看不清)
+    const effectiveWindowDurationMs = windowDurationMs || 8000;
+    const pxPerMs = width / effectiveWindowDurationMs;
+    // 示波器走纸锚点：'right' (85% 实时走纸记录仪模式，当前点在最右端实时产生并向左沉淀) | 'left' (20% 前瞻领跑模式)
+    const playheadRatio = playheadPosition === 'left' ? 0.20 : 0.85;
+    const playheadX = Math.round(width * playheadRatio);
 
     const curTime = Math.max(0, timeToRender);
     const windowStartMs = curTime - (playheadX / pxPerMs);
     const windowEndMs = curTime + ((width - playheadX) / pxPerMs);
 
     // 4. 批量绘制垂直时间网格 (单次 Path 提交)
-    const firstGridTime = Math.floor(windowStartMs / 500) * 500;
+    // 根据当前窗口大小自适应网格间隔：时间窗口 >= 6s 时每 1000ms 一条线，更清爽舒适
+    const gridStepMs = effectiveWindowDurationMs >= 6000 ? 1000 : 500;
+    const firstGridTime = Math.floor(windowStartMs / gridStepMs) * gridStepMs;
     ctx.lineWidth = 0.5;
     ctx.strokeStyle = colors.grid;
     ctx.beginPath();
-    for (let t = firstGridTime; t <= windowEndMs; t += 500) {
+    for (let t = firstGridTime; t <= windowEndMs; t += gridStepMs) {
       if (t < 0) continue;
       const x = playheadX + (t - curTime) * pxPerMs;
       ctx.moveTo(x, 0);
@@ -274,17 +280,17 @@ export default function MorseTimelineCanvas({
     ctx.stroke();
     ctx.shadowBlur = 0;
 
-    // 顶部小指示三角
+    // 顶部小指示三角 (精巧紧凑，与 30px 高度完美呼应，不遮挡顶部脉冲)
     ctx.fillStyle = colors.playhead;
     ctx.beginPath();
-    ctx.moveTo(playheadX - 4, 0);
-    ctx.lineTo(playheadX + 4, 0);
-    ctx.lineTo(playheadX, 6);
+    ctx.moveTo(playheadX - 3.5, 0);
+    ctx.lineTo(playheadX + 3.5, 0);
+    ctx.lineTo(playheadX, 4.5);
     ctx.closePath();
     ctx.fill();
 
     ctx.restore();
-  }, [targetTimeline, userEvents, isPlaying, isFinished, mode, isDark, t]);
+  }, [targetTimeline, userEvents, isPlaying, isFinished, mode, playheadPosition, windowDurationMs, isDark, t]);
 
   // 自驱 60FPS 动画引擎：在播放中或按压中直接由 Canvas RAF 循环驱动，彻底解耦 React 父树重渲染！
   useEffect(() => {
@@ -313,7 +319,7 @@ export default function MorseTimelineCanvas({
   }, [isPlaying, isPaused, isPressing, currentTime, drawAtTime]);
 
   return (
-    <div ref={containerRef} className="w-full relative overflow-hidden rounded-xl border border-slate-200 dark:border-[#2b2b2b] shadow-inner bg-slate-50 dark:bg-[#121212]">
+    <div ref={containerRef} className="w-full relative overflow-hidden rounded-lg border border-slate-200 dark:border-[#2b2b2b] shadow-2xs bg-slate-50 dark:bg-[#121212]">
       <canvas 
         ref={canvasRef} 
         style={{ width: '100%', height: `${height}px`, display: 'block' }} 

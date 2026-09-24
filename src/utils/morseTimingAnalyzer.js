@@ -219,11 +219,14 @@ export function extractUserPulsesAndGaps(rawEvents = [], sessionStartTime = 0) {
           ? Number(ev.duration)
           : Math.max(10, relTime - currentDown);
         
-        pulses.push({
-          start: currentDown,
-          end: currentDown + pulseDuration,
-          duration: pulseDuration
-        });
+        // 过滤低于 15ms 的物理触点抖动杂波 (Debounce / Glitch filter)
+        if (pulseDuration >= 15) {
+          pulses.push({
+            start: currentDown,
+            end: currentDown + pulseDuration,
+            duration: pulseDuration
+          });
+        }
         currentDown = null;
       }
     }
@@ -273,6 +276,8 @@ export function analyzeSession(arg1, arg2 = [], arg3 = 0) {
       unitMs,
       avgDot: 0,
       avgDash: 0,
+      avgElementGap: null,
+      avgCharGap: null,
       dotDashRatio: 0,
       dotDeviation: 0,
       dashDeviation: 0,
@@ -422,6 +427,8 @@ export function analyzeSession(arg1, arg2 = [], arg3 = 0) {
     unitMs: Math.round(unitMs),
     avgDot: Math.round(avgDot),
     avgDash: Math.round(avgDash),
+    avgElementGap: userElemGaps.length > 0 ? Math.round(avgElemGap) : null,
+    avgCharGap: userCharGaps.length > 0 ? Math.round(avgCharGap) : null,
     dotDashRatio,
     dotDeviation,
     dashDeviation,

@@ -117,6 +117,8 @@ function testKeyInputHookContract() {
   assert.ok(hookCode.includes('pressDuration'), 'useKeyInput must return pressDuration');
   assert.ok(hookCode.includes('serialConnected'), 'useKeyInput must return serialConnected');
   assert.ok(hookCode.includes('connectSerial'), 'useKeyInput must return connectSerial');
+  assert.ok(hookCode.includes('paddleReverse'), 'useKeyInput must accept paddleReverse option');
+  assert.ok(hookCode.includes('wpm'), 'useKeyInput must accept wpm option');
 
   // 模拟 DOWN / UP 事件格式验证
   const receivedEvents = [];
@@ -171,7 +173,12 @@ function testSidetoneOffsetAndModeIntegrity() {
   );
   assert.ok(panelCode.includes('sidetoneOffset'), 'TrainingScopePanel MUST support sidetoneOffset prop');
   assert.ok(panelCode.includes('Volume2'), 'TrainingScopePanel MUST import and display Volume2 icon');
-  console.log('✓ TrainingScopePanel mode button non-blocking & sidetone UI validated.');
+  assert.ok(panelCode.includes('keyType'), 'TrainingScopePanel MUST support keyType prop');
+  assert.ok(panelCode.includes('setKeyType'), 'TrainingScopePanel MUST support setKeyType prop');
+  assert.ok(panelCode.includes('playheadPosition'), 'TrainingScopePanel MUST support playheadPosition prop');
+  assert.ok(panelCode.includes('timeWindowSec'), 'TrainingScopePanel MUST support timeWindowSec prop');
+  assert.ok(panelCode.includes('setTimeWindowSec'), 'TrainingScopePanel MUST support setTimeWindowSec prop');
+  console.log('✓ TrainingScopePanel mode button, key type switch, playhead mode, timebase window & sidetone UI validated.');
 
   // 3. 检查 MorseTimelineCanvas.jsx：盲跟模式逻辑与细长舒展轨道参数
   const canvasPath = path.resolve('src/components/training/MorseTimelineCanvas.jsx');
@@ -181,18 +188,22 @@ function testSidetoneOffsetAndModeIntegrity() {
     'MorseTimelineCanvas MUST hide target pulses whenever mode is blind (even before playback)'
   );
   assert.ok(
-    canvasCode.includes('windowDurationMs = 4000') || canvasCode.includes('windowDurationMs = 4500'),
-    'MorseTimelineCanvas MUST use an elegant window (4000ms) for slender, elongated pulses'
+    canvasCode.includes('windowDurationMs = 8000') || canvasCode.includes('effectiveWindowDurationMs'),
+    'MorseTimelineCanvas MUST support elegant window (default 8000ms) for calm, readable pulses at 20-30 WPM'
   );
   assert.ok(
     canvasCode.includes('pulseH = 3'),
     'MorseTimelineCanvas MUST use 3px refined pulse height'
   );
-  console.log('✓ MorseTimelineCanvas blind mode masking & slender 4000ms window validated.');
+  console.log('✓ MorseTimelineCanvas blind mode masking & calm 8000ms window validated.');
 
-  // 4. 检查 FollowTrainingModule.jsx：默认 +80Hz、本地存储及播放器伴听静音
+  // 4. 检查 FollowTrainingModule.jsx：默认 +80Hz、时基持久化及播放器伴听静音
   const modulePath = path.resolve('src/components/training/FollowTrainingModule.jsx');
   const moduleCode = fs.readFileSync(modulePath, 'utf8');
+  assert.ok(
+    moduleCode.includes('moyu_cw_time_window'),
+    'FollowTrainingModule MUST persist time window setting in localStorage'
+  );
   assert.ok(
     moduleCode.includes('moyu_sidetone_offset'),
     'FollowTrainingModule MUST persist sidetone offset in localStorage'
@@ -270,7 +281,7 @@ export function testFollowTrainingLogic() {
   const testText = "CQ CQ DE BG5AV 73 88";
   const testWpm = 20;
   const testTimeline = generateTargetTimeline({ text: testText, wpm: testWpm, numberMode: 'long' });
-  const unitMs = 1200 / testWpm;
+  const _unitMs = 1200 / testWpm;
   // 首字 'C' (-.-.) 持续 (3+1+1+1+3+1+1)*60 = 660ms，加间隙 3*60 = 180ms，合计 840ms
   // 第二字 'Q' (--.-) 起始时间必须精确等于 840ms
   assert.strictEqual(testTimeline.tokenAnchorMap[0].start, 0);
