@@ -78,17 +78,17 @@ export default function TrainingScopePanel({
               e.preventDefault();
               onManualUp?.();
             }}
-            className={`h-6 px-1.5 rounded-md font-mono text-[11px] font-semibold flex items-center gap-1.5 transition-all shadow-2xs whitespace-nowrap shrink-0 cursor-pointer select-none active:scale-95 ${
+            className={`h-6 w-[58px] px-1.5 rounded-md font-mono text-[10.5px] font-semibold flex items-center justify-center gap-1.5 transition-colors shadow-2xs whitespace-nowrap shrink-0 cursor-pointer select-none active:scale-95 ${
               isKeyDown 
                 ? 'bg-emerald-500 text-white shadow-emerald-500/30' 
                 : 'bg-slate-200/80 dark:bg-[#252525] text-slate-600 dark:text-slate-400 hover:bg-slate-300 dark:hover:bg-[#303030]'
             }`}
             title={isKeyDown ? t('training.scope.keyDown', '电键按下 (支持长按发报)') : t('training.scope.keyUp', '电键待命 (点击或长按可虚拟发报)')}
           >
-            <span className={`w-2 h-2 rounded-full ${isKeyDown ? 'bg-white animate-ping' : 'bg-slate-400 dark:bg-slate-500'}`} />
-            {pressDuration > 0 && (
-              <span className="font-mono text-[10.5px]">{pressDuration}ms</span>
-            )}
+            <span className={`w-2 h-2 rounded-full shrink-0 ${isKeyDown ? 'bg-white animate-ping' : 'bg-slate-400 dark:bg-slate-500'}`} />
+            <span className="font-mono text-[10.5px] tabular-nums">
+              {pressDuration > 0 ? `${pressDuration}ms` : '--'}
+            </span>
           </div>
 
           {/* 输入源切换图标: 键盘 (默认) ↔ CH552G 硬件芯片 */}
