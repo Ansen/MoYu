@@ -1,4 +1,4 @@
-import { textToMorseTokens, getCharMorseCode } from './morseCode.js';
+import { textToMorseTokens, getCharMorseCode, normalizeMorseTokenGaps } from './morseCode.js';
 
 /**
  * 计算标准 WPM 下单个时间单元 (unit / dot) 的毫秒数
@@ -76,13 +76,14 @@ export function generateTargetTimeline(input, wpm = 20, numberMode = 'long', opt
     }
   }
 
+  const playbackTokens = normalizeMorseTokenGaps(allTokens);
   const pulses = [];
   const gaps = [];
   const tokenAnchorMap = {}; // rawIndex -> { start, end, char }
   let currentTime = 0;
 
-  for (let tIdx = 0; tIdx < allTokens.length; tIdx++) {
-    const token = allTokens[tIdx];
+  for (let tIdx = 0; tIdx < playbackTokens.length; tIdx++) {
+    const token = playbackTokens[tIdx];
     const tokenStartTime = currentTime;
 
     if (token.code === null) {
@@ -172,7 +173,7 @@ export function generateTargetTimeline(input, wpm = 20, numberMode = 'long', opt
     totalDuration: currentTime,
     unitMs,
     wpm: configWpm,
-    tokens: allTokens,
+    tokens: playbackTokens,
     tokenAnchorMap,
     prefixStart: prefixStart >= 0 ? prefixStart : 0,
     prefixEnd: prefixEnd >= 0 ? prefixEnd : 0

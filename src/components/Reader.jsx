@@ -86,6 +86,25 @@ export default function Reader({ bookData, onClose, jumpToSibling, jumpToChapter
     });
   }, []);
 
+  // 隐藏/显示正文 (听抄防偷瞄模式)
+  const [isTextHidden, setIsTextHidden] = useState(() => {
+    try {
+      return localStorage.getItem('pref_reader_hide_text') === 'true';
+    } catch {
+      return false;
+    }
+  });
+
+  const handleToggleTextHidden = useCallback((val) => {
+    setIsTextHidden(prev => {
+      const next = typeof val === 'boolean' ? val : !prev;
+      try {
+        localStorage.setItem('pref_reader_hide_text', String(next));
+      } catch {}
+      return next;
+    });
+  }, []);
+
   // 离开阅读器时清理播放器
   useEffect(() => {
     return () => {
@@ -204,6 +223,12 @@ export default function Reader({ bookData, onClose, jumpToSibling, jumpToChapter
     const handleKeyDown = (e) => {
       if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
 
+      if (e.key === 'h' || e.key === 'H') {
+        e.preventDefault();
+        handleToggleTextHidden();
+        return;
+      }
+
       if (isTraining) {
         if (e.key === 'Enter') {
           e.preventDefault();
@@ -227,7 +252,7 @@ export default function Reader({ bookData, onClose, jumpToSibling, jumpToChapter
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isTraining, togglePlay, handlePrev, handleNext]);
+  }, [isTraining, togglePlay, handlePrev, handleNext, handleToggleTextHidden]);
 
   const paginationLabel = engineRef.current ? engineRef.current.getPaginationLabel() : '';
 
@@ -273,6 +298,8 @@ export default function Reader({ bookData, onClose, jumpToSibling, jumpToChapter
         toggleInterferenceMode={toggleInterferenceMode}
         isTraining={isTraining}
         setIsTraining={handleToggleTraining}
+        isTextHidden={isTextHidden}
+        setIsTextHidden={handleToggleTextHidden}
       />
 
       {/* Main Content Area */}
@@ -292,7 +319,7 @@ export default function Reader({ bookData, onClose, jumpToSibling, jumpToChapter
         {/* Text Engine Viewer */}
         <div className="flex-1 flex flex-col min-w-0 bg-white dark:bg-[#1c1c1c] relative overflow-hidden">
           <div className="flex-1 relative">
-            <div className="absolute inset-0">
+            <div className={`absolute inset-0 transition-opacity duration-200 ${isTextHidden ? 'invisible pointer-events-none opacity-0 select-none' : 'visible opacity-100'}`}>
               <TxtEngine 
                 ref={engineRef}
                 bookData={bookData}

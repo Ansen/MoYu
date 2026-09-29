@@ -1,5 +1,5 @@
 import { MORSE_AUDIO_CONFIG } from '../config/morseAudio.js';
-import { textToMorseTokens, getCharMorseCode } from './morseCode.js';
+import { textToMorseTokens, getCharMorseCode, normalizeMorseTokenGaps } from './morseCode.js';
 
 const TONE_VOLUME = MORSE_AUDIO_CONFIG.OUTPUT.TONE_VOLUME;
 const TONE_FADE_SECONDS = 0.002;
@@ -26,7 +26,7 @@ export const AUDIO_STATE = {
  *    - 纯门控增益调制 (Gain Envelope Switching)，0 内存分配，0 垃圾回收卡顿
  * 2. W3C 双时钟前瞻调度 (Lookahead Scheduler)：
  *    - 硬件时钟 (AudioContext.currentTime)：微秒级高精度控制发声时间点与淡入淡出包络
- *    - 调度器时钟 (setInterval 25ms)：前瞻 100ms 批量向硬件管道提交音符，免疫主线程卡顿
+ *    - 调度器时钟 (setInterval 25ms)：前瞻 150ms 批量向硬件管道提交音符，吸收短时抖动；超时后顺延，避免压缩间隔
  * 3. 统一音频生命周期停音管理 (_stopPlaybackEngine)：3ms setTargetAtTime 指数软淡出消爆音
  * 4. 串行互斥锁 (_runCommand)：杜绝并发连击导致的异步时序踩踏
  * 5. 单一真实状态源 (SSOT) 与事件总线：通过 subscribe 广播状态，解耦 UI
@@ -312,10 +312,13 @@ class DesktopAudioPlayer {
     // 立即对音频管道执行下字符无缝热重调度，确保当前字符自然发音完毕后，从下一个字符 100% 立即采用新速率与新码表
     if (this.playbackState.isPlaying && !this.playbackState.isPaused && (wpmChanged || numberModeChanged)) {
       this._rescheduleFromNextChar();
-    } else if (numberModeChanged && this.queue && this.queue.length > 0) {
-      // 处于非播放状态 (停止/暂停) 时仅刷新待播队列中的数字编码
-      this._refreshQueueNumberMode(Math.max(0, this.queueIndex || 0), config.numberMode);
+    } else if ((wpmChanged || numberModeChanged) && this.queue.length > 0) {
+      const startIndex = Math.max(0, this.queueIndex || 0);
+      this._refreshQueueNumberMode(startIndex, this.playbackConfig.numberMode);
+      this._recomputeTimelineOffsets(startIndex);
     }
+
+    Object.assign(this.session.options, config);
 
     this._emitStateChange();
   }
@@ -327,34 +330,57 @@ class DesktopAudioPlayer {
     if (!this.queue || this.queue.length === 0) return;
 
     const now = this.audioContext ? this.audioContext.currentTime : 0;
+    const dotSec = 1.2 / this.playbackConfig.wpm;
+    let previousIndex = -1;
+    let nextIndex = this.queueIndex;
+    let nextStart = Math.max(now, this.nextNoteTime);
 
-    // 1. 查找当前正在发声的字符 (保留它平滑自然播完，避免任何截音或爆音)
-    let activeIndex = -1;
-    let cutOffTime = now;
-
-    if (this.audioContext) {
-      for (let i = 0; i < this.queue.length; i++) {
-        const it = this.queue[i];
-        if (it.startTime !== undefined && it.endTime !== undefined) {
-          if (it.startTime <= now && it.endTime > now) {
-            activeIndex = i;
-            cutOffTime = it.endTime;
-            break;
-          } else if (it.startTime > now) {
-            if (activeIndex === -1) {
-              activeIndex = Math.max(0, i - 1);
-              cutOffTime = Math.max(now, it.startTime);
-            }
-            break;
-          }
-        }
+    // Preserve only characters whose sound has actually started. A character
+    // scheduled during the lead-in is still pending, including queue[0].
+    for (let i = 0; i < this.queue.length; i++) {
+      const item = this.queue[i];
+      if (item.startTime === undefined) continue;
+      if (item.startTime > now) {
+        nextIndex = i;
+        nextStart = item.startTime;
+        break;
       }
+      if (item.code !== null) previousIndex = i;
     }
 
-    const nextIndex = activeIndex >= 0 ? activeIndex + 1 : Math.max(0, this.queueIndex);
+    let cutOffTime = now;
+    let nextOffsetMs;
+    if (previousIndex >= 0) {
+      const previous = this.queue[previousIndex];
+      nextIndex = previousIndex + 1;
+      while (nextIndex < this.queue.length && this.queue[nextIndex].code === null) nextIndex++;
+      if (nextIndex >= this.queue.length) return;
+
+      const toneEnd = previous.toneEndTime;
+      // Keep the final release ramp at toneEnd; cancelling AT its endpoint
+      // would remove that ramp and clip the last tone's envelope.
+      cutOffTime = toneEnd > now ? toneEnd + 0.000001 : now;
+      const hasWordGap = nextIndex > previousIndex + 1;
+      // Retiming is based on the end of sound, not the old 3-unit char gap.
+      // If a faster setting's gap has already elapsed, never rewind time.
+      nextStart = Math.max(cutOffTime, toneEnd + (hasWordGap ? 7 : 3) * dotSec);
+      previous.endTime = hasWordGap ? toneEnd + 3 * dotSec : nextStart;
+      previous.timelineDurationMs = (previous.endTime - previous.startTime) * 1000;
+      previous.timelineEndMs = previous.timelineStartMs + previous.timelineDurationMs;
+      nextOffsetMs = previous.timelineEndMs;
+
+      if (hasWordGap) {
+        const gap = this.queue[previousIndex + 1];
+        gap.startTime = previous.endTime;
+        gap.endTime = nextStart;
+        gap.timelineStartMs = nextOffsetMs;
+        gap.timelineDurationMs = (nextStart - gap.startTime) * 1000;
+        gap.timelineEndMs = nextOffsetMs + gap.timelineDurationMs;
+        nextOffsetMs = gap.timelineEndMs;
+      }
+    }
     if (nextIndex >= this.queue.length) return;
 
-    // 2. 撤销 cutOffTime 之后的所有预排硬件包络，并自增代数以作废过期的未触发高亮回调
     this._scheduleEpoch = (this._scheduleEpoch || 0) + 1;
     if (this.oscGain) {
       try {
@@ -363,14 +389,17 @@ class DesktopAudioPlayer {
       } catch {}
     }
 
-    // 3. 将调度游标重新对准下一个字符，并将基准时间点对齐至当前字符结束时刻
+    // Cancelled lookahead entries must not masquerade as already scheduled
+    // on a second speed change, pause, or progress query.
+    for (let i = nextIndex; i < this.queue.length; i++) {
+      delete this.queue[i].startTime;
+      delete this.queue[i].endTime;
+      delete this.queue[i].toneEndTime;
+    }
     this.queueIndex = nextIndex;
-    this.nextNoteTime = Math.max(now, cutOffTime);
-
-    // 4. 刷新从下一个字符开始的后续队列数字码
+    this.nextNoteTime = nextStart;
     this._refreshQueueNumberMode(nextIndex, this.playbackConfig.numberMode);
-
-    // 5. 立即用最新的 WPM / 码表填充调度管道
+    this._recomputeTimelineOffsets(nextIndex, nextOffsetMs);
     this.scheduler();
   }
 
@@ -404,10 +433,10 @@ class DesktopAudioPlayer {
    * 物理级 0 延迟、0 丢划、0 拓扑重排
    */
   scheduleTone(durationSec, startTime) {
-    if (!this.audioContext || !this.oscGain) return;
-    const gain = this.oscGain.gain;
-    const now = this.audioContext.currentTime;
+    const now = this.audioContext ? this.audioContext.currentTime : startTime;
     const actualStart = Math.max(startTime, now);
+    if (!this.audioContext || !this.oscGain) return actualStart;
+    const gain = this.oscGain.gain;
     const fade = Math.min(TONE_FADE_SECONDS, durationSec * 0.25);
 
     try {
@@ -421,6 +450,7 @@ class DesktopAudioPlayer {
         gain.setValueAtTime(0, actualStart + durationSec);
       } catch {}
     }
+    return actualStart;
   }
 
   /**
@@ -517,6 +547,14 @@ class DesktopAudioPlayer {
       } catch {}
     }
 
+    // A paused character is replayed from its start. Old lookahead timestamps
+    // no longer belong to this run, particularly after a paused config change.
+    for (let i = this.queueIndex; i < this.queue.length; i++) {
+      delete this.queue[i].startTime;
+      delete this.queue[i].endTime;
+      delete this.queue[i].toneEndTime;
+    }
+    this._recomputeTimelineOffsets(this.queueIndex);
     this.nextNoteTime = now + leadIn;
 
     // 启动 25ms Lookahead 调度心跳
@@ -568,21 +606,21 @@ class DesktopAudioPlayer {
       }
     }
 
-    this.queue = queue;
+    this.queue = normalizeMorseTokenGaps(queue);
     this.queueIndex = 0;
     this._recomputeTimelineOffsets();
-    return queue;
+    return this.queue;
   }
 
   /**
    * 预计算队列中每一个字符在整段文本时间轴上的理论毫秒刻度 (纯只读元数据)
    */
-  _recomputeTimelineOffsets() {
+  _recomputeTimelineOffsets(startIndex = 0, startOffsetMs = this.queue?.[startIndex - 1]?.timelineEndMs ?? 0) {
     if (!this.queue) return;
     const dotMs = (1200 / Math.max(5, Math.min(60, Number(this.playbackConfig.wpm) || 20)));
-    let offsetMs = 0;
+    let offsetMs = startOffsetMs;
 
-    for (let i = 0; i < this.queue.length; i++) {
+    for (let i = startIndex; i < this.queue.length; i++) {
       const item = this.queue[i];
       item.timelineStartMs = offsetMs;
 
@@ -618,14 +656,59 @@ class DesktopAudioPlayer {
 
     const dotSec = (1200 / this.playbackConfig.wpm) / 1000;
 
-    // 前瞻 100ms 批量填充硬件管道
+    // 前瞻 150ms 批量填充硬件管道
     while (this.queueIndex < this.queue.length && this.nextNoteTime < this.audioContext.currentTime + SCHEDULE_AHEAD_TIME_SEC) {
       const item = this.queue[this.queueIndex];
-      const curStartTime = this.nextNoteTime;
-      item.startTime = curStartTime;
+      const plannedStart = this.nextNoteTime;
+      item.startTime = plannedStart;
 
       const currentEpoch = this._scheduleEpoch;
 
+      if (item.code === null) {
+        // 空格/间隔: 标准 4 dots 词间间隔 (加前置字符尾部 3 dots = 标准 7 dots)
+        this.nextNoteTime += 4 * dotSec;
+      } else {
+        // 点划发射：如果是数字，始终确保以最新的 numberMode 编码为准 (双重保障)
+        let activeCode = item.code;
+        if (/[0-9]/.test(item.char)) {
+          const latestCode = getCharMorseCode(item.char, this.playbackConfig.numberMode);
+          if (latestCode) {
+            activeCode = latestCode;
+            item.code = latestCode;
+            if (item.rawToken) item.rawToken.code = latestCode;
+          }
+        }
+
+        const symbols = activeCode.split('');
+        for (let s = 0; s < symbols.length; s++) {
+          const sym = symbols[s];
+          const durSec = sym === '-' ? 3 * dotSec : 1 * dotSec;
+          const actualStart = this.scheduleTone(durSec, this.nextNoteTime);
+          if (s === 0) {
+            item.startTime = actualStart;
+            item.timelineStartMs += (actualStart - plannedStart) * 1000;
+          }
+          // Shift every following symbol too: clamping just this tone would
+          // steal its delay from the next element/character/word gap.
+          this.nextNoteTime = actualStart + durSec;
+          if (s < symbols.length - 1) {
+            this.nextNoteTime += 1 * dotSec; // 字符内点划间隙 1 dot
+          }
+        }
+        item.toneEndTime = this.nextNoteTime;
+        this.nextNoteTime += 3 * dotSec; // 字符间间隙 3 dots
+      }
+
+
+      item.endTime = this.nextNoteTime;
+      const durationMs = (item.endTime - item.startTime) * 1000;
+      const retimed = Math.abs(durationMs - item.timelineDurationMs) > 1e-7 || item.startTime !== plannedStart;
+      item.timelineDurationMs = durationMs;
+      item.timelineEndMs = item.timelineStartMs + durationMs;
+      this.queueIndex++;
+      if (retimed) this._recomputeTimelineOffsets(this.queueIndex);
+
+      const curStartTime = item.startTime;
       if (item.type === 'prefix' || item.type === 'suffix') {
         if (item.code !== null) {
           const delayMs = Math.max(0, (curStartTime - this.audioContext.currentTime) * 1000);
@@ -659,38 +742,6 @@ class DesktopAudioPlayer {
         }
       }
 
-
-      if (item.code === null) {
-        // 空格/间隔: 标准 4 dots 词间间隔 (加前置字符尾部 3 dots = 标准 7 dots)
-        this.nextNoteTime += 4 * dotSec;
-      } else {
-        // 点划发射：如果是数字，始终确保以最新的 numberMode 编码为准 (双重保障)
-        let activeCode = item.code;
-        if (/[0-9]/.test(item.char)) {
-          const latestCode = getCharMorseCode(item.char, this.playbackConfig.numberMode);
-          if (latestCode) {
-            activeCode = latestCode;
-            item.code = latestCode;
-            if (item.rawToken) item.rawToken.code = latestCode;
-          }
-        }
-
-        const symbols = activeCode.split('');
-        for (let s = 0; s < symbols.length; s++) {
-          const sym = symbols[s];
-          const durSec = sym === '-' ? 3 * dotSec : 1 * dotSec;
-          this.scheduleTone(durSec, this.nextNoteTime);
-          this.nextNoteTime += durSec;
-          if (s < symbols.length - 1) {
-            this.nextNoteTime += 1 * dotSec; // 字符内点划间隙 1 dot
-          }
-        }
-        this.nextNoteTime += 3 * dotSec; // 字符间间隙 3 dots
-      }
-
-
-      item.endTime = this.nextNoteTime;
-      this.queueIndex++;
     }
 
     // 播放完毕检测

@@ -88,3 +88,9 @@ export function textToMorseTokens(text, numberMode = 'long') {
   
   return tokens;
 }
+
+/** Keep one word boundary, without a leading orphan gap (e.g. seek/suffix). */
+export function normalizeMorseTokenGaps(tokens) {
+  return tokens.filter((token, index) => token.code !== null
+    || (index > 0 && tokens[index - 1].code !== null));
+}
