@@ -12,9 +12,9 @@ export default function Sidebar({ currentView, setView, openAbout }) {
 
   useEffect(() => {
     try {
-      getVersion().then(v => setVersion('v' + v)).catch(() => setVersion('v0.1.23'));
+      getVersion().then(v => setVersion('v' + v)).catch(() => setVersion('v0.1.24'));
     } catch {
-      setVersion('v0.1.23');
+      setVersion('v0.1.24');
     }
   }, []);
 
