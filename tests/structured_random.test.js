@@ -145,5 +145,71 @@ export function testStructuredRandom() {
   }
   console.log('✓ Letters mode (5-letter groups) validated.');
 
+  // 7. Test Specified Digit Slots (e.g. Fixed Slot 2 -> 3rd character is digit)
+  const fixedSlot2Result = generateStructuredRandomContent({
+    mode: 'custom',
+    pool: '0123456789abcdefghijklmnopqrstuvwxyz'.split(''),
+    charsPerGroup: 5,
+    maxDigitsPerGroup: 1,
+    digitSlots: [2], // 0-based index 2 -> 3rd char
+    groupCount: 50
+  });
+
+  for (let i = 0; i < fixedSlot2Result.groups.length; i++) {
+    const g = fixedSlot2Result.groups[i];
+    if (!/[0-9]/.test(g[2])) {
+      throw new Error(`Group ${i} ('${g.join('')}') expected digit at fixed index 2, got '${g[2]}'`);
+    }
+    const otherDigits = g.filter((ch, idx) => idx !== 2 && /[0-9]/.test(ch));
+    if (otherDigits.length > 0) {
+      throw new Error(`Group ${i} ('${g.join('')}') has unexpected digit outside fixed slot 2`);
+    }
+  }
+  console.log('✓ Specified single digit slot [2] (3rd char) validated (100% match).');
+
+  // 8. Test Specified Boundary Digit Slot [0] (1st char is digit)
+  const fixedSlot0Result = generateStructuredRandomContent({
+    mode: 'custom',
+    pool: '0123456789abcdefghijklmnopqrstuvwxyz'.split(''),
+    charsPerGroup: 5,
+    maxDigitsPerGroup: 1,
+    digitSlots: [0], // 0-based index 0 -> 1st char
+    groupCount: 50
+  });
+
+  for (let i = 0; i < fixedSlot0Result.groups.length; i++) {
+    const g = fixedSlot0Result.groups[i];
+    if (!/[0-9]/.test(g[0])) {
+      throw new Error(`Group ${i} ('${g.join('')}') expected digit at boundary index 0, got '${g[0]}'`);
+    }
+    const otherDigits = g.filter((ch, idx) => idx !== 0 && /[0-9]/.test(ch));
+    if (otherDigits.length > 0) {
+      throw new Error(`Group ${i} ('${g.join('')}') has unexpected digit outside fixed slot 0`);
+    }
+  }
+  console.log('✓ Specified boundary digit slot [0] (1st char) validated (100% match).');
+
+  // 9. Test Specified Multi Digit Slots [1, 3] (2nd and 4th chars are digits)
+  const fixedMultiSlotsResult = generateStructuredRandomContent({
+    mode: 'custom',
+    pool: '0123456789abcdefghijklmnopqrstuvwxyz'.split(''),
+    charsPerGroup: 5,
+    maxDigitsPerGroup: 2,
+    digitSlots: [1, 3], // 2nd and 4th chars
+    groupCount: 50
+  });
+
+  for (let i = 0; i < fixedMultiSlotsResult.groups.length; i++) {
+    const g = fixedMultiSlotsResult.groups[i];
+    if (!/[0-9]/.test(g[1]) || !/[0-9]/.test(g[3])) {
+      throw new Error(`Group ${i} ('${g.join('')}') expected digits at slots [1, 3]`);
+    }
+    const otherDigits = g.filter((ch, idx) => idx !== 1 && idx !== 3 && /[0-9]/.test(ch));
+    if (otherDigits.length > 0) {
+      throw new Error(`Group ${i} ('${g.join('')}') has unexpected digit outside fixed slots [1, 3]`);
+    }
+  }
+  console.log('✓ Specified multi digit slots [1, 3] validated (100% match).');
+
   console.log('All Upgraded Random Generator tests passed successfully!\n');
 }

@@ -6,6 +6,7 @@ import { testReaderToolbarLogic } from './reader_toolbar.test.js';
 import { testAudioPlayerLogic } from './audio_player.test.js';
 import { testEpubExportFormatting } from './epub_export.test.js';
 import { testPdfExport } from './pdf_export.test.js';
+import { testDatasetExportConsistency } from './dataset_export.test.js';
 import { testStructuredRandom } from './structured_random.test.js';
 import { testRadioInterferenceLogic } from './radio_interference.test.js';
 import { testFollowTrainingLogic } from './follow_training.test.js';
@@ -27,6 +28,7 @@ async function main() {
     testFollowTrainingLogic();
     testEpubExportFormatting();
     testPdfExport();
+    testDatasetExportConsistency();
     
     console.log('========================================');
     console.log('🎉 ALL UNIT TESTS PASSED SUCCESSFULLY! ');

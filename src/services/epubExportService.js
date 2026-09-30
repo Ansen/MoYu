@@ -16,56 +16,71 @@ export async function exportEpubPractice({
   includeCallsignSuffix,
   pool,
   noAdjacentDup,
+  digitSlots = null,
   epubStartMarker = '',
   epubEndMarker = '',
   title,
   t,
-  onProgress
+  onProgress,
+  generatedPages: pregeneratedPages
 }) {
   const chapters = [];
 
-  for (let i = 0; i < exportPages; i++) {
-    const percent = Math.min(80, Math.round(5 + ((i + 1) / exportPages) * 75));
-    if (onProgress) {
-      onProgress({
-        current: i + 1,
-        total: exportPages,
-        percent,
-        text: (t('generator.epubExport.generating') || '正在生成第 {current} / {total} 页...')
-          .replace('{current}', i + 1)
-          .replace('{total}', exportPages)
+  if (pregeneratedPages && Array.isArray(pregeneratedPages) && pregeneratedPages.length > 0) {
+    const total = pregeneratedPages.length;
+    for (let i = 0; i < total; i++) {
+      const chapterHtml = formatEpubChapterHtml({
+        groups: pregeneratedPages[i] || [],
+        startMarker: epubStartMarker,
+        endMarker: epubEndMarker
       });
+      chapters.push(chapterHtml);
     }
-    if (i % 2 === 0 || i === exportPages - 1) {
-      await new Promise(r => setTimeout(r, 6));
-    }
+  } else {
+    for (let i = 0; i < exportPages; i++) {
+      const percent = Math.min(80, Math.round(5 + ((i + 1) / exportPages) * 75));
+      if (onProgress) {
+        onProgress({
+          current: i + 1,
+          total: exportPages,
+          percent,
+          text: (t('generator.epubExport.generating') || '正在生成第 {current} / {total} 页...')
+            .replace('{current}', i + 1)
+            .replace('{total}', exportPages)
+        });
+      }
+      if (i % 2 === 0 || i === exportPages - 1) {
+        await new Promise(r => setTimeout(r, 6));
+      }
 
-    let sample = null;
-    if (presetMode === 'callsigns') {
-      sample = generateStructuredRandomContent({
-        mode: 'callsigns',
-        groupCount: effectiveGroupCount,
-        includeCallsignSuffix
+      let sample = null;
+      if (presetMode === 'callsigns') {
+        sample = generateStructuredRandomContent({
+          mode: 'callsigns',
+          groupCount: effectiveGroupCount,
+          includeCallsignSuffix
+        });
+      } else {
+        sample = generateStructuredRandomContent({
+          mode: 'custom',
+          pool,
+          charsPerGroup: effectiveLength,
+          maxDigitsPerGroup: presetMode === 'mixed' ? effectiveMaxDigits : null,
+          digitSlots: presetMode === 'mixed' ? digitSlots : null,
+          groupCount: effectiveGroupCount,
+          allowAdjacentDuplicate: !noAdjacentDup,
+          customProfile: true
+        });
+      }
+
+      const chapterHtml = formatEpubChapterHtml({
+        groups: sample?.groups || [],
+        startMarker: epubStartMarker,
+        endMarker: epubEndMarker
       });
-    } else {
-      sample = generateStructuredRandomContent({
-        mode: 'custom',
-        pool,
-        charsPerGroup: effectiveLength,
-        maxDigitsPerGroup: presetMode === 'mixed' ? effectiveMaxDigits : null,
-        groupCount: effectiveGroupCount,
-        allowAdjacentDuplicate: !noAdjacentDup,
-        customProfile: true
-      });
+
+      chapters.push(chapterHtml);
     }
-
-    const chapterHtml = formatEpubChapterHtml({
-      groups: sample?.groups || [],
-      startMarker: epubStartMarker,
-      endMarker: epubEndMarker
-    });
-
-    chapters.push(chapterHtml);
   }
 
   if (onProgress) {
@@ -78,9 +93,10 @@ export async function exportEpubPractice({
   }
   await new Promise(r => setTimeout(r, 20));
 
+  const safeFilename = (title || 'Telegram').replace(/[\/\\:*?"<>|]/g, '_');
   const filePath = await save({
     filters: [{ name: 'EPUB', extensions: ['epub'] }],
-    defaultPath: `${title}.epub`
+    defaultPath: `${safeFilename}.epub`
   });
 
   if (!filePath) return false;

@@ -16,7 +16,13 @@ export default function GroupLengthSelector({
   setIsCustomMaxDigits,
   customMaxDigitsInput,
   setCustomMaxDigitsInput,
-  maxAllowedDigits
+  maxAllowedDigits,
+  selectedDigitSlots = [],
+  setSelectedDigitSlots,
+  digitSlotsInput = '',
+  setDigitSlotsInput,
+  effectiveLength,
+  effectiveMaxDigits
 }) {
   const { t } = useI18n();
 
@@ -154,6 +160,48 @@ export default function GroupLengthSelector({
                 }}
                 className="w-16 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none text-center bg-white dark:bg-[#1a1a1a] border border-slate-300 dark:border-[#444444] rounded px-1 py-0.5 text-[16px] font-mono focus:outline-hidden disabled:opacity-50"
               />
+            </div>
+          </div>
+
+          {/* Digit Position (Slots) Input Component */}
+          <div className="space-y-2 pt-2 border-t border-slate-200/60 dark:border-[#333333]/60">
+            <div className="flex items-center justify-between p-3 rounded-xl bg-slate-50 dark:bg-[#252525]/60 border border-slate-200/80 dark:border-[#333333]">
+              <div className="flex flex-col pr-3">
+                <div className="flex items-center gap-2">
+                  <label className="font-bold text-slate-800 dark:text-slate-200 text-[15px] flex items-center gap-2">
+                    <span className="w-1.5 h-3.5 bg-orange-500 rounded-full inline-block"></span>
+                    <span>{t('generator.digitPosition')}</span>
+                  </label>
+                  <span className="text-[12px] px-2 py-0.5 rounded-full bg-slate-200/70 dark:bg-[#333333] text-slate-600 dark:text-slate-300 font-mono">
+                    {selectedDigitSlots.length === 0
+                      ? t('generator.digitPosition.statusRandom')
+                      : t('generator.digitPosition.statusFixed', { slots: selectedDigitSlots.map(s => s + 1).join(', ') })}
+                  </span>
+                </div>
+                <span className="text-[12px] text-slate-400 dark:text-slate-500 mt-1">
+                  {t('generator.digitPosition.inputDesc', { max: effectiveLength || 5 })}
+                </span>
+              </div>
+
+              <div className="flex items-center gap-2 shrink-0">
+                <input
+                  type="text"
+                  placeholder={t('generator.digitPosition.inputPlaceholder')}
+                  value={digitSlotsInput}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setDigitSlotsInput?.(val);
+                    if (!setSelectedDigitSlots) return;
+                    const nums = (val.match(/\d+/g) || [])
+                      .map(n => parseInt(n, 10))
+                      .filter(n => n >= 1 && n <= (effectiveLength || 5));
+                    const unique = Array.from(new Set(nums)).map(n => n - 1);
+                    const limit = effectiveMaxDigits || 1;
+                    setSelectedDigitSlots(unique.slice(0, limit));
+                  }}
+                  className="w-32 h-10 px-3 text-[14px] font-mono text-center bg-white dark:bg-[#1a1a1a] border border-slate-300 dark:border-[#444444] rounded-lg focus:outline-hidden focus:border-orange-500 dark:focus:border-orange-500 transition-colors shadow-2xs placeholder:text-slate-400 placeholder:font-sans placeholder:text-[13px]"
+                />
+              </div>
             </div>
           </div>
         </div>

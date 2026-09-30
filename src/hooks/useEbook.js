@@ -380,7 +380,7 @@ export function useEbook() {
       }
     }
 
-    const text = generatePracticeText(config || mode);
+    const text = (config && config.rawText) ? config.rawText : generatePracticeText(config || mode);
     setBookData({
       type: 'txt',
       data: text,

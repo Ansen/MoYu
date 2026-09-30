@@ -1,79 +1,53 @@
 import React from 'react';
-import { Printer, Download, RefreshCw, Check, Play } from 'lucide-react';
+import { Layers, Play, RefreshCw } from 'lucide-react';
 import { useI18n } from '../../i18n';
 
 export default function ModalFooter({
-  isExportingPdf,
-  isExportingEpub,
-  exportStatus,
-  onExportPdf,
-  onExportEpub,
+  isGenerating,
   onClose,
-  onStart
+  onGenerateBatch,
+  onStartPractice
 }) {
   const { t } = useI18n();
 
   return (
     <div className="shrink-0 px-5 py-3.5 bg-slate-50 dark:bg-[#252526] border-t border-slate-200 dark:border-[#333333] flex justify-between gap-3 items-center">
-      <div className="flex items-center gap-2">
-        {/* Export PDF Button (Print Recommended) */}
+      <button
+        type="button"
+        onClick={onClose}
+        disabled={isGenerating}
+        className="px-4 py-2 rounded-xl border border-slate-300 dark:border-[#555555] text-slate-600 dark:text-[#cccccc] hover:bg-slate-100 dark:hover:bg-[#333333] transition-colors text-[14px] font-medium cursor-pointer"
+      >
+        {t('generator.btn.cancel')}
+      </button>
+
+      <div className="flex items-center gap-2.5">
+        {/* Generate Telegram Dataset (for PDF/EPUB multi-page export) */}
         <button
           type="button"
-          onClick={onExportPdf}
-          disabled={isExportingPdf || isExportingEpub}
-          className={`px-3.5 py-2 rounded-xl border flex items-center gap-1.5 transition-all text-[14px] font-medium shadow-xs cursor-pointer ${
-            isExportingPdf 
-              ? 'border-slate-300 dark:border-[#444444] bg-slate-100 dark:bg-[#222222] text-slate-400 dark:text-slate-500' 
-              : 'border-emerald-400/80 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100 dark:hover:bg-emerald-900/50 hover:shadow-md'
-          }`}
+          onClick={onGenerateBatch}
+          disabled={isGenerating}
+          title={t('generator.btn.generateBatchTip')}
+          className="px-4 py-2 rounded-xl border border-orange-300 dark:border-orange-500/50 bg-orange-50/60 dark:bg-orange-500/10 text-orange-600 dark:text-orange-400 hover:bg-orange-100/80 dark:hover:bg-orange-500/20 transition-all text-[14px] font-medium flex items-center gap-1.5 shadow-2xs cursor-pointer disabled:opacity-50"
         >
-          {isExportingPdf ? <RefreshCw size={14} className="animate-spin" /> : <Printer size={14} className="text-emerald-600 dark:text-emerald-400" />}
-          <span>{isExportingPdf ? t('generator.btn.exporting') : t('generator.btn.exportPdf')}</span>
+          {isGenerating ? (
+            <RefreshCw size={14} className="animate-spin" />
+          ) : (
+            <Layers size={14} />
+          )}
+          <span>{isGenerating ? t('generator.btn.exporting') : t('generator.btn.generateBatch')}</span>
         </button>
 
-        {/* Export EPUB Button */}
+        {/* Start Practice Directly (1-page rapid practice in software) */}
         <button
           type="button"
-          onClick={onExportEpub}
-          disabled={isExportingPdf || isExportingEpub}
-          className={`px-3 py-2 rounded-xl border flex items-center gap-1.5 transition-all text-[14px] font-medium shadow-xs cursor-pointer ${
-            isExportingEpub 
-              ? 'border-slate-300 dark:border-[#444444] bg-slate-100 dark:bg-[#222222] text-slate-400 dark:text-slate-500' 
-              : 'border-slate-300 dark:border-[#444444] bg-white dark:bg-[#252525] text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-[#333333] hover:shadow-md'
-          }`}
-        >
-          {isExportingEpub ? <RefreshCw size={14} className="animate-spin" /> : <Download size={14} />}
-          <span>{isExportingEpub ? t('generator.btn.exporting') : t('generator.btn.exportEpub')}</span>
-        </button>
-
-        {exportStatus === 'success' && (
-          <span className="text-emerald-600 dark:text-emerald-500 text-[14px] font-medium flex items-center gap-1 animate-in fade-in slide-in-from-left-2 duration-300">
-            <Check size={14} className="stroke-[2.5]" />
-            {t('generator.pdfExport.successToast')}
-          </span>
-        )}
-        {exportStatus === 'error' && (
-          <span className="text-red-500 text-[14px] font-medium animate-in fade-in slide-in-from-left-2 duration-300">
-            {t('generator.pdfExport.errorToast')}
-          </span>
-        )}
-      </div>
-      
-      <div className="flex gap-2.5 items-center">
-        <button
-          type="button"
-          onClick={onClose}
-          className="px-4 py-2 rounded-xl border border-slate-300 dark:border-[#555555] text-slate-600 dark:text-[#cccccc] hover:bg-slate-100 dark:hover:bg-[#333333] transition-colors text-[14px] font-medium cursor-pointer"
-        >
-          {t('generator.btn.cancel')}
-        </button>
-        <button
-          type="button"
-          onClick={onStart}
-          className="px-5 py-2 rounded-xl bg-orange-500 hover:bg-orange-600 text-white transition-all text-[14px] font-medium flex items-center gap-1.5 shadow-xs hover:shadow-md cursor-pointer"
+          onClick={onStartPractice}
+          disabled={isGenerating}
+          title={t('generator.btn.startPracticeTip')}
+          className="px-5 py-2 rounded-xl bg-orange-500 hover:bg-orange-600 text-white transition-all text-[14px] font-medium flex items-center gap-1.5 shadow-xs hover:shadow-md cursor-pointer disabled:opacity-50"
         >
           <Play size={14} className="fill-current" />
-          <span>{t('generator.btn.generate')}</span>
+          <span>{t('generator.btn.startPracticeDirect')}</span>
         </button>
       </div>
     </div>

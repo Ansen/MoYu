@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
-import { X, Sparkles } from 'lucide-react';
+import { X, Sparkles, CheckCircle2 } from 'lucide-react';
 import { useI18n } from '../i18n';
+import { generateStructuredRandomContent } from '../utils/morse/structuredRandom';
 import { exportPdfPractice } from '../services/pdfExportService';
 import { exportEpubPractice } from '../services/epubExportService';
 import ModeSelector from './generator/ModeSelector';
@@ -10,6 +11,7 @@ import AdvancedOptions from './generator/AdvancedOptions';
 import ExportSettingsSection from './generator/ExportSettingsSection';
 import ExportProgressBanner from './generator/ExportProgressBanner';
 import ModalFooter from './generator/ModalFooter';
+import TelegramReadyView from './generator/TelegramReadyView';
 
 export default function GeneratorModal({ isOpen, onClose, onGenerate }) {
   const { t } = useI18n();
@@ -29,10 +31,20 @@ export default function GeneratorModal({ isOpen, onClose, onGenerate }) {
   const [customCountInput, setCustomCountInput] = useState('200');
   const [noAdjacentDup, setNoAdjacentDup] = useState(true);
 
-  // Export Config
+  // Mixed Mode Digit Slot Position (0-based array, empty means random default)
+  const [selectedDigitSlots, setSelectedDigitSlots] = useState([]);
+  const [digitSlotsInput, setDigitSlotsInput] = useState('');
+
+  // Export / Dataset Config
   const [exportPages, setExportPages] = useState(40);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [generatedDataset, setGeneratedDataset] = useState(null);
+
+  // Multi-format export progress & statuses
   const [isExportingPdf, setIsExportingPdf] = useState(false);
   const [isExportingEpub, setIsExportingEpub] = useState(false);
+  const [pdfExported, setPdfExported] = useState(false);
+  const [epubExported, setEpubExported] = useState(false);
   const [exportType, setExportType] = useState('pdf'); // 'pdf' | 'epub'
   const [exportStatus, setExportStatus] = useState(null); // 'success' | 'error' | null
   const [exportProgress, setExportProgress] = useState(null); // { current, total, percent, text }
@@ -49,6 +61,8 @@ export default function GeneratorModal({ isOpen, onClose, onGenerate }) {
   const handleSelectPresetMode = (mode) => {
     setPresetMode(mode);
     setIsCustomLength(false);
+    setSelectedDigitSlots([]);
+    setDigitSlotsInput('');
     if (mode === 'letters' || mode === 'mixed') {
       setGroupLength(5);
     } else {
@@ -89,9 +103,24 @@ export default function GeneratorModal({ isOpen, onClose, onGenerate }) {
     return Math.min(Math.max(1, raw), maxAllowedDigits);
   }, [isCustomMaxDigits, customMaxDigitsInput, maxDigitsPerGroup, maxAllowedDigits]);
 
+  // Derived safe digit slots bounded by effectiveLength and effectiveMaxDigits
+  const effectiveDigitSlots = useMemo(() => {
+    if (presetMode !== 'mixed' || !selectedDigitSlots.length) return [];
+    return selectedDigitSlots
+      .filter(s => s >= 0 && s < effectiveLength)
+      .slice(0, effectiveMaxDigits);
+  }, [presetMode, selectedDigitSlots, effectiveLength, effectiveMaxDigits]);
+
+  // Reset dataset and close
+  const handleClose = () => {
+    setGeneratedDataset(null);
+    onClose();
+  };
+
   if (!isOpen) return null;
 
-  const handleStart = () => {
+  // Rapid 1-page practice directly into software player without multi-page export workflow
+  const handleStartPracticeDirect = () => {
     let typeDesc = t('generator.title.mixed');
     if (presetMode === 'numbers') typeDesc = t('generator.title.numbers');
     else if (presetMode === 'letters') typeDesc = t('generator.title.letters');
@@ -106,43 +135,117 @@ export default function GeneratorModal({ isOpen, onClose, onGenerate }) {
         title: `${typeDesc} (${effectiveGroupCount} ${t('generator.title.groups')}${suffixTag})`
       };
       onGenerate(config);
-      onClose();
+      handleClose();
       return;
     }
 
     const suffix = includeSymbols ? ` ${t('generator.title.withSymbols')}` : '';
     const digitsInfo = presetMode === 'mixed' ? ` · ${t('generator.title.maxDigits', { count: effectiveMaxDigits })}` : '';
+    const slotInfo = (presetMode === 'mixed' && effectiveDigitSlots.length > 0)
+      ? ` ${t('generator.title.slotInfo', { slots: effectiveDigitSlots.map(s => s + 1).join(',') })}`
+      : '';
+
     const config = {
       mode: 'custom',
       pool,
       charsPerGroup: effectiveLength,
       maxDigitsPerGroup: presetMode === 'mixed' ? effectiveMaxDigits : null,
+      digitSlots: presetMode === 'mixed' && effectiveDigitSlots.length > 0 ? effectiveDigitSlots : null,
       groupCount: effectiveGroupCount,
       allowAdjacentDuplicate: !noAdjacentDup,
       customProfile: true,
-      title: `${typeDesc} (${effectiveLength} ${t('generator.title.chars')}${digitsInfo} · ${effectiveGroupCount} ${t('generator.title.groups')}${suffix})`
+      title: `${typeDesc} (${effectiveLength} ${t('generator.title.chars')}${digitsInfo}${slotInfo} · ${effectiveGroupCount} ${t('generator.title.groups')}${suffix})`
     };
 
     onGenerate(config);
-    onClose();
+    handleClose();
   };
 
-  const handleExportPdf = async () => {
+  // Step 1 -> Step 2: Generate the authoritative dataset in-memory (for multi-page export)
+  const handleGenerateDataset = async () => {
     try {
-      setIsExportingPdf(true);
-      setExportType('pdf');
-      setExportStatus(null);
-      setExportProgress({ current: 0, total: exportPages, percent: 5, text: t('generator.btn.exporting') });
+      setIsGenerating(true);
+      await new Promise(r => setTimeout(r, 30));
 
       let typeDesc = t('generator.title.mixed');
       if (presetMode === 'numbers') typeDesc = t('generator.title.numbers');
       else if (presetMode === 'letters') typeDesc = t('generator.title.letters');
       else if (presetMode === 'callsigns') typeDesc = t('generator.title.callsigns');
 
-      const title = `${typeDesc} - ${exportPages} ${t('generator.exportPages')}`;
+      const pages = [];
+      for (let i = 0; i < exportPages; i++) {
+        let sample = null;
+        if (presetMode === 'callsigns') {
+          sample = generateStructuredRandomContent({
+            mode: 'callsigns',
+            groupCount: effectiveGroupCount,
+            includeCallsignSuffix
+          });
+        } else {
+          sample = generateStructuredRandomContent({
+            mode: 'custom',
+            pool,
+            charsPerGroup: effectiveLength,
+            maxDigitsPerGroup: presetMode === 'mixed' ? effectiveMaxDigits : null,
+            digitSlots: presetMode === 'mixed' && effectiveDigitSlots.length > 0 ? effectiveDigitSlots : null,
+            groupCount: effectiveGroupCount,
+            allowAdjacentDuplicate: !noAdjacentDup,
+            customProfile: true
+          });
+        }
+        pages.push(sample?.groups || []);
+      }
+
+      const totalGroups = pages.reduce((sum, p) => sum + p.length, 0);
+      const totalChars = pages.reduce((sum, p) => sum + p.reduce((s, g) => s + g.length, 0), 0);
+
+      // First 20 groups of Page 1 partitioned into 5 groups per row for telegram preview
+      const page1Groups = pages[0] || [];
+      const first20 = page1Groups.slice(0, 20).map(g => (Array.isArray(g) ? g.join('') : g));
+      const previewRows = [];
+      for (let i = 0; i < first20.length; i += 5) {
+        previewRows.push(first20.slice(i, i + 5));
+      }
+
+      const suffixTag = includeCallsignSuffix ? ` ${t('generator.title.withSymbols')}` : '';
+      const suffix = includeSymbols ? ` ${t('generator.title.withSymbols')}` : '';
+      const digitsInfo = presetMode === 'mixed' ? ` · ${t('generator.title.maxDigits', { count: effectiveMaxDigits })}` : '';
+      const slotInfo = (presetMode === 'mixed' && effectiveDigitSlots.length > 0)
+        ? ` ${t('generator.title.slotInfo', { slots: effectiveDigitSlots.map(s => s + 1).join(',') })}`
+        : '';
+      const fullTitle = presetMode === 'callsigns'
+        ? `${typeDesc} (${effectiveGroupCount} ${t('generator.title.groups')}${suffixTag})`
+        : `${typeDesc} (${effectiveLength} ${t('generator.title.chars')}${digitsInfo}${slotInfo} · ${exportPages} ${t('reader.pages.unit', '页')}${suffix})`;
+
+      setGeneratedDataset({
+        pages,
+        totalPages: exportPages,
+        totalGroups,
+        totalChars,
+        previewRows,
+        title: fullTitle
+      });
+
+      setPdfExported(false);
+      setEpubExported(false);
+    } catch (err) {
+      console.error('Failed to generate dataset:', err);
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  // Step 2 Action: Export PDF using the identical generated dataset
+  const handleExportPdf = async () => {
+    if (!generatedDataset) return;
+    try {
+      setIsExportingPdf(true);
+      setExportType('pdf');
+      setExportStatus(null);
+      setExportProgress({ current: 0, total: exportPages, percent: 5, text: t('generator.btn.exporting') });
 
       const success = await exportPdfPractice({
-        exportPages,
+        exportPages: generatedDataset.totalPages,
         presetMode,
         effectiveLength,
         effectiveMaxDigits,
@@ -150,14 +253,16 @@ export default function GeneratorModal({ isOpen, onClose, onGenerate }) {
         includeCallsignSuffix,
         pool,
         noAdjacentDup,
-        title,
+        title: generatedDataset.title,
         t,
-        onProgress: setExportProgress
+        onProgress: setExportProgress,
+        generatedPages: generatedDataset.pages
       });
 
       if (success) {
         setExportProgress({ current: exportPages, total: exportPages, percent: 100, text: t('generator.pdfExport.successToast') });
         setExportStatus('success');
+        setPdfExported(true);
         setTimeout(() => {
           setExportStatus(null);
           setExportProgress(null);
@@ -176,22 +281,17 @@ export default function GeneratorModal({ isOpen, onClose, onGenerate }) {
     }
   };
 
+  // Step 2 Action: Export EPUB using the identical generated dataset
   const handleExportEpub = async () => {
+    if (!generatedDataset) return;
     try {
       setIsExportingEpub(true);
       setExportType('epub');
       setExportStatus(null);
       setExportProgress({ current: 0, total: exportPages, percent: 5, text: t('generator.btn.exporting') });
 
-      let typeDesc = t('generator.title.mixed');
-      if (presetMode === 'numbers') typeDesc = t('generator.title.numbers');
-      else if (presetMode === 'letters') typeDesc = t('generator.title.letters');
-      else if (presetMode === 'callsigns') typeDesc = t('generator.title.callsigns');
-
-      const title = `${typeDesc} - ${exportPages} ${t('generator.exportPages')}`;
-
       const success = await exportEpubPractice({
-        exportPages,
+        exportPages: generatedDataset.totalPages,
         presetMode,
         effectiveLength,
         effectiveMaxDigits,
@@ -199,14 +299,16 @@ export default function GeneratorModal({ isOpen, onClose, onGenerate }) {
         includeCallsignSuffix,
         pool,
         noAdjacentDup,
-        title,
+        title: generatedDataset.title,
         t,
-        onProgress: setExportProgress
+        onProgress: setExportProgress,
+        generatedPages: generatedDataset.pages
       });
 
       if (success) {
         setExportProgress({ current: exportPages, total: exportPages, percent: 100, text: t('generator.epubExport.successToast') });
         setExportStatus('success');
+        setEpubExported(true);
         setTimeout(() => {
           setExportStatus(null);
           setExportProgress(null);
@@ -225,6 +327,10 @@ export default function GeneratorModal({ isOpen, onClose, onGenerate }) {
     }
   };
 
+  const handleBackToConfig = () => {
+    setGeneratedDataset(null);
+  };
+
   return (
     <div className="fixed inset-0 bg-black/40 dark:bg-black/70 z-[100] flex items-center justify-center p-4 sm:p-6 backdrop-blur-xs select-none animate-in fade-in duration-200">
       <div className="bg-white dark:bg-[#1e1e1e] border border-slate-300 dark:border-[#333333] rounded-2xl shadow-2xl w-[600px] max-w-[94vw] h-[660px] max-h-[calc(100vh-2rem)] overflow-hidden flex flex-col animate-in zoom-in-95 duration-200">
@@ -232,71 +338,101 @@ export default function GeneratorModal({ isOpen, onClose, onGenerate }) {
         {/* Modal Header */}
         <div className="shrink-0 h-12 flex items-center justify-between px-5 bg-slate-50 dark:bg-[#252526] border-b border-slate-200 dark:border-[#333333]">
           <div className="flex items-center gap-2 font-bold text-[16px] text-slate-800 dark:text-[#dddddd]">
-            <Sparkles size={16} className="text-orange-500" />
-            <span>{t('generator.modal.title')}</span>
+            {generatedDataset ? (
+              <>
+                <CheckCircle2 size={16} className="text-emerald-500" />
+                <span>{t('generator.ready.modalTitle')}</span>
+              </>
+            ) : (
+              <>
+                <Sparkles size={16} className="text-orange-500" />
+                <span>{t('generator.modal.title')}</span>
+              </>
+            )}
           </div>
           <button 
-            onClick={onClose} 
+            onClick={handleClose} 
             className="p-1 rounded-md text-slate-400 hover:text-slate-600 dark:hover:text-[#ffffff] hover:bg-slate-200/50 dark:hover:bg-[#333333] transition-colors cursor-pointer"
           >
             <X size={17} />
           </button>
         </div>
 
-        {/* Modal Body */}
-        <div className="flex-1 p-6 space-y-5 text-[15px] text-slate-700 dark:text-[#cccccc] overflow-y-auto custom-scrollbar">
-          <ModeSelector presetMode={presetMode} onSelectMode={handleSelectPresetMode} />
-          <GroupLengthSelector
-            presetMode={presetMode}
-            groupLength={groupLength}
-            setGroupLength={setGroupLength}
-            isCustomLength={isCustomLength}
-            setIsCustomLength={setIsCustomLength}
-            customLengthInput={customLengthInput}
-            setCustomLengthInput={setCustomLengthInput}
-            recommendedLength={recommendedLength}
-            maxDigitsPerGroup={maxDigitsPerGroup}
-            setMaxDigitsPerGroup={setMaxDigitsPerGroup}
-            isCustomMaxDigits={isCustomMaxDigits}
-            setIsCustomMaxDigits={setIsCustomMaxDigits}
-            customMaxDigitsInput={customMaxDigitsInput}
-            setCustomMaxDigitsInput={setCustomMaxDigitsInput}
-            maxAllowedDigits={maxAllowedDigits}
+        {/* Modal Body: Two-step view */}
+        {generatedDataset ? (
+          <TelegramReadyView
+            dataset={generatedDataset}
+            isExportingPdf={isExportingPdf}
+            isExportingEpub={isExportingEpub}
+            pdfExported={pdfExported}
+            epubExported={epubExported}
+            onExportPdf={handleExportPdf}
+            onExportEpub={handleExportEpub}
+            onRegenerate={handleGenerateDataset}
+            onBackToConfig={handleBackToConfig}
+            onClose={handleClose}
+            isGenerating={isGenerating}
           />
-          <GroupCountSelector
-            groupCount={groupCount}
-            setGroupCount={setGroupCount}
-            isCustomCount={isCustomCount}
-            setIsCustomCount={setIsCustomCount}
-            customCountInput={customCountInput}
-            setCustomCountInput={setCustomCountInput}
-          />
-          <AdvancedOptions
-            presetMode={presetMode}
-            includeSymbols={includeSymbols}
-            setIncludeSymbols={setIncludeSymbols}
-            includeCallsignSuffix={includeCallsignSuffix}
-            setIncludeCallsignSuffix={setIncludeCallsignSuffix}
-            noAdjacentDup={noAdjacentDup}
-            setNoAdjacentDup={setNoAdjacentDup}
-          />
-          <ExportSettingsSection
-            exportPages={exportPages}
-            setExportPages={setExportPages}
-          />
-        </div>
+        ) : (
+          <>
+            <div className="flex-1 p-6 space-y-5 text-[15px] text-slate-700 dark:text-[#cccccc] overflow-y-auto custom-scrollbar">
+              <ModeSelector presetMode={presetMode} onSelectMode={handleSelectPresetMode} />
+              <GroupLengthSelector
+                presetMode={presetMode}
+                groupLength={groupLength}
+                setGroupLength={setGroupLength}
+                isCustomLength={isCustomLength}
+                setIsCustomLength={setIsCustomLength}
+                customLengthInput={customLengthInput}
+                setCustomLengthInput={setCustomLengthInput}
+                recommendedLength={recommendedLength}
+                maxDigitsPerGroup={maxDigitsPerGroup}
+                setMaxDigitsPerGroup={setMaxDigitsPerGroup}
+                isCustomMaxDigits={isCustomMaxDigits}
+                setIsCustomMaxDigits={setIsCustomMaxDigits}
+                customMaxDigitsInput={customMaxDigitsInput}
+                setCustomMaxDigitsInput={setCustomMaxDigitsInput}
+                maxAllowedDigits={maxAllowedDigits}
+                selectedDigitSlots={effectiveDigitSlots}
+                setSelectedDigitSlots={setSelectedDigitSlots}
+                digitSlotsInput={digitSlotsInput}
+                setDigitSlotsInput={setDigitSlotsInput}
+                effectiveLength={effectiveLength}
+                effectiveMaxDigits={effectiveMaxDigits}
+              />
+              <GroupCountSelector
+                groupCount={groupCount}
+                setGroupCount={setGroupCount}
+                isCustomCount={isCustomCount}
+                setIsCustomCount={setIsCustomCount}
+                customCountInput={customCountInput}
+                setCustomCountInput={setCustomCountInput}
+              />
+              <AdvancedOptions
+                presetMode={presetMode}
+                includeSymbols={includeSymbols}
+                setIncludeSymbols={setIncludeSymbols}
+                includeCallsignSuffix={includeCallsignSuffix}
+                setIncludeCallsignSuffix={setIncludeCallsignSuffix}
+                noAdjacentDup={noAdjacentDup}
+                setNoAdjacentDup={setNoAdjacentDup}
+              />
+              <ExportSettingsSection
+                exportPages={exportPages}
+                setExportPages={setExportPages}
+              />
+            </div>
+
+            <ModalFooter
+              isGenerating={isGenerating}
+              onClose={handleClose}
+              onGenerateBatch={handleGenerateDataset}
+              onStartPractice={handleStartPracticeDirect}
+            />
+          </>
+        )}
 
         <ExportProgressBanner exportProgress={exportProgress} exportType={exportType} />
-        <ModalFooter
-          isExportingPdf={isExportingPdf}
-          isExportingEpub={isExportingEpub}
-          exportStatus={exportStatus}
-          onExportPdf={handleExportPdf}
-          onExportEpub={handleExportEpub}
-          onClose={onClose}
-          onStart={handleStart}
-        />
-
       </div>
     </div>
   );

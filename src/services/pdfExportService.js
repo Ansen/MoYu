@@ -15,47 +15,54 @@ export async function exportPdfPractice({
   includeCallsignSuffix,
   pool,
   noAdjacentDup,
+  digitSlots = null,
   title,
   t,
-  onProgress
+  onProgress,
+  generatedPages: pregeneratedPages
 }) {
   const generatedPages = [];
 
-  for (let i = 0; i < exportPages; i++) {
-    const percent = Math.min(80, Math.round(5 + ((i + 1) / exportPages) * 75));
-    if (onProgress) {
-      onProgress({
-        current: i + 1,
-        total: exportPages,
-        percent,
-        text: (t('generator.pdfExport.generating') || '正在生成第 {current} / {total} 页 PDF...')
-          .replace('{current}', i + 1)
-          .replace('{total}', exportPages)
-      });
-    }
-    if (i % 2 === 0 || i === exportPages - 1) {
-      await new Promise(r => setTimeout(r, 6));
-    }
+  if (pregeneratedPages && Array.isArray(pregeneratedPages) && pregeneratedPages.length > 0) {
+    generatedPages.push(...pregeneratedPages);
+  } else {
+    for (let i = 0; i < exportPages; i++) {
+      const percent = Math.min(80, Math.round(5 + ((i + 1) / exportPages) * 75));
+      if (onProgress) {
+        onProgress({
+          current: i + 1,
+          total: exportPages,
+          percent,
+          text: (t('generator.pdfExport.generating') || '正在生成第 {current} / {total} 页 PDF...')
+            .replace('{current}', i + 1)
+            .replace('{total}', exportPages)
+        });
+      }
+      if (i % 2 === 0 || i === exportPages - 1) {
+        await new Promise(r => setTimeout(r, 6));
+      }
 
-    let sample = null;
-    if (presetMode === 'callsigns') {
-      sample = generateStructuredRandomContent({
-        mode: 'callsigns',
-        groupCount: effectiveGroupCount,
-        includeCallsignSuffix
-      });
-    } else {
-      sample = generateStructuredRandomContent({
-        mode: 'custom',
-        pool,
-        charsPerGroup: effectiveLength,
-        maxDigitsPerGroup: presetMode === 'mixed' ? effectiveMaxDigits : null,
-        groupCount: effectiveGroupCount,
-        allowAdjacentDuplicate: !noAdjacentDup,
-        customProfile: true
-      });
+      let sample = null;
+      if (presetMode === 'callsigns') {
+        sample = generateStructuredRandomContent({
+          mode: 'callsigns',
+          groupCount: effectiveGroupCount,
+          includeCallsignSuffix
+        });
+      } else {
+        sample = generateStructuredRandomContent({
+          mode: 'custom',
+          pool,
+          charsPerGroup: effectiveLength,
+          maxDigitsPerGroup: presetMode === 'mixed' ? effectiveMaxDigits : null,
+          digitSlots: presetMode === 'mixed' ? digitSlots : null,
+          groupCount: effectiveGroupCount,
+          allowAdjacentDuplicate: !noAdjacentDup,
+          customProfile: true
+        });
+      }
+      generatedPages.push(sample?.groups || []);
     }
-    generatedPages.push(sample?.groups || []);
   }
 
   if (onProgress) {
@@ -68,9 +75,10 @@ export async function exportPdfPractice({
   }
   await new Promise(r => setTimeout(r, 15));
 
+  const safeFilename = (title || 'Telegram').replace(/[\/\\:*?"<>|]/g, '_');
   const filePath = await save({
     filters: [{ name: 'PDF Document', extensions: ['pdf'] }],
-    defaultPath: `${title}.pdf`
+    defaultPath: `${safeFilename}.pdf`
   });
 
   if (!filePath) return false;
