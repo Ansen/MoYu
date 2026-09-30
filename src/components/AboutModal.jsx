@@ -23,7 +23,7 @@ const GithubIcon = ({ size = 16, className = "" }) => (
 );
 
 export default function AboutModal({ isOpen, onClose }) {
-  const [version, setVersion] = useState('v...');
+  const [version, setVersion] = useState(typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : 'v...');
   const { t } = useI18n();
   const [updateStatus, setUpdateStatus] = useState('idle'); // idle, checking, available, installing, uptodate, error
   const [latestVer, setLatestVer] = useState('');
@@ -31,7 +31,9 @@ export default function AboutModal({ isOpen, onClose }) {
   const [installProgress, setInstallProgress] = useState(null);
 
   useEffect(() => {
-    getVersion().then(v => setVersion('v' + v)).catch(() => setVersion('v1.0.0'));
+    try {
+      getVersion().then(v => setVersion('v' + v)).catch(() => {});
+    } catch {}
   }, []);
 
   const handleCheckUpdate = async () => {

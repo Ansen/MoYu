@@ -6,16 +6,14 @@ import { getVersion } from '@tauri-apps/api/app';
 
 export default function Sidebar({ currentView, setView, openAbout }) {
   const [isCollapsed, setIsCollapsed] = useState(false);
-  const [version, setVersion] = useState('');
+  const [version, setVersion] = useState(typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '');
   const { width: sidebarWidth, startResizing } = useResizable(224, 140, 400);
   const { t } = useI18n();
 
   useEffect(() => {
     try {
-      getVersion().then(v => setVersion('v' + v)).catch(() => setVersion('v0.1.24'));
-    } catch {
-      setVersion('v0.1.24');
-    }
+      getVersion().then(v => setVersion('v' + v)).catch(() => {});
+    } catch {}
   }, []);
 
   const menuItems = [
