@@ -1,4 +1,11 @@
 use epub_builder::{EpubBuilder, EpubContent, ReferenceType, ZipLibrary};
+use tauri::Manager;
+
+mod serial;
+use serial::{
+    connect_serial_port, disconnect_serial_port, get_serial_status, spawn_serial_monitor,
+    SerialManagerState,
+};
 
 #[tauri::command]
 fn generate_epub(title: String, chapters: Vec<String>) -> Result<Vec<u8>, String> {
@@ -65,13 +72,22 @@ fn toggle_devtools(window: tauri::WebviewWindow) {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    let serial_state = SerialManagerState::default();
+
     let mut builder = tauri::Builder::default()
+        .manage(serial_state)
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_persisted_scope::init())
         .plugin(tauri_plugin_store::Builder::new().build())
-        .invoke_handler(tauri::generate_handler![generate_epub, toggle_devtools]);
+        .invoke_handler(tauri::generate_handler![
+            generate_epub,
+            toggle_devtools,
+            get_serial_status,
+            connect_serial_port,
+            disconnect_serial_port
+        ]);
 
     #[cfg(desktop)]
     {
@@ -87,6 +103,10 @@ pub fn run() {
                         .build(),
                 )?;
             }
+
+            let state = app.state::<SerialManagerState>();
+            spawn_serial_monitor(app.handle().clone(), &state);
+
             Ok(())
         })
         .run(tauri::generate_context!())

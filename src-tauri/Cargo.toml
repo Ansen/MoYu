@@ -1,6 +1,6 @@
 [package]
 name = "moyu"
-version = "0.1.20"
+version = "0.1.25"
 description = "MoYu Reader"
 authors = ["you"]
 license = ""
@@ -40,3 +40,4 @@ strip = true # Remove debug symbols
 
 [target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
 tauri-plugin-updater = "2"
+serialport = { version = "4.7", default-features = false }

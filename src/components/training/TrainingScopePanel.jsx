@@ -9,7 +9,11 @@ import {
   BarChart2, 
   Cpu, 
   Keyboard,
-  Clock
+  Clock,
+  CheckCircle2,
+  AlertCircle,
+  Info,
+  X
 } from 'lucide-react';
 import MorseTimelineCanvas from './MorseTimelineCanvas';
 import { useI18n } from '../../i18n';
@@ -31,6 +35,9 @@ export default function TrainingScopePanel({
   setTimeWindowSec,
   onConnectSerial,
   isSerialConnected = false,
+  serialPortName = null,
+  modeNotice = null,
+  onDismissNotice,
   isKeyDown = false,
   pressDuration = 0,
   targetTimeline = [],
@@ -48,14 +55,50 @@ export default function TrainingScopePanel({
   onManualDown,
   onManualUp
 }) {
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
+  const isEn = lang === 'en';
+
   return (
-    <div className="border-t border-slate-200 dark:border-[#282828] bg-slate-50/95 dark:bg-[#161616]/95 backdrop-blur-md shrink-0 transition-all select-none">
+    <div className="relative border-t border-slate-200 dark:border-[#282828] bg-slate-50/95 dark:bg-[#161616]/95 backdrop-blur-md shrink-0 transition-all select-none">
       
+      {/* 友好模式状态浮动胶囊通知 (不推挤阅读器正文排版，零抖动) */}
+      {modeNotice && (
+        <div className="absolute -top-9 left-1/2 -translate-x-1/2 z-30 max-w-[92vw] pointer-events-auto animate-in fade-in slide-in-from-bottom-1 duration-200">
+          <div
+            className={`flex items-center gap-2 px-3 py-1 rounded-full text-xs font-medium shadow-md border backdrop-blur-md whitespace-nowrap ${
+              modeNotice.tone === 'success'
+                ? 'bg-emerald-50/95 text-emerald-700 border-emerald-300 dark:bg-emerald-950/90 dark:text-emerald-200 dark:border-emerald-700/80'
+                : modeNotice.tone === 'warning'
+                ? 'bg-amber-50/95 text-amber-700 border-amber-300 dark:bg-amber-950/90 dark:text-amber-200 dark:border-amber-700/80'
+                : 'bg-indigo-50/95 text-indigo-700 border-indigo-300 dark:bg-indigo-950/90 dark:text-indigo-200 dark:border-indigo-700/80'
+            }`}
+          >
+            {modeNotice.tone === 'success' ? (
+              <CheckCircle2 size={13} className="text-emerald-600 dark:text-emerald-400 shrink-0" />
+            ) : modeNotice.tone === 'warning' ? (
+              <AlertCircle size={13} className="text-amber-600 dark:text-amber-400 shrink-0" />
+            ) : (
+              <Info size={13} className="text-indigo-600 dark:text-indigo-400 shrink-0" />
+            )}
+            <span className="truncate">{modeNotice.message}</span>
+            {onDismissNotice && (
+              <button
+                type="button"
+                onClick={onDismissNotice}
+                className="ml-0.5 p-0.5 rounded-full opacity-70 hover:opacity-100 transition-opacity cursor-pointer"
+                aria-label="Close notice"
+              >
+                <X size={12} />
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* 示波器顶栏轻量控制条: 严控单行不折行，极简专业排版 */}
       <div className="h-8 px-3 sm:px-4 flex items-center justify-between text-xs border-b border-slate-200/50 dark:border-[#222222] whitespace-nowrap overflow-x-auto overflow-y-hidden custom-scrollbar select-none gap-2">
         
-        {/* 左侧：电键指示灯(支持触控打键)、硬件/键盘图标切换、纯图标模式胶囊、侧音频率微调 */}
+        {/* 左侧：电键指示灯(支持触控打键)、硬件/键盘模式徽章、手键/自动键切换、模式胶囊、侧音频率微调 */}
         <div className="flex items-center gap-2 shrink-0">
           {/* 电键状态指示灯 (支持鼠标点击/屏幕长按触摸发报) */}
           <div 
@@ -91,7 +134,7 @@ export default function TrainingScopePanel({
             </span>
           </div>
 
-          {/* 输入源切换图标: 键盘 (默认) ↔ CH552G 硬件芯片 */}
+          {/* 输入源模式切换按钮: 直观展示当前处于【键盘模式】还是【CH552G 硬件模式】 */}
           <button
             type="button"
             onClick={() => {
@@ -100,30 +143,48 @@ export default function TrainingScopePanel({
                 if (!isSerialConnected && onConnectSerial) {
                   onConnectSerial();
                 }
-              } else if (!isSerialConnected) {
-                if (onConnectSerial) onConnectSerial();
               } else {
                 setInputDevice?.('keyboard');
               }
             }}
-            className={`h-6 px-1.5 rounded-md flex items-center gap-1 text-[11px] font-medium border transition-all cursor-pointer whitespace-nowrap shrink-0 ${
+            className={`h-6 px-2 rounded-md flex items-center gap-1.5 text-[11px] font-medium border transition-all cursor-pointer whitespace-nowrap shrink-0 ${
               inputDevice === 'ch552g'
                 ? isSerialConnected
-                  ? 'bg-emerald-50 text-emerald-600 border-emerald-300 dark:bg-emerald-950/50 dark:text-emerald-300 dark:border-emerald-800 shadow-2xs'
-                  : 'bg-amber-50 text-amber-600 border-amber-300 dark:bg-amber-950/50 dark:text-amber-300 dark:border-amber-800 shadow-2xs'
-                : 'bg-slate-200/80 dark:bg-[#252525] border-transparent text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                  ? 'bg-emerald-50 text-emerald-700 border-emerald-300 dark:bg-emerald-950/60 dark:text-emerald-300 dark:border-emerald-700/80 shadow-2xs'
+                  : 'bg-amber-50 text-amber-700 border-amber-300 dark:bg-amber-950/60 dark:text-amber-300 dark:border-amber-700/80 shadow-2xs'
+                : 'bg-slate-200/80 dark:bg-[#252525] border-slate-300/60 dark:border-[#333333] text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
             }`}
             title={
               inputDevice === 'ch552g'
                 ? isSerialConnected
-                  ? t('training.scope.ch552gConnected', 'CH552G 实体电键已连接 (点击切回键盘)')
-                  : t('training.scope.ch552gConnect', 'CH552G 实体电键未连接 (点击连接或切回键盘)')
-                : t('training.scope.deviceKeyboard', '当前为键盘 Space 发报 (点击切换为 CH552G 实体电键)')
+                  ? `${t('training.scope.ch552gConnected', 'CH552G 实体电键已连接 (点击切回键盘)')}${serialPortName ? ` [${serialPortName}]` : ''}`
+                  : t('training.scope.ch552gConnect', 'CH552G 实体电键未连接 (插入设备自动连接，点击切回键盘)')
+                : t('training.scope.deviceKeyboard', '当前为键盘发报模式 (插入 CH552G 自动切换，或点击手动切换)')
             }
           >
-            {inputDevice === 'ch552g' ? <Cpu size={13} /> : <Keyboard size={13} />}
-            {inputDevice === 'ch552g' && (
-              <span className="text-[10px] font-mono font-bold">{isSerialConnected ? 'USB' : 'OFF'}</span>
+            {inputDevice === 'ch552g' ? (
+              <>
+                <span
+                  className={`w-1.5 h-1.5 rounded-full shrink-0 ${
+                    isSerialConnected ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'
+                  }`}
+                />
+                <Cpu size={12} className="shrink-0" />
+                <span className="text-[10.5px] font-semibold">
+                  {isSerialConnected
+                    ? `CH552G${serialPortName && serialPortName !== 'USB' ? ` · ${serialPortName}` : ''}`
+                    : isEn
+                    ? 'CH552G (Wait)'
+                    : 'CH552G (待插入)'}
+                </span>
+              </>
+            ) : (
+              <>
+                <Keyboard size={12} className="shrink-0 text-indigo-500 dark:text-indigo-400" />
+                <span className="text-[10.5px] font-semibold">
+                  {isEn ? 'Keyboard' : '键盘模式'}
+                </span>
+              </>
             )}
           </button>
 
@@ -233,7 +294,7 @@ export default function TrainingScopePanel({
             </button>
           </div>
 
-          {/* 示波器时基窗口微调: 控制流淌速度 (4s-16s，默认8s，大幅降低20~30 WPM视觉流速) */}
+          {/* 示波器时基窗口微调: 控制流淌速度 (4s-16s，默认8s) */}
           <div 
             className="flex items-center bg-slate-200/80 dark:bg-[#222222] px-2 py-0.5 rounded-lg border border-slate-300/60 dark:border-[#333333] text-[11px] font-mono shrink-0 gap-1.5 h-6"
             title={t('training.scope.timeWindowTooltip', { sec: timeWindowSec }, `示波器时基窗口: ${timeWindowSec}秒 (数值越大波形流速越慢，20~30 WPM更清晰)`)}

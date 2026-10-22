@@ -1,14 +1,23 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { invoke } from '@tauri-apps/api/core';
+import { listen } from '@tauri-apps/api/event';
 
 // ============================================================================
-// 全局 WebSerial 硬件单例连接管理器 (Hardware Serial Singleton)
-// 确保在切换书本、章节或页面导航时，物理 USB 串口保持连接、零中断复用，杜绝重复 open 报错
+// 全局硬件串口单例连接管理器 (Tauri Rust Native Serial + WebSerial Fallback)
+// 1. 桌面端 (Tauri): 由底层 Rust 线程按 USB VID 自动探测热插拔并直接读取，零权限弹窗、即插即用
+// 2. 网页端 (Browser): 自动回退至 WebSerial API，保持跨环境兼容
 // ============================================================================
 let globalPort = null;
 let globalReader = null;
 let globalIsReading = false;
 let globalConnected = false;
+let globalPortName = null;
+let tauriSerialInitialized = false;
 const globalListeners = new Set();
+
+function isTauriEnv() {
+  return typeof window !== 'undefined' && Boolean(window.__TAURI_INTERNALS__ || window.__TAURI__);
+}
 
 function notifyGlobalListeners(byte) {
   for (const listener of globalListeners) {
@@ -20,15 +29,53 @@ function notifyGlobalListeners(byte) {
   }
 }
 
-function notifyGlobalConnection(connected) {
+function notifyGlobalConnection(connected, portName = null) {
   globalConnected = connected;
+  if (portName !== undefined) {
+    globalPortName = portName;
+  }
   for (const listener of globalListeners) {
     try {
-      listener.onConnectionChange(connected);
+      listener.onConnectionChange(connected, globalPortName);
     } catch (e) {
       console.error('[SerialSingleton] Connection callback error:', e);
     }
   }
+}
+
+function initTauriSerialSingleton() {
+  if (tauriSerialInitialized || !isTauriEnv()) return;
+  tauriSerialInitialized = true;
+
+  // 1. 监听来自 Rust 原生串口线程的实时按键单字节流
+  listen('ch552g-byte', (event) => {
+    const byte = Number(event.payload);
+    if (!Number.isNaN(byte)) {
+      if (!globalConnected) {
+        notifyGlobalConnection(true, globalPortName);
+      }
+      notifyGlobalListeners(byte);
+    }
+  }).catch((err) => {
+    console.warn('[SerialSingleton] Failed to attach ch552g-byte listener:', err);
+  });
+
+  // 2. 监听来自 Rust 原生串口线程的热插拔连接状态变更
+  listen('ch552g-status', (event) => {
+    const payload = event.payload || {};
+    notifyGlobalConnection(Boolean(payload.connected), payload.port || null);
+  }).catch((err) => {
+    console.warn('[SerialSingleton] Failed to attach ch552g-status listener:', err);
+  });
+
+  // 3. 挂载时立即同步当前 Rust 端串口连接状态
+  invoke('get_serial_status')
+    .then((status) => {
+      if (status && typeof status.connected === 'boolean') {
+        notifyGlobalConnection(status.connected, status.port || null);
+      }
+    })
+    .catch(() => {});
 }
 
 function startGlobalReadLoop(port) {
@@ -72,7 +119,7 @@ function startGlobalReadLoop(port) {
     } finally {
       globalIsReading = false;
       if (!globalPort || !globalPort.readable) {
-        notifyGlobalConnection(false);
+        notifyGlobalConnection(false, null);
       }
     }
   })();
@@ -81,6 +128,21 @@ function startGlobalReadLoop(port) {
 let connectingPromise = null;
 
 async function connectGlobalSerialPort() {
+  // Tauri 桌面环境下直接使用 Rust 原生串口通道，免去 WebView 授权弹窗
+  if (isTauriEnv()) {
+    initTauriSerialSingleton();
+    try {
+      const status = await invoke('connect_serial_port');
+      if (status && typeof status.connected === 'boolean') {
+        notifyGlobalConnection(status.connected, status.port || null);
+      }
+      return status;
+    } catch (err) {
+      console.warn('[SerialSingleton] Rust connect_serial_port warning:', err);
+      return null;
+    }
+  }
+
   if (connectingPromise) {
     return connectingPromise;
   }
@@ -102,7 +164,7 @@ async function doConnectGlobalSerialPort() {
   // 1. 如果全局已有且处于打开状态并正在读取，直接复用！
   if (globalPort && globalPort.readable && globalIsReading) {
     globalConnected = true;
-    notifyGlobalConnection(true);
+    notifyGlobalConnection(true, 'USB');
     return globalPort;
   }
 
@@ -120,16 +182,14 @@ async function doConnectGlobalSerialPort() {
 
   // 3. 如果找到端口，确保以有效 readable 状态打开
   if (port) {
-    // 检查 port.readable 是否已经可用且未被锁定
     if (port.readable && !port.readable.locked) {
       globalPort = port;
       globalConnected = true;
-      notifyGlobalConnection(true);
+      notifyGlobalConnection(true, 'USB');
       startGlobalReadLoop(globalPort);
       return globalPort;
     }
 
-    // 否则尝试先 close 释放任何遗留句柄，然后重新 open
     try {
       if (globalReader) {
         try { await globalReader.cancel(); } catch {}
@@ -140,7 +200,7 @@ async function doConnectGlobalSerialPort() {
       await port.open({ baudRate: 115200 });
       globalPort = port;
       globalConnected = true;
-      notifyGlobalConnection(true);
+      notifyGlobalConnection(true, 'USB');
       startGlobalReadLoop(globalPort);
       return globalPort;
     } catch (openErr) {
@@ -150,7 +210,7 @@ async function doConnectGlobalSerialPort() {
         await port.open({ baudRate: 115200 });
         globalPort = port;
         globalConnected = true;
-        notifyGlobalConnection(true);
+        notifyGlobalConnection(true, 'USB');
         startGlobalReadLoop(globalPort);
         return globalPort;
       } catch (retryErr) {
@@ -160,7 +220,7 @@ async function doConnectGlobalSerialPort() {
     }
   }
 
-  // 4. 若无已配对端口或打开失败，调起系统选择器
+  // 4. 若无已配对端口或打开失败，调起系统选择器 (仅纯网页端)
   if (!port) {
     try {
       port = await navigator.serial.requestPort({
@@ -184,13 +244,21 @@ async function doConnectGlobalSerialPort() {
 
   globalPort = port;
   globalConnected = true;
-  notifyGlobalConnection(true);
+  notifyGlobalConnection(true, 'USB');
   startGlobalReadLoop(globalPort);
   return globalPort;
 }
 
 async function disconnectGlobalSerialPort() {
-  notifyGlobalConnection(false);
+  if (isTauriEnv()) {
+    try {
+      await invoke('disconnect_serial_port');
+    } catch {}
+    notifyGlobalConnection(false, null);
+    return;
+  }
+
+  notifyGlobalConnection(false, null);
   const reader = globalReader;
   globalReader = null;
   if (reader) {
@@ -211,8 +279,8 @@ async function disconnectGlobalSerialPort() {
   globalIsReading = false;
 }
 
-// 监听硬件物理热插拔拔出事件
-if (typeof window !== 'undefined' && 'serial' in navigator) {
+// 监听硬件物理热插拔拔出事件 (纯网页端 WebSerial)
+if (typeof window !== 'undefined' && !isTauriEnv() && 'serial' in navigator) {
   navigator.serial.addEventListener('disconnect', (event) => {
     if (event.port === globalPort) {
       console.log('[SerialSingleton] Physical USB disconnected');
@@ -223,7 +291,7 @@ if (typeof window !== 'undefined' && 'serial' in navigator) {
 
 /**
  * 统一多源按键采集与即时侧音 Hook
- * 1. 支持硬件电键 (CH552G USB / WebSerial) 与键盘空格键 (临时测试)
+ * 1. 支持硬件电键 (Tauri Rust 原生串口直读 / WebSerial 网页后备) 与键盘空格键
  * 2. 硬件电键按下时通过 Web Audio 零延迟触发侧音 (SideTone)
  * 3. 记录高精度时间戳 (performance.now()) 事件流
  */
@@ -235,11 +303,15 @@ export function useKeyInput({
   wpm = 20,
   frequency = 400,
   volume = 0.8,
-  onKeyEvent = null
+  onKeyEvent = null,
+  onHardwareActivity = null
 }) {
   const [isKeyDown, setIsKeyDown] = useState(false);
   const [pressDuration, setPressDuration] = useState(0);
-  const [serialConnected, setSerialConnected] = useState(() => globalConnected && globalPort !== null && !!globalPort.readable);
+  const [serialConnected, setSerialConnected] = useState(() =>
+    isTauriEnv() ? globalConnected : (globalConnected && globalPort !== null && !!globalPort.readable)
+  );
+  const [serialPortName, setSerialPortName] = useState(() => globalPortName);
 
   const isKeyDownRef = useRef(false);
   const keyDownTimeRef = useRef(0);
@@ -248,6 +320,8 @@ export function useKeyInput({
   const gainRef = useRef(null);
   const onKeyEventRef = useRef(onKeyEvent);
   onKeyEventRef.current = onKeyEvent;
+  const onHardwareActivityRef = useRef(onHardwareActivity);
+  onHardwareActivityRef.current = onHardwareActivity;
 
   const keyTypeRef = useRef(keyType);
   keyTypeRef.current = keyType;
@@ -541,7 +615,7 @@ export function useKeyInput({
     };
   }, [enabled, handleDown, handleUp, onPaddleDit, onPaddleDah, setTone]);
 
-  // 3. WebSerial 硬件串口支持 (基于全局硬件单例，切换书本/章节无缝复用)
+  // 3. 硬件串口支持 (Tauri Rust 原生直读 + WebSerial 后备，切换书本/章节无缝复用)
   useEffect(() => {
     const listener = {
       onByte: (byte) => {
@@ -552,6 +626,7 @@ export function useKeyInput({
         // 0x02: P1.5 按下 (自动键默认点 Dit)
         // 0x03: P1.5 松开
         if (byte === 1) {
+          if (onHardwareActivityRef.current) onHardwareActivityRef.current();
           if (keyTypeRef.current === 'straight') {
             handleDown('serial');
           } else {
@@ -568,6 +643,7 @@ export function useKeyInput({
         } else if (byte === 2) {
           // 仅自动键响应 P1.5（手键模式完全屏蔽，防止大二芯单声道插头接地误触）
           if (keyTypeRef.current === 'paddle') {
+            if (onHardwareActivityRef.current) onHardwareActivityRef.current();
             if (isP14Dit) onPaddleDah(true);
             else onPaddleDit(true);
           }
@@ -577,20 +653,50 @@ export function useKeyInput({
             else onPaddleDit(false);
           }
         } else if (byte === 0x44 /* 'D' */) {
+          if (onHardwareActivityRef.current) onHardwareActivityRef.current();
           handleDown('serial');
         } else if (byte === 0x55 /* 'U' */) {
           handleUp('serial');
         }
       },
-      onConnectionChange: (connected) => {
+      onConnectionChange: (connected, portName) => {
         setSerialConnected(connected);
+        setSerialPortName(portName || null);
+        // 安全保护：若在按下电键发声中途拔出 USB，立即切断侧音并复位状态机，防止长鸣卡死
+        if (!connected) {
+          if (keyerTimerRef.current) {
+            clearTimeout(keyerTimerRef.current);
+            keyerTimerRef.current = null;
+          }
+          ditPaddleRef.current = false;
+          dahPaddleRef.current = false;
+          latchRef.current = null;
+          keyerRunningRef.current = false;
+          if (isKeyDownRef.current) {
+            handleUp('serial');
+          } else {
+            setTone(false);
+            setIsKeyDown(false);
+          }
+        }
       }
     };
 
+    // 先注册 listener，再初始化并查询 Tauri 后端状态，确保回调 100% 不丢失
     globalListeners.add(listener);
 
-    // 挂载时如果全局已经连接，立即同步状态为 true！
-    if (globalConnected && globalPort && globalPort.readable) {
+    if (isTauriEnv()) {
+      initTauriSerialSingleton();
+      setSerialConnected(globalConnected);
+      setSerialPortName(globalPortName);
+      invoke('get_serial_status')
+        .then((status) => {
+          if (status && typeof status.connected === 'boolean') {
+            notifyGlobalConnection(status.connected, status.port || null);
+          }
+        })
+        .catch(() => {});
+    } else if (globalConnected && globalPort && globalPort.readable) {
       setSerialConnected(true);
     }
 
@@ -599,8 +705,14 @@ export function useKeyInput({
     };
   }, [handleDown, handleUp, onPaddleDit, onPaddleDah]);
 
-  // 当设备为 ch552g 且未连接时，自动尝试静默直连已配对端口
+  // 当设备为 ch552g 或在 Tauri 环境下挂载时，自动激活静默直连
   useEffect(() => {
+    if (isTauriEnv()) {
+      initTauriSerialSingleton();
+      connectGlobalSerialPort().catch(() => {});
+      return;
+    }
+
     if ((_device === 'ch552g' || _device === 'serial') && !globalConnected) {
       if (typeof navigator !== 'undefined' && 'serial' in navigator && 'getPorts' in navigator.serial) {
         navigator.serial.getPorts().then((ports) => {
@@ -613,13 +725,16 @@ export function useKeyInput({
   }, [_device]);
 
   const connectSerial = useCallback(async () => {
+    initAudio();
+    if (isTauriEnv()) {
+      await connectGlobalSerialPort();
+      return;
+    }
     if (!('serial' in navigator)) {
-      alert('当前运行环境不支持 WebSerial 接口，请使用键盘或标准 HID 模式');
+      alert('当前运行环境不支持 WebSerial 接口，请使用桌面客户端或键盘模式');
       return;
     }
     try {
-      // 预先激活 AudioContext
-      initAudio();
       await connectGlobalSerialPort();
     } catch (err) {
       console.warn('[useKeyInput] Connect serial cancelled or failed:', err);
@@ -649,6 +764,7 @@ export function useKeyInput({
     isKeyDown,
     pressDuration,
     serialConnected,
+    serialPortName,
     connectSerial,
     disconnectSerial,
     manualDown: () => {

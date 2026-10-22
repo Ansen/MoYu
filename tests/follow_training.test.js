@@ -120,6 +120,19 @@ function testKeyInputHookContract() {
   assert.ok(hookCode.includes('paddleReverse'), 'useKeyInput must accept paddleReverse option');
   assert.ok(hookCode.includes('wpm'), 'useKeyInput must accept wpm option');
 
+  // 验证 Tauri Rust 原生串口免授权桥接契约
+  assert.ok(hookCode.includes('ch552g-byte'), 'useKeyInput must listen to Rust ch552g-byte event');
+  assert.ok(hookCode.includes('ch552g-status'), 'useKeyInput must listen to Rust ch552g-status event');
+  assert.ok(hookCode.includes('get_serial_status'), 'useKeyInput must invoke Rust get_serial_status');
+  assert.ok(hookCode.includes('connect_serial_port'), 'useKeyInput must invoke Rust connect_serial_port');
+
+  const rustSerialPath = path.resolve('src-tauri/src/serial.rs');
+  assert.ok(fs.existsSync(rustSerialPath), 'src-tauri/src/serial.rs must exist for native CH552G serial reading');
+  const rustSerialCode = fs.readFileSync(rustSerialPath, 'utf8');
+  assert.ok(rustSerialCode.includes('0x16C0'), 'Rust serial module must recognize MoYu CH552G VID 0x16C0');
+  assert.ok(rustSerialCode.includes('0xBA8B'), 'Rust serial module must recognize MoYu CH552G exact PID 0xBA8B');
+  assert.ok(rustSerialCode.includes('0x1A86'), 'Rust serial module must recognize WCH CH552G VID 0x1A86');
+
   // 模拟 DOWN / UP 事件格式验证
   const receivedEvents = [];
   const mockOnKeyEvent = (ev) => receivedEvents.push(ev);
@@ -139,7 +152,7 @@ function testKeyInputHookContract() {
   assert.strictEqual(receivedEvents[0].source, 'keyboard');
   assert.strictEqual(receivedEvents[1].state, 'UP');
   assert.strictEqual(receivedEvents[1].duration, 300);
-  console.log('✓ useKeyInput options signature and event stream contract validated.');
+  console.log('✓ useKeyInput options signature, Rust native serial bridge, and event stream contract validated.');
 }
 
 /**
@@ -178,7 +191,8 @@ function testSidetoneOffsetAndModeIntegrity() {
   assert.ok(panelCode.includes('playheadPosition'), 'TrainingScopePanel MUST support playheadPosition prop');
   assert.ok(panelCode.includes('timeWindowSec'), 'TrainingScopePanel MUST support timeWindowSec prop');
   assert.ok(panelCode.includes('setTimeWindowSec'), 'TrainingScopePanel MUST support setTimeWindowSec prop');
-  console.log('✓ TrainingScopePanel mode button, key type switch, playhead mode, timebase window & sidetone UI validated.');
+  assert.ok(panelCode.includes('modeNotice'), 'TrainingScopePanel MUST render friendly modeNotice toast');
+  console.log('✓ TrainingScopePanel mode button, key type switch, playhead mode, timebase window, modeNotice & sidetone UI validated.');
 
   // 3. 检查 MorseTimelineCanvas.jsx：盲跟模式逻辑与细长舒展轨道参数
   const canvasPath = path.resolve('src/components/training/MorseTimelineCanvas.jsx');
