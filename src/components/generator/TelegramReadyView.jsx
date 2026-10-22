@@ -7,22 +7,46 @@ import { useI18n } from '../../i18n';
  */
 export default function TelegramReadyView({
   dataset,
+  selectedFormats = { pdf: true, epub: true },
+  onToggleFormat,
   isExportingPdf,
   isExportingEpub,
   pdfExported,
   epubExported,
-  onExportPdf,
-  onExportEpub,
+  onExportSelected,
   onRegenerate,
   onBackToConfig,
   onClose,
   isGenerating
 }) {
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
+  const isEn = lang === 'en';
 
   if (!dataset) return null;
 
   const { totalPages, totalGroups, totalChars, previewRows = [], title } = dataset;
+  const isExporting = isExportingPdf || isExportingEpub;
+  const hasSelection = Boolean(selectedFormats.pdf || selectedFormats.epub);
+  const allSelectedExported =
+    hasSelection &&
+    (!selectedFormats.pdf || pdfExported) &&
+    (!selectedFormats.epub || epubExported);
+
+  const getExportButtonLabel = () => {
+    if (isExporting) {
+      return t('generator.btn.exporting');
+    }
+    if (!hasSelection) {
+      return isEn ? 'Select Format to Export' : '请勾选导出格式';
+    }
+    if (selectedFormats.pdf && selectedFormats.epub) {
+      return isEn ? 'Export Both (PDF + EPUB)' : '导出报底 (PDF + EPUB)';
+    }
+    if (selectedFormats.pdf) {
+      return t('generator.btn.exportPdf');
+    }
+    return t('generator.btn.exportEpub');
+  };
 
   return (
     <div className="flex-1 flex flex-col justify-between overflow-hidden animate-in fade-in zoom-in-98 duration-200">
@@ -110,105 +134,128 @@ export default function TelegramReadyView({
           </div>
         </div>
 
-        {/* Multi-Format Export Cards */}
-        <div className="space-y-2 pt-1">
-          <div className="text-[12px] font-semibold text-slate-500 dark:text-slate-400 px-0.5 uppercase tracking-wider">
-            {t('generator.exportOptions')}
+        {/* Multi-Format Export Checkbox Cards */}
+        <div className="space-y-2.5 pt-1">
+          <div className="flex items-center justify-between px-0.5">
+            <span className="text-[12px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+              {t('generator.exportOptions')}
+            </span>
+            <span className="text-[11px] text-slate-400 dark:text-slate-500">
+              {isEn ? 'Select formats to export together' : '勾选格式，一键同时生成同名文件'}
+            </span>
           </div>
 
           <div className="grid grid-cols-2 gap-3">
-            {/* PDF Export Card */}
-            <div className="p-3.5 rounded-xl border border-slate-200 dark:border-[#333333] bg-white dark:bg-[#222222] hover:border-emerald-400/80 dark:hover:border-emerald-700/80 transition-all flex flex-col justify-between gap-3 shadow-xs">
-              <div className="flex items-start gap-2.5">
-                <div className="p-2 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 shrink-0">
-                  <Printer size={18} />
+            {/* PDF Checkbox Card */}
+            <div
+              role="checkbox"
+              aria-checked={selectedFormats.pdf}
+              tabIndex={0}
+              onClick={() => !isExporting && onToggleFormat?.('pdf')}
+              onKeyDown={(e) => {
+                if ((e.key === ' ' || e.key === 'Enter') && !isExporting) {
+                  e.preventDefault();
+                  onToggleFormat?.('pdf');
+                }
+              }}
+              className={`p-3.5 rounded-xl border transition-all cursor-pointer flex flex-col justify-between gap-2 shadow-xs select-none ${
+                selectedFormats.pdf
+                  ? 'border-emerald-500/80 dark:border-emerald-600/80 bg-emerald-50/35 dark:bg-emerald-950/20 ring-1 ring-emerald-500/20'
+                  : 'border-slate-200 dark:border-[#333333] bg-white dark:bg-[#222222] opacity-70 hover:opacity-100 hover:border-slate-300 dark:hover:border-[#444]'
+              }`}
+            >
+              <div className="flex items-start justify-between gap-2">
+                <div className="flex items-start gap-2.5">
+                  <div className={`p-2 rounded-lg shrink-0 transition-colors ${
+                    selectedFormats.pdf
+                      ? 'bg-emerald-500 text-white shadow-xs'
+                      : 'bg-slate-100 dark:bg-[#2d2d2d] text-slate-400'
+                  }`}>
+                    <Printer size={17} />
+                  </div>
+                  <div>
+                    <div className="font-bold text-[14px] text-slate-800 dark:text-slate-100 flex items-center gap-1.5 flex-wrap">
+                      <span>{t('generator.ready.pdfTitle')}</span>
+                      {pdfExported && (
+                        <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-100 text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-300">
+                          <Check size={10} className="stroke-[3]" />
+                          {t('generator.ready.exported')}
+                        </span>
+                      )}
+                    </div>
+                    <div className="text-[12px] text-slate-500 dark:text-slate-400 leading-snug mt-1">
+                      {t('generator.ready.pdfDesc')}
+                    </div>
+                  </div>
                 </div>
-                <div>
-                  <div className="font-bold text-[14px] text-slate-800 dark:text-slate-200">
-                    {t('generator.ready.pdfTitle')}
-                  </div>
-                  <div className="text-[12px] text-slate-400 dark:text-slate-500 leading-snug mt-0.5">
-                    {t('generator.ready.pdfDesc')}
-                  </div>
+
+                {/* Custom Checkbox Indicator */}
+                <div
+                  className={`w-5 h-5 rounded-md border flex items-center justify-center shrink-0 transition-all mt-0.5 ${
+                    selectedFormats.pdf
+                      ? 'bg-emerald-500 border-emerald-500 text-white shadow-2xs'
+                      : 'border-slate-300 dark:border-[#4a4a4a] bg-white dark:bg-[#1a1a1a]'
+                  }`}
+                >
+                  {selectedFormats.pdf && <Check size={13} className="stroke-[3]" />}
                 </div>
               </div>
-
-              <button
-                type="button"
-                onClick={onExportPdf}
-                disabled={isExportingPdf || isExportingEpub}
-                className={`w-full py-2 px-3 rounded-lg border text-[13px] font-medium flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
-                  isExportingPdf
-                    ? 'border-slate-300 dark:border-[#444444] bg-slate-100 dark:bg-[#2a2a2a] text-slate-400 dark:text-slate-500'
-                    : pdfExported
-                      ? 'border-emerald-300 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-400'
-                      : 'border-emerald-400/80 dark:border-emerald-700 bg-emerald-500 hover:bg-emerald-600 text-white shadow-xs hover:shadow-md'
-                }`}
-              >
-                {isExportingPdf ? (
-                  <>
-                    <RefreshCw size={13} className="animate-spin" />
-                    <span>{t('generator.btn.exporting')}</span>
-                  </>
-                ) : pdfExported ? (
-                  <>
-                    <Check size={13} className="stroke-[2.5]" />
-                    <span>{t('generator.ready.exported')} ({t('generator.ready.reExport')})</span>
-                  </>
-                ) : (
-                  <>
-                    <Printer size={13} />
-                    <span>{t('generator.btn.exportPdf')}</span>
-                  </>
-                )}
-              </button>
             </div>
 
-            {/* EPUB Export Card */}
-            <div className="p-3.5 rounded-xl border border-slate-200 dark:border-[#333333] bg-white dark:bg-[#222222] hover:border-indigo-400/80 dark:hover:border-indigo-700/80 transition-all flex flex-col justify-between gap-3 shadow-xs">
-              <div className="flex items-start gap-2.5">
-                <div className="p-2 rounded-lg bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 shrink-0">
-                  <BookOpen size={18} />
+            {/* EPUB Checkbox Card */}
+            <div
+              role="checkbox"
+              aria-checked={selectedFormats.epub}
+              tabIndex={0}
+              onClick={() => !isExporting && onToggleFormat?.('epub')}
+              onKeyDown={(e) => {
+                if ((e.key === ' ' || e.key === 'Enter') && !isExporting) {
+                  e.preventDefault();
+                  onToggleFormat?.('epub');
+                }
+              }}
+              className={`p-3.5 rounded-xl border transition-all cursor-pointer flex flex-col justify-between gap-2 shadow-xs select-none ${
+                selectedFormats.epub
+                  ? 'border-indigo-500/80 dark:border-indigo-600/80 bg-indigo-50/35 dark:bg-indigo-950/20 ring-1 ring-indigo-500/20'
+                  : 'border-slate-200 dark:border-[#333333] bg-white dark:bg-[#222222] opacity-70 hover:opacity-100 hover:border-slate-300 dark:hover:border-[#444]'
+              }`}
+            >
+              <div className="flex items-start justify-between gap-2">
+                <div className="flex items-start gap-2.5">
+                  <div className={`p-2 rounded-lg shrink-0 transition-colors ${
+                    selectedFormats.epub
+                      ? 'bg-indigo-500 text-white shadow-xs'
+                      : 'bg-slate-100 dark:bg-[#2d2d2d] text-slate-400'
+                  }`}>
+                    <BookOpen size={17} />
+                  </div>
+                  <div>
+                    <div className="font-bold text-[14px] text-slate-800 dark:text-slate-100 flex items-center gap-1.5 flex-wrap">
+                      <span>{t('generator.ready.epubTitle')}</span>
+                      {epubExported && (
+                        <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-indigo-100 text-indigo-700 dark:bg-indigo-900/50 dark:text-indigo-300">
+                          <Check size={10} className="stroke-[3]" />
+                          {t('generator.ready.exported')}
+                        </span>
+                      )}
+                    </div>
+                    <div className="text-[12px] text-slate-500 dark:text-slate-400 leading-snug mt-1">
+                      {t('generator.ready.epubDesc')}
+                    </div>
+                  </div>
                 </div>
-                <div>
-                  <div className="font-bold text-[14px] text-slate-800 dark:text-slate-200">
-                    {t('generator.ready.epubTitle')}
-                  </div>
-                  <div className="text-[12px] text-slate-400 dark:text-slate-500 leading-snug mt-0.5">
-                    {t('generator.ready.epubDesc')}
-                  </div>
+
+                {/* Custom Checkbox Indicator */}
+                <div
+                  className={`w-5 h-5 rounded-md border flex items-center justify-center shrink-0 transition-all mt-0.5 ${
+                    selectedFormats.epub
+                      ? 'bg-indigo-500 border-indigo-500 text-white shadow-2xs'
+                      : 'border-slate-300 dark:border-[#4a4a4a] bg-white dark:bg-[#1a1a1a]'
+                  }`}
+                >
+                  {selectedFormats.epub && <Check size={13} className="stroke-[3]" />}
                 </div>
               </div>
-
-              <button
-                type="button"
-                onClick={onExportEpub}
-                disabled={isExportingPdf || isExportingEpub}
-                className={`w-full py-2 px-3 rounded-lg border text-[13px] font-medium flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
-                  isExportingEpub
-                    ? 'border-slate-300 dark:border-[#444444] bg-slate-100 dark:bg-[#2a2a2a] text-slate-400 dark:text-slate-500'
-                    : epubExported
-                      ? 'border-indigo-300 dark:border-indigo-800 bg-indigo-50 dark:bg-indigo-950/30 text-indigo-700 dark:text-indigo-400'
-                      : 'border-indigo-400/80 dark:border-indigo-700 bg-indigo-500 hover:bg-indigo-600 text-white shadow-xs hover:shadow-md'
-                }`}
-              >
-                {isExportingEpub ? (
-                  <>
-                    <RefreshCw size={13} className="animate-spin" />
-                    <span>{t('generator.btn.exporting')}</span>
-                  </>
-                ) : epubExported ? (
-                  <>
-                    <Check size={13} className="stroke-[2.5]" />
-                    <span>{t('generator.ready.exported')} ({t('generator.ready.reExport')})</span>
-                  </>
-                ) : (
-                  <>
-                    <Download size={13} />
-                    <span>{t('generator.btn.exportEpub')}</span>
-                  </>
-                )}
-              </button>
             </div>
           </div>
         </div>
@@ -222,8 +269,8 @@ export default function TelegramReadyView({
           <button
             type="button"
             onClick={onBackToConfig}
-            disabled={isExportingPdf || isExportingEpub || isGenerating}
-            className="px-3 py-2 rounded-xl border border-slate-300 dark:border-[#444444] text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-[#333333] transition-colors text-[13px] font-medium flex items-center gap-1 cursor-pointer"
+            disabled={isExporting || isGenerating}
+            className="px-3 py-2 rounded-xl border border-slate-300 dark:border-[#444444] text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-[#333333] transition-colors text-[13px] font-medium flex items-center gap-1 cursor-pointer disabled:opacity-50"
           >
             <ChevronLeft size={15} />
             <span>{t('generator.ready.backToConfig')}</span>
@@ -233,24 +280,54 @@ export default function TelegramReadyView({
           <button
             type="button"
             onClick={onRegenerate}
-            disabled={isExportingPdf || isExportingEpub || isGenerating}
-            className="px-3 py-2 rounded-xl border border-slate-300 dark:border-[#444444] text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-[#333333] transition-colors text-[13px] font-medium flex items-center gap-1.5 cursor-pointer"
+            disabled={isExporting || isGenerating}
+            className="px-3 py-2 rounded-xl border border-slate-300 dark:border-[#444444] text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-[#333333] transition-colors text-[13px] font-medium flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
           >
             <RefreshCw size={13} className={isGenerating ? 'animate-spin text-orange-500' : ''} />
             <span>{t('generator.ready.regenerate')}</span>
           </button>
         </div>
 
-        {/* Done / Close Dialog Button */}
-        <button
-          type="button"
-          onClick={onClose}
-          disabled={isExportingPdf || isExportingEpub || isGenerating}
-          className="px-5 py-2 rounded-xl bg-orange-500 hover:bg-orange-600 text-white transition-all text-[14px] font-medium flex items-center gap-1.5 shadow-xs hover:shadow-md cursor-pointer"
-        >
-          <Check size={15} />
-          <span>{t('generator.ready.done')}</span>
-        </button>
+        <div className="flex items-center gap-2">
+          {allSelectedExported && (
+            <button
+              type="button"
+              onClick={onClose}
+              disabled={isExporting || isGenerating}
+              className="px-4 py-2 rounded-xl border border-slate-300 dark:border-[#444444] text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-[#333333] transition-colors text-[13px] font-medium flex items-center gap-1.5 cursor-pointer"
+            >
+              <Check size={14} />
+              <span>{t('generator.ready.done')}</span>
+            </button>
+          )}
+
+          {/* Primary Export Button */}
+          <button
+            type="button"
+            onClick={onExportSelected}
+            disabled={!hasSelection || isExporting || isGenerating}
+            className={`px-5 py-2 rounded-xl transition-all text-[14px] font-medium flex items-center gap-1.5 shadow-xs cursor-pointer ${
+              !hasSelection || isExporting
+                ? 'bg-slate-300 dark:bg-[#383838] text-slate-500 dark:text-slate-400 cursor-not-allowed'
+                : allSelectedExported
+                ? 'bg-emerald-600 hover:bg-emerald-700 text-white hover:shadow-md'
+                : 'bg-orange-500 hover:bg-orange-600 text-white hover:shadow-md'
+            }`}
+          >
+            {isExporting ? (
+              <RefreshCw size={15} className="animate-spin" />
+            ) : allSelectedExported ? (
+              <Check size={15} className="stroke-[2.5]" />
+            ) : (
+              <Download size={15} />
+            )}
+            <span>
+              {allSelectedExported && !isExporting
+                ? `${t('generator.ready.exported')} · ${t('generator.ready.reExport')}`
+                : getExportButtonLabel()}
+            </span>
+          </button>
+        </div>
       </div>
     </div>
   );

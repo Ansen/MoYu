@@ -19,7 +19,8 @@ export async function exportPdfPractice({
   title,
   t,
   onProgress,
-  generatedPages: pregeneratedPages
+  generatedPages: pregeneratedPages,
+  targetFilePath = null
 }) {
   const generatedPages = [];
 
@@ -65,6 +66,17 @@ export async function exportPdfPractice({
     }
   }
 
+  let filePath = targetFilePath;
+  if (!filePath) {
+    const safeFilename = (title || 'Telegram').replace(/[/\\:*?"<>|]/g, '_');
+    filePath = await save({
+      filters: [{ name: 'PDF Document', extensions: ['pdf'] }],
+      defaultPath: `${safeFilename}.pdf`
+    });
+  }
+
+  if (!filePath) return false;
+
   if (onProgress) {
     onProgress({
       current: exportPages,
@@ -75,13 +87,14 @@ export async function exportPdfPractice({
   }
   await new Promise(r => setTimeout(r, 15));
 
-  const safeFilename = (title || 'Telegram').replace(/[\/\\:*?"<>|]/g, '_');
-  const filePath = await save({
-    filters: [{ name: 'PDF Document', extensions: ['pdf'] }],
-    defaultPath: `${safeFilename}.pdf`
+  const pdfBytes = generateTelegramPdf({
+    pages: generatedPages,
+    title,
+    presetMode,
+    groupLength: effectiveLength,
+    groupCount: effectiveGroupCount,
+    includePageNumber: true
   });
-
-  if (!filePath) return false;
 
   if (onProgress) {
     onProgress({
@@ -93,15 +106,6 @@ export async function exportPdfPractice({
   }
   await new Promise(r => setTimeout(r, 10));
 
-  const pdfBytes = generateTelegramPdf({
-    pages: generatedPages,
-    title,
-    presetMode,
-    groupLength: effectiveLength,
-    groupCount: effectiveGroupCount,
-    includePageNumber: true
-  });
-
   await writeFile(filePath, pdfBytes);
-  return true;
+  return filePath;
 }

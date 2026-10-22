@@ -8,7 +8,11 @@ use serial::{
 };
 
 #[tauri::command]
-fn generate_epub(title: String, chapters: Vec<String>) -> Result<Vec<u8>, String> {
+fn generate_epub(
+    title: String,
+    chapters: Vec<String>,
+    save_path: Option<String>,
+) -> Result<Vec<u8>, String> {
     let mut builder = EpubBuilder::new(ZipLibrary::new().map_err(|e| e.to_string())?)
         .map_err(|e| e.to_string())?;
     
@@ -58,6 +62,10 @@ fn generate_epub(title: String, chapters: Vec<String>) -> Result<Vec<u8>, String
 
     let mut out = Vec::new();
     builder.generate(&mut out).map_err(|e| e.to_string())?;
+    if let Some(path) = save_path {
+        std::fs::write(&path, &out).map_err(|e| e.to_string())?;
+        return Ok(Vec::new());
+    }
     Ok(out)
 }
 

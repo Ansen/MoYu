@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { save } from '@tauri-apps/plugin-dialog';
 import { X, Sparkles, CheckCircle2 } from 'lucide-react';
 import { useI18n } from '../i18n';
 import { generateStructuredRandomContent } from '../utils/morse/structuredRandom';
@@ -14,7 +15,8 @@ import ModalFooter from './generator/ModalFooter';
 import TelegramReadyView from './generator/TelegramReadyView';
 
 export default function GeneratorModal({ isOpen, onClose, onGenerate }) {
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
+  const isEn = lang === 'en';
 
   // Primary Mode: 'numbers' | 'letters' | 'mixed' | 'callsigns'
   const [presetMode, setPresetMode] = useState('mixed');
@@ -40,13 +42,13 @@ export default function GeneratorModal({ isOpen, onClose, onGenerate }) {
   const [isGenerating, setIsGenerating] = useState(false);
   const [generatedDataset, setGeneratedDataset] = useState(null);
 
-  // Multi-format export progress & statuses
+  // Multi-format export checkboxes (default both checked) & statuses
+  const [selectedFormats, setSelectedFormats] = useState({ pdf: true, epub: true });
   const [isExportingPdf, setIsExportingPdf] = useState(false);
   const [isExportingEpub, setIsExportingEpub] = useState(false);
   const [pdfExported, setPdfExported] = useState(false);
   const [epubExported, setEpubExported] = useState(false);
   const [exportType, setExportType] = useState('pdf'); // 'pdf' | 'epub'
-  const [exportStatus, setExportStatus] = useState(null); // 'success' | 'error' | null
   const [exportProgress, setExportProgress] = useState(null); // { current, total, percent, text }
 
   const effectiveGroupCount = isCustomCount ? Math.max(1, parseInt(customCountInput) || 100) : groupCount;
@@ -114,10 +116,36 @@ export default function GeneratorModal({ isOpen, onClose, onGenerate }) {
   // Reset dataset and close
   const handleClose = () => {
     setGeneratedDataset(null);
+    setExportProgress(null);
+    setPdfExported(false);
+    setEpubExported(false);
     onClose();
   };
 
   if (!isOpen) return null;
+
+  // Helper to generate a single page (or preview sample) of groups
+  const generateSinglePageGroups = (count = effectiveGroupCount) => {
+    if (presetMode === 'callsigns') {
+      const sample = generateStructuredRandomContent({
+        mode: 'callsigns',
+        groupCount: count,
+        includeCallsignSuffix
+      });
+      return sample?.groups || [];
+    }
+    const sample = generateStructuredRandomContent({
+      mode: 'custom',
+      pool,
+      charsPerGroup: effectiveLength,
+      maxDigitsPerGroup: presetMode === 'mixed' ? effectiveMaxDigits : null,
+      digitSlots: presetMode === 'mixed' && effectiveDigitSlots.length > 0 ? effectiveDigitSlots : null,
+      groupCount: count,
+      allowAdjacentDuplicate: !noAdjacentDup,
+      customProfile: true
+    });
+    return sample?.groups || [];
+  };
 
   // Rapid 1-page practice directly into software player without multi-page export workflow
   const handleStartPracticeDirect = () => {
@@ -161,179 +189,215 @@ export default function GeneratorModal({ isOpen, onClose, onGenerate }) {
     handleClose();
   };
 
-  // Step 1 -> Step 2: Generate the authoritative dataset in-memory (for multi-page export)
-  const handleGenerateDataset = async () => {
+  // Step 1 -> Step 2: Instantly enter export view with lightweight 1-page preview (full multi-page dataset is generated lazily on export)
+  const handlePrepareExportView = () => {
+    let typeDesc = t('generator.title.mixed');
+    if (presetMode === 'numbers') typeDesc = t('generator.title.numbers');
+    else if (presetMode === 'letters') typeDesc = t('generator.title.letters');
+    else if (presetMode === 'callsigns') typeDesc = t('generator.title.callsigns');
+
+    // Only generate Page 1 now (<1ms) so preview is instant and zero-lag; remaining pages are generated when user clicks Export
+    const firstPageGroups = generateSinglePageGroups(effectiveGroupCount);
+    const first20 = firstPageGroups.slice(0, 20).map(g => (Array.isArray(g) ? g.join('') : g));
+    const previewRows = [];
+    for (let i = 0; i < first20.length; i += 5) {
+      previewRows.push(first20.slice(i, i + 5));
+    }
+
+    const totalGroups = exportPages * effectiveGroupCount;
+    const avgLen = presetMode === 'callsigns' ? 6 : effectiveLength;
+    const totalChars = totalGroups * avgLen;
+
+    const suffixTag = includeCallsignSuffix ? ` ${t('generator.title.withSymbols')}` : '';
+    const suffix = includeSymbols ? ` ${t('generator.title.withSymbols')}` : '';
+    const digitsInfo = presetMode === 'mixed' ? ` · ${t('generator.title.maxDigits', { count: effectiveMaxDigits })}` : '';
+    const slotInfo = (presetMode === 'mixed' && effectiveDigitSlots.length > 0)
+      ? ` ${t('generator.title.slotInfo', { slots: effectiveDigitSlots.map(s => s + 1).join(',') })}`
+      : '';
+    const fullTitle = presetMode === 'callsigns'
+      ? `${typeDesc} (${effectiveGroupCount} ${t('generator.title.groups')}${suffixTag})`
+      : `${typeDesc} (${effectiveLength} ${t('generator.title.chars')}${digitsInfo}${slotInfo} · ${exportPages} ${t('reader.pages.unit', '页')}${suffix})`;
+
+    setGeneratedDataset({
+      firstPageGroups,
+      pages: null, // Lazily populated when user clicks Export and confirms save path
+      totalPages: exportPages,
+      totalGroups,
+      totalChars,
+      previewRows,
+      title: fullTitle
+    });
+
+    setPdfExported(false);
+    setEpubExported(false);
+  };
+
+  const handleToggleFormat = (fmt) => {
+    setSelectedFormats((prev) => ({
+      ...prev,
+      [fmt]: !prev[fmt]
+    }));
+  };
+
+  // Lazily build (or reuse) the full multi-page dataset with real-time progress bar AFTER user confirms save path
+  const ensureFullPagesGenerated = async (progressScale = 0.7) => {
+    if (generatedDataset?.pages && generatedDataset.pages.length === exportPages) {
+      return generatedDataset.pages;
+    }
+
+    setIsGenerating(true);
     try {
-      setIsGenerating(true);
-      await new Promise(r => setTimeout(r, 30));
-
-      let typeDesc = t('generator.title.mixed');
-      if (presetMode === 'numbers') typeDesc = t('generator.title.numbers');
-      else if (presetMode === 'letters') typeDesc = t('generator.title.letters');
-      else if (presetMode === 'callsigns') typeDesc = t('generator.title.callsigns');
-
-      const pages = [];
-      for (let i = 0; i < exportPages; i++) {
-        let sample = null;
-        if (presetMode === 'callsigns') {
-          sample = generateStructuredRandomContent({
-            mode: 'callsigns',
-            groupCount: effectiveGroupCount,
-            includeCallsignSuffix
+      const pages = [generatedDataset.firstPageGroups || generateSinglePageGroups(effectiveGroupCount)];
+      for (let i = 1; i < exportPages; i++) {
+        if (i % 2 === 0 || i === exportPages - 1) {
+          const percent = Math.max(5, Math.round(((i + 1) / exportPages) * 100 * progressScale));
+          setExportProgress({
+            current: i + 1,
+            total: exportPages,
+            percent,
+            text: (t('generator.pdfExport.generating') || '正在生成第 {current} / {total} 页报底...')
+              .replace('{current}', i + 1)
+              .replace('{total}', exportPages)
           });
-        } else {
-          sample = generateStructuredRandomContent({
-            mode: 'custom',
-            pool,
-            charsPerGroup: effectiveLength,
-            maxDigitsPerGroup: presetMode === 'mixed' ? effectiveMaxDigits : null,
-            digitSlots: presetMode === 'mixed' && effectiveDigitSlots.length > 0 ? effectiveDigitSlots : null,
-            groupCount: effectiveGroupCount,
-            allowAdjacentDuplicate: !noAdjacentDup,
-            customProfile: true
-          });
+          await new Promise(r => setTimeout(r, 6));
         }
-        pages.push(sample?.groups || []);
+        pages.push(generateSinglePageGroups(effectiveGroupCount));
       }
 
-      const totalGroups = pages.reduce((sum, p) => sum + p.length, 0);
-      const totalChars = pages.reduce((sum, p) => sum + p.reduce((s, g) => s + g.length, 0), 0);
-
-      // First 20 groups of Page 1 partitioned into 5 groups per row for telegram preview
-      const page1Groups = pages[0] || [];
-      const first20 = page1Groups.slice(0, 20).map(g => (Array.isArray(g) ? g.join('') : g));
-      const previewRows = [];
-      for (let i = 0; i < first20.length; i += 5) {
-        previewRows.push(first20.slice(i, i + 5));
-      }
-
-      const suffixTag = includeCallsignSuffix ? ` ${t('generator.title.withSymbols')}` : '';
-      const suffix = includeSymbols ? ` ${t('generator.title.withSymbols')}` : '';
-      const digitsInfo = presetMode === 'mixed' ? ` · ${t('generator.title.maxDigits', { count: effectiveMaxDigits })}` : '';
-      const slotInfo = (presetMode === 'mixed' && effectiveDigitSlots.length > 0)
-        ? ` ${t('generator.title.slotInfo', { slots: effectiveDigitSlots.map(s => s + 1).join(',') })}`
-        : '';
-      const fullTitle = presetMode === 'callsigns'
-        ? `${typeDesc} (${effectiveGroupCount} ${t('generator.title.groups')}${suffixTag})`
-        : `${typeDesc} (${effectiveLength} ${t('generator.title.chars')}${digitsInfo}${slotInfo} · ${exportPages} ${t('reader.pages.unit', '页')}${suffix})`;
-
-      setGeneratedDataset({
-        pages,
-        totalPages: exportPages,
-        totalGroups,
-        totalChars,
-        previewRows,
-        title: fullTitle
-      });
-
-      setPdfExported(false);
-      setEpubExported(false);
-    } catch (err) {
-      console.error('Failed to generate dataset:', err);
+      const actualChars = pages.reduce((sum, p) => sum + p.reduce((s, g) => s + g.length, 0), 0);
+      setGeneratedDataset((prev) => prev ? { ...prev, pages, totalChars: actualChars } : prev);
+      return pages;
     } finally {
       setIsGenerating(false);
     }
   };
 
-  // Step 2 Action: Export PDF using the identical generated dataset
-  const handleExportPdf = async () => {
+  // Unified Export Action:
+  // 1. Prompts save dialog FIRST (0ms, zero wasted computation if cancelled)
+  // 2. Generates the multi-page dataset with progress bar
+  // 3. Writes selected formats (.pdf and/or .epub) from the identical dataset
+  const handleExportSelected = async () => {
     if (!generatedDataset) return;
+    const { pdf, epub } = selectedFormats;
+    if (!pdf && !epub) return;
+
+    const safeFilename = (generatedDataset.title || 'Telegram').replace(/[/\\:*?"<>|]/g, '_');
+
     try {
-      setIsExportingPdf(true);
-      setExportType('pdf');
-      setExportStatus(null);
-      setExportProgress({ current: 0, total: exportPages, percent: 5, text: t('generator.btn.exporting') });
-
-      const success = await exportPdfPractice({
-        exportPages: generatedDataset.totalPages,
-        presetMode,
-        effectiveLength,
-        effectiveMaxDigits,
-        effectiveGroupCount,
-        includeCallsignSuffix,
-        pool,
-        noAdjacentDup,
-        title: generatedDataset.title,
-        t,
-        onProgress: setExportProgress,
-        generatedPages: generatedDataset.pages
-      });
-
-      if (success) {
-        setExportProgress({ current: exportPages, total: exportPages, percent: 100, text: t('generator.pdfExport.successToast') });
-        setExportStatus('success');
-        setPdfExported(true);
-        setTimeout(() => {
-          setExportStatus(null);
-          setExportProgress(null);
-        }, 2500);
+      // Step 1: Open save dialog immediately before generating all pages
+      let chosenPath = null;
+      if (pdf) {
+        chosenPath = await save({
+          filters: [{ name: 'PDF Document', extensions: ['pdf'] }],
+          defaultPath: `${safeFilename}.pdf`
+        });
       } else {
-        setExportStatus(null);
-        setExportProgress(null);
+        chosenPath = await save({
+          filters: [{ name: 'EPUB eBook', extensions: ['epub'] }],
+          defaultPath: `${safeFilename}.epub`
+        });
       }
+
+      // If user cancelled the save dialog, exit cleanly without generating anything
+      if (!chosenPath) {
+        return;
+      }
+
+      const basePath = String(chosenPath).replace(/\.(pdf|epub)$/i, '');
+      const targetPdfPath = pdf ? String(chosenPath) : `${basePath}.pdf`;
+      const targetEpubPath = !pdf && epub ? String(chosenPath) : `${basePath}.epub`;
+
+      // Step 2: Now generate the full multi-page dataset (or reuse if already generated for this batch)
+      setExportType(pdf ? 'pdf' : 'epub');
+      const pages = await ensureFullPagesGenerated(pdf && epub ? 0.55 : 0.75);
+
+      // Step 3: Export PDF if selected
+      if (pdf) {
+        setIsExportingPdf(true);
+        setExportType('pdf');
+        await exportPdfPractice({
+          exportPages: generatedDataset.totalPages,
+          presetMode,
+          effectiveLength,
+          effectiveMaxDigits,
+          effectiveGroupCount,
+          includeCallsignSuffix,
+          pool,
+          noAdjacentDup,
+          title: generatedDataset.title,
+          t,
+          onProgress: (prog) => {
+            setExportProgress({
+              ...prog,
+              percent: epub ? 55 + Math.round((prog.percent || 90) * 0.2) : prog.percent
+            });
+          },
+          generatedPages: pages,
+          targetFilePath: targetPdfPath
+        });
+        setPdfExported(true);
+        setIsExportingPdf(false);
+      }
+
+      // Step 4: Export EPUB if selected (uses the exact same `pages` array)
+      if (epub) {
+        setIsExportingEpub(true);
+        setExportType('epub');
+        await exportEpubPractice({
+          exportPages: generatedDataset.totalPages,
+          presetMode,
+          effectiveLength,
+          effectiveMaxDigits,
+          effectiveGroupCount,
+          includeCallsignSuffix,
+          pool,
+          noAdjacentDup,
+          title: generatedDataset.title,
+          t,
+          onProgress: (prog) => {
+            setExportProgress({
+              ...prog,
+              percent: pdf ? 75 + Math.round((prog.percent || 90) * 0.22) : prog.percent
+            });
+          },
+          generatedPages: pages,
+          targetFilePath: targetEpubPath
+        });
+        setEpubExported(true);
+        setIsExportingEpub(false);
+      }
+
+      // Step 5: Complete
+      setExportProgress({
+        current: exportPages,
+        total: exportPages,
+        percent: 100,
+        text: pdf && epub
+          ? (isEn ? 'PDF & EPUB exported simultaneously!' : '已同时生成并导出同名 PDF 与 EPUB 报底文件！')
+          : pdf
+          ? t('generator.pdfExport.successToast')
+          : t('generator.epubExport.successToast')
+      });
+      setTimeout(() => {
+        setExportProgress(null);
+      }, 2600);
     } catch (e) {
-      console.error('PDF export error:', e);
-      setExportStatus('error');
+      console.error('Export error:', e);
       setExportProgress(null);
-      setTimeout(() => setExportStatus(null), 3000);
     } finally {
       setIsExportingPdf(false);
-    }
-  };
-
-  // Step 2 Action: Export EPUB using the identical generated dataset
-  const handleExportEpub = async () => {
-    if (!generatedDataset) return;
-    try {
-      setIsExportingEpub(true);
-      setExportType('epub');
-      setExportStatus(null);
-      setExportProgress({ current: 0, total: exportPages, percent: 5, text: t('generator.btn.exporting') });
-
-      const success = await exportEpubPractice({
-        exportPages: generatedDataset.totalPages,
-        presetMode,
-        effectiveLength,
-        effectiveMaxDigits,
-        effectiveGroupCount,
-        includeCallsignSuffix,
-        pool,
-        noAdjacentDup,
-        title: generatedDataset.title,
-        t,
-        onProgress: setExportProgress,
-        generatedPages: generatedDataset.pages
-      });
-
-      if (success) {
-        setExportProgress({ current: exportPages, total: exportPages, percent: 100, text: t('generator.epubExport.successToast') });
-        setExportStatus('success');
-        setEpubExported(true);
-        setTimeout(() => {
-          setExportStatus(null);
-          setExportProgress(null);
-        }, 2500);
-      } else {
-        setExportStatus(null);
-        setExportProgress(null);
-      }
-    } catch (e) {
-      console.error('EPUB export error:', e);
-      setExportStatus('error');
-      setExportProgress(null);
-      setTimeout(() => setExportStatus(null), 3000);
-    } finally {
       setIsExportingEpub(false);
     }
   };
 
   const handleBackToConfig = () => {
     setGeneratedDataset(null);
+    setExportProgress(null);
   };
 
   return (
     <div className="fixed inset-0 bg-black/40 dark:bg-black/70 z-[100] flex items-center justify-center p-4 sm:p-6 backdrop-blur-xs select-none animate-in fade-in duration-200">
-      <div className="bg-white dark:bg-[#1e1e1e] border border-slate-300 dark:border-[#333333] rounded-2xl shadow-2xl w-[600px] max-w-[94vw] h-[660px] max-h-[calc(100vh-2rem)] overflow-hidden flex flex-col animate-in zoom-in-95 duration-200">
+      <div className="bg-white dark:bg-[#1e1e1e] border border-slate-300 dark:border-[#333333] rounded-2xl shadow-2xl w-[600px] max-w-[94vw] h-[640px] max-h-[calc(100vh-2rem)] overflow-hidden flex flex-col animate-in zoom-in-95 duration-200">
         
         {/* Modal Header */}
         <div className="shrink-0 h-12 flex items-center justify-between px-5 bg-slate-50 dark:bg-[#252526] border-b border-slate-200 dark:border-[#333333]">
@@ -362,13 +426,14 @@ export default function GeneratorModal({ isOpen, onClose, onGenerate }) {
         {generatedDataset ? (
           <TelegramReadyView
             dataset={generatedDataset}
+            selectedFormats={selectedFormats}
+            onToggleFormat={handleToggleFormat}
             isExportingPdf={isExportingPdf}
             isExportingEpub={isExportingEpub}
             pdfExported={pdfExported}
             epubExported={epubExported}
-            onExportPdf={handleExportPdf}
-            onExportEpub={handleExportEpub}
-            onRegenerate={handleGenerateDataset}
+            onExportSelected={handleExportSelected}
+            onRegenerate={handlePrepareExportView}
             onBackToConfig={handleBackToConfig}
             onClose={handleClose}
             isGenerating={isGenerating}
@@ -426,7 +491,7 @@ export default function GeneratorModal({ isOpen, onClose, onGenerate }) {
             <ModalFooter
               isGenerating={isGenerating}
               onClose={handleClose}
-              onGenerateBatch={handleGenerateDataset}
+              onGenerateBatch={handlePrepareExportView}
               onStartPractice={handleStartPracticeDirect}
             />
           </>

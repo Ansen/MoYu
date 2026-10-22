@@ -22,7 +22,8 @@ export async function exportEpubPractice({
   title,
   t,
   onProgress,
-  generatedPages: pregeneratedPages
+  generatedPages: pregeneratedPages,
+  targetFilePath = null
 }) {
   const chapters = [];
 
@@ -83,6 +84,17 @@ export async function exportEpubPractice({
     }
   }
 
+  let filePath = targetFilePath;
+  if (!filePath) {
+    const safeFilename = (title || 'Telegram').replace(/[/\\:*?"<>|]/g, '_');
+    filePath = await save({
+      filters: [{ name: 'EPUB', extensions: ['epub'] }],
+      defaultPath: `${safeFilename}.epub`
+    });
+  }
+
+  if (!filePath) return false;
+
   if (onProgress) {
     onProgress({
       current: exportPages,
@@ -92,14 +104,6 @@ export async function exportEpubPractice({
     });
   }
   await new Promise(r => setTimeout(r, 20));
-
-  const safeFilename = (title || 'Telegram').replace(/[\/\\:*?"<>|]/g, '_');
-  const filePath = await save({
-    filters: [{ name: 'EPUB', extensions: ['epub'] }],
-    defaultPath: `${safeFilename}.epub`
-  });
-
-  if (!filePath) return false;
 
   if (onProgress) {
     onProgress({
@@ -111,7 +115,9 @@ export async function exportEpubPractice({
   }
   await new Promise(r => setTimeout(r, 10));
 
-  const epubData = await invoke('generate_epub', { title, chapters });
-  await writeFile(filePath, new Uint8Array(epubData));
-  return true;
+  const epubData = await invoke('generate_epub', { title, chapters, savePath: filePath });
+  if (epubData && epubData.length > 0) {
+    await writeFile(filePath, new Uint8Array(epubData));
+  }
+  return filePath;
 }

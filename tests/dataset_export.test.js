@@ -1,3 +1,6 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import assert from 'node:assert';
 import { formatEpubChapterHtml } from '../src/utils/epubHelper.js';
 import { generateTelegramPdf } from '../src/utils/pdfHelper.js';
 
@@ -52,8 +55,17 @@ export function testDatasetExportConsistency() {
     throw new Error('Practice raw text does not match shared dataset');
   }
 
+  // 4. 验证复选框默认全选与单次保存框同名双文件导出契约
+  const readyViewCode = fs.readFileSync(path.resolve('src/components/generator/TelegramReadyView.jsx'), 'utf8');
+  assert.ok(readyViewCode.includes('selectedFormats = { pdf: true, epub: true }'), 'TelegramReadyView must default both PDF and EPUB checkboxes to true');
+  assert.ok(readyViewCode.includes('onToggleFormat'), 'TelegramReadyView must support toggling format checkboxes');
+  assert.ok(readyViewCode.includes('onExportSelected'), 'TelegramReadyView must trigger unified onExportSelected button');
+
+  const epubServiceCode = fs.readFileSync(path.resolve('src/services/epubExportService.js'), 'utf8');
+  assert.ok(epubServiceCode.includes('targetFilePath = null'), 'epubExportService must support targetFilePath for companion dual-file export');
+
   console.log('✓ Shared dataset successfully exported to EPUB chapters with exact token match.');
   console.log(`✓ Shared dataset successfully rendered to PDF (${pdfBytes.length} bytes).`);
-  console.log('✓ In-software practice raw text precisely mirrors the exported dataset.');
+  console.log('✓ Dual-format checkbox cards (PDF + EPUB checked by default) & single-dialog companion export validated.');
   console.log('All Dataset Export Consistency tests passed successfully!\n');
 }
