@@ -172,6 +172,7 @@ fn find_ch552g_port() -> Option<MatchedSerialPort> {
 
 /// 检查指定端口在系统中是否仍然存在（用于辅助检测热拔出）
 #[cfg(not(any(target_os = "android", target_os = "ios")))]
+#[allow(dead_code)]
 fn port_still_exists(port_name: &str) -> bool {
     #[cfg(target_os = "linux")]
     {
@@ -281,9 +282,19 @@ pub fn spawn_serial_monitor(app_handle: AppHandle, state: &SerialManagerState) {
                                 // 每约 600ms (40 * 15ms) 执行一次硬件存活探针，确保拔出后 <0.6s 即时感知
                                 if idle_ticks >= 40 {
                                     idle_ticks = 0;
-                                    if port.bytes_to_read().is_err() || !port_still_exists(&port_name)
+                                    #[cfg(target_os = "linux")]
                                     {
-                                        break;
+                                        if port.bytes_to_read().is_err() || !port_still_exists(&port_name) {
+                                            break;
+                                        }
+                                    }
+                                    #[cfg(not(target_os = "linux"))]
+                                    {
+                                        // Windows 下 bytes_to_read() (ClearCommError) 仅需 <1μs，
+                                        // 杜绝调用 available_ports() 全系统 PnP 设备树扫描阻塞串口读取线程
+                                        if port.bytes_to_read().is_err() {
+                                            break;
+                                        }
                                     }
                                 }
                             }

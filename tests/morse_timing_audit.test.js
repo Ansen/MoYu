@@ -337,3 +337,23 @@ test('paused speed/code changes rebase pending metadata without rewriting played
   near(player.queue[1].timelineStartMs, playedEnd, 'pending timeline starts after preserved history');
   near(player.queue[1].timelineDurationMs, 480, 'new short-code 1 has eight units including char gap');
 });
+
+test('dynamic speed change (20 -> 15 WPM) updates target timeline without desync or phase drift', () => {
+  const text = '3025 4616 5803 6031 9537 5302 1342 6520';
+  const baseline = recordPlayback(text, { wpm: 20 });
+  // Trigger speed change midway at group 3
+  const midToken = baseline.player.queue[12];
+  const at = midToken.toneEndTime + 0.01;
+  const { player, tones } = recordPlayback(text, { wpm: 20 }, 0.005, 0, changeOnce(at, { wpm: 15 }));
+  
+  // Build queue-based target timeline
+  const targetTimeline = generateTargetTimeline({ queue: player.queue, wpm: 15 });
+  assert.equal(targetTimeline.pulses.length, tones.length, 'pulse count must match hardware tone count');
+
+  for (let i = 0; i < tones.length; i++) {
+    const toneStartMs = (tones[i].start - 0.35) * 1000;
+    const toneDurMs = (tones[i].end - tones[i].start) * 1000;
+    near(toneStartMs, targetTimeline.pulses[i].start, 'target pulse ' + i + ' start must align with audio tone');
+    near(toneDurMs, targetTimeline.pulses[i].duration, 'target pulse ' + i + ' duration must align with audio tone');
+  }
+});

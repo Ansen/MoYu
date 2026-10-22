@@ -373,6 +373,7 @@ class DesktopAudioPlayer {
         const gap = this.queue[previousIndex + 1];
         gap.startTime = previous.endTime;
         gap.endTime = nextStart;
+        gap.unitMs = dotSec * 1000;
         gap.timelineStartMs = nextOffsetMs;
         gap.timelineDurationMs = (nextStart - gap.startTime) * 1000;
         gap.timelineEndMs = nextOffsetMs + gap.timelineDurationMs;
@@ -549,7 +550,7 @@ class DesktopAudioPlayer {
 
     // A paused character is replayed from its start. Old lookahead timestamps
     // no longer belong to this run, particularly after a paused config change.
-    for (let i = this.queueIndex; i < this.queue.length; i++) {
+    for (let i = 0; i < this.queue.length; i++) {
       delete this.queue[i].startTime;
       delete this.queue[i].endTime;
       delete this.queue[i].toneEndTime;
@@ -623,6 +624,7 @@ class DesktopAudioPlayer {
     for (let i = startIndex; i < this.queue.length; i++) {
       const item = this.queue[i];
       item.timelineStartMs = offsetMs;
+      item.unitMs = dotMs;
 
       if (item.code === null) {
         const dur = 4 * dotMs;
@@ -661,6 +663,7 @@ class DesktopAudioPlayer {
       const item = this.queue[this.queueIndex];
       const plannedStart = this.nextNoteTime;
       item.startTime = plannedStart;
+      item.unitMs = dotSec * 1000;
 
       const currentEpoch = this._scheduleEpoch;
 
@@ -706,7 +709,10 @@ class DesktopAudioPlayer {
       item.timelineDurationMs = durationMs;
       item.timelineEndMs = item.timelineStartMs + durationMs;
       this.queueIndex++;
-      if (retimed) this._recomputeTimelineOffsets(this.queueIndex);
+      if (retimed) {
+        this._recomputeTimelineOffsets(this.queueIndex);
+        this._emitStateChange();
+      }
 
       const curStartTime = item.startTime;
       if (item.type === 'prefix' || item.type === 'suffix') {
@@ -1000,7 +1006,7 @@ class DesktopAudioPlayer {
             currentItem = it;
             break;
           } else if (now < it.startTime) {
-            currentItem = i > 0 ? this.queue[i - 1] : this.queue[0];
+            currentItem = it;
             break;
           }
         }
@@ -1013,7 +1019,7 @@ class DesktopAudioPlayer {
     let calculatedMs = 0;
     if (currentItem && currentItem.startTime !== undefined) {
       const baseMs = currentItem.timelineStartMs !== undefined ? currentItem.timelineStartMs : 0;
-      const offsetMs = (now - currentItem.startTime) * 1000;
+      const offsetMs = Math.max(0, (now - currentItem.startTime) * 1000);
       calculatedMs = Math.max(0, baseMs + offsetMs);
     } else if (this.queue && this.queue[0] && this.queue[0].timelineStartMs !== undefined) {
       calculatedMs = this.queue[0].timelineStartMs;

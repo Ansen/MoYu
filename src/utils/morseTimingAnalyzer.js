@@ -24,9 +24,10 @@ export function generateTargetTimeline(input, wpm = 20, numberMode = 'long', opt
   let prefixMarker = '';
   let suffixMarker = '';
   let startIndex = 0;
+  let queue = null;
 
   // 兼容单配置对象传参与传统多参数传参
-  if (input && typeof input === 'object' && ('text' in input || 'wpm' in input)) {
+  if (input && typeof input === 'object' && ('text' in input || 'wpm' in input || 'queue' in input)) {
     text = input.text || '';
     if (input.wpm !== undefined) configWpm = input.wpm;
     if (input.numberMode !== undefined) configNumberMode = input.numberMode;
@@ -34,6 +35,7 @@ export function generateTargetTimeline(input, wpm = 20, numberMode = 'long', opt
     if (input.prefixMarker !== undefined) prefixMarker = String(input.prefixMarker || '');
     if (input.suffixMarker !== undefined) suffixMarker = String(input.suffixMarker || '');
     if (input.startIndex !== undefined) startIndex = Math.max(0, Number(input.startIndex) || 0);
+    if (Array.isArray(input.queue)) queue = input.queue;
   } else {
     text = typeof input === 'string' ? input : (input && typeof input.text === 'string' ? input.text : '');
     if (options && typeof options === 'object') {
@@ -41,10 +43,127 @@ export function generateTargetTimeline(input, wpm = 20, numberMode = 'long', opt
       if (options.prefixMarker !== undefined) prefixMarker = String(options.prefixMarker || '');
       if (options.suffixMarker !== undefined) suffixMarker = String(options.suffixMarker || '');
       if (options.startIndex !== undefined) startIndex = Math.max(0, Number(options.startIndex) || 0);
+      if (Array.isArray(options.queue)) queue = options.queue;
     }
   }
 
   const unitMs = calculateUnitDuration(configWpm);
+
+  // 核心：若传入了播放器正在运行的 authoritative 队列 (queue)，
+  // 直接以每个 Token 实际已锁定/已重调度的精确 timelineStartMs、timelineEndMs 与 unitMs 逐脉冲派生，
+  // 彻底杜绝播放中动态改变发报速度 (WPM) 或数码模式时全篇重算导致的声画脱节与相位偏移！
+  if (Array.isArray(queue) && queue.length > 0) {
+    const pulses = [];
+    const gaps = [];
+    const tokenAnchorMap = {};
+    let prefixStart = -1;
+    let prefixEnd = -1;
+    let currentTime = 0;
+
+    for (let tIdx = 0; tIdx < queue.length; tIdx++) {
+      const item = queue[tIdx];
+      const tokenType = item.type || item.tokenType || (item.code === null ? 'word_gap' : 'body');
+      const rawIndex = item.rawToken?.index !== undefined ? item.rawToken.index : item.rawIndex;
+      const itemUnitMs = Number(item.unitMs) > 0 ? Number(item.unitMs) : unitMs;
+      const tokenStartTime = item.timelineStartMs !== undefined ? Number(item.timelineStartMs) : currentTime;
+
+      if (item.code === null) {
+        const gapDuration = item.timelineDurationMs !== undefined
+          ? Number(item.timelineDurationMs)
+          : 4 * itemUnitMs;
+        const gapEnd = item.timelineEndMs !== undefined
+          ? Number(item.timelineEndMs)
+          : tokenStartTime + gapDuration;
+        gaps.push({
+          start: tokenStartTime,
+          end: gapEnd,
+          duration: gapEnd - tokenStartTime,
+          type: 'WORD_GAP',
+          char: ' ',
+          unitMs: itemUnitMs
+        });
+        currentTime = gapEnd;
+        continue;
+      }
+
+      const code = item.code;
+      let symTime = tokenStartTime;
+
+      for (let cIdx = 0; cIdx < code.length; cIdx++) {
+        const symbol = code[cIdx];
+        const isDah = symbol === '-';
+        const pulseDuration = isDah ? itemUnitMs * 3 : itemUnitMs;
+
+        const pulse = {
+          id: `p_${tIdx}_${cIdx}`,
+          start: symTime,
+          end: symTime + pulseDuration,
+          duration: pulseDuration,
+          type: isDah ? 'DASH' : 'DOT',
+          char: item.char,
+          tokenType,
+          tokenIndex: rawIndex !== undefined ? rawIndex : -1,
+          symbolIndex: cIdx,
+          unitMs: itemUnitMs
+        };
+
+        if (tokenType === 'prefix') {
+          if (prefixStart === -1) prefixStart = symTime;
+          prefixEnd = symTime + pulseDuration;
+        }
+
+        pulses.push(pulse);
+        symTime += pulseDuration;
+
+        if (cIdx < code.length - 1) {
+          gaps.push({
+            start: symTime,
+            end: symTime + itemUnitMs,
+            duration: itemUnitMs,
+            type: 'ELEMENT_GAP',
+            char: item.char,
+            unitMs: itemUnitMs
+          });
+          symTime += itemUnitMs;
+        }
+      }
+
+      const tokenEndTime = item.timelineEndMs !== undefined
+        ? Number(item.timelineEndMs)
+        : symTime + 3 * itemUnitMs;
+      const charGapDuration = Math.max(0, tokenEndTime - symTime);
+      gaps.push({
+        start: symTime,
+        end: tokenEndTime,
+        duration: charGapDuration,
+        type: 'CHAR_GAP',
+        char: item.char,
+        unitMs: itemUnitMs
+      });
+      currentTime = tokenEndTime;
+
+      if (tokenType === 'body' && rawIndex !== undefined) {
+        tokenAnchorMap[rawIndex] = {
+          start: Math.round(tokenStartTime),
+          end: Math.round(tokenEndTime),
+          duration: Math.round(tokenEndTime - tokenStartTime),
+          char: item.char
+        };
+      }
+    }
+
+    return {
+      pulses,
+      gaps,
+      totalDuration: currentTime,
+      unitMs,
+      wpm: configWpm,
+      tokens: queue,
+      tokenAnchorMap,
+      prefixStart: prefixStart >= 0 ? prefixStart : 0,
+      prefixEnd: prefixEnd >= 0 ? prefixEnd : 0
+    };
+  }
 
   // 1. 构建全序列 Tokens (100% 严格对齐 audioPlayer._buildQueue 的排队顺序与索引)
   const allTokens = [];

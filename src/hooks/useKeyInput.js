@@ -318,6 +318,7 @@ export function useKeyInput({
   const audioCtxRef = useRef(null);
   const oscRef = useRef(null);
   const gainRef = useRef(null);
+  const keepAliveOscRef = useRef(null);
   const onKeyEventRef = useRef(onKeyEvent);
   onKeyEventRef.current = onKeyEvent;
   const onHardwareActivityRef = useRef(onHardwareActivity);
@@ -344,12 +345,17 @@ export function useKeyInput({
   const lastElementRef = useRef('dit');
   const keyerTimerRef = useRef(null);
 
-  // 1. 初始化即时侧音合成器 (SideTone Audio Synthesizer)
+  // 1. 初始化即时侧音合成器 (SideTone Audio Synthesizer) 并主动唤醒硬件声卡
   const initAudio = useCallback(() => {
-    if (audioCtxRef.current) return;
+    if (audioCtxRef.current) {
+      if (audioCtxRef.current.state === 'suspended') {
+        audioCtxRef.current.resume().catch(() => {});
+      }
+      return audioCtxRef.current;
+    }
     try {
       const AudioCtx = window.AudioContext || window.webkitAudioContext;
-      if (!AudioCtx) return;
+      if (!AudioCtx) return null;
       const ctx = new AudioCtx();
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
@@ -365,10 +371,61 @@ export function useKeyInput({
       audioCtxRef.current = ctx;
       oscRef.current = osc;
       gainRef.current = gain;
+
+      // 预先建立音频驱动加电稳态，消除首次按键 80~150ms 的 DAC 冷启动延迟
+      if (ctx.state === 'suspended') {
+        ctx.resume().catch(() => {});
+      }
+      try {
+        const buf = ctx.createBuffer(1, 128, ctx.sampleRate || 44100);
+        const src = ctx.createBufferSource();
+        src.buffer = buf;
+        src.connect(gain);
+        src.start(0);
+      } catch {}
+
+      // 亚音频常驻防休眠载波 (Anti-Sleep Keep-Alive DAC Stream)
+      // 采用 20Hz 亚音频、振幅 0.0001 (-80dB) 的常驻正弦波直通声卡
+      // 物理上完全低于人耳听觉阈值与扬声器起振幅值，完全静音
+      // 但持续激活操作系统 (WASAPI) 音频硬件流水线，彻底防止闲置数秒/数分钟后声卡 DAC 芯片休眠导致的再次按键冷启动延迟
+      try {
+        const keepAliveOsc = ctx.createOscillator();
+        const keepAliveGain = ctx.createGain();
+        keepAliveOsc.type = 'sine';
+        keepAliveOsc.frequency.setValueAtTime(20, ctx.currentTime);
+        keepAliveGain.gain.setValueAtTime(0.0001, ctx.currentTime);
+        keepAliveOsc.connect(keepAliveGain);
+        keepAliveGain.connect(ctx.destination);
+        keepAliveOsc.start();
+        keepAliveOscRef.current = keepAliveOsc;
+      } catch {}
+
+      return ctx;
     } catch (e) {
       console.warn('[useKeyInput] AudioContext init warning:', e);
+      return null;
     }
   }, []);
+
+  // 挂载时以及在任意全局交互手势时预先初始化与唤醒声卡通道，消除首键延迟
+  useEffect(() => {
+    initAudio();
+
+    const warmUpHandler = () => {
+      const ctx = initAudio();
+      if (ctx && ctx.state === 'suspended') {
+        ctx.resume().catch(() => {});
+      }
+    };
+
+    window.addEventListener('pointerdown', warmUpHandler, { once: true, passive: true });
+    window.addEventListener('keydown', warmUpHandler, { once: true, passive: true });
+
+    return () => {
+      window.removeEventListener('pointerdown', warmUpHandler);
+      window.removeEventListener('keydown', warmUpHandler);
+    };
+  }, [initAudio]);
 
   // 动态更新侧音频率
   useEffect(() => {
@@ -753,6 +810,9 @@ export function useKeyInput({
       }
       if (oscRef.current) {
         try { oscRef.current.stop(); } catch {}
+      }
+      if (keepAliveOscRef.current) {
+        try { keepAliveOscRef.current.stop(); } catch {}
       }
       if (audioCtxRef.current) {
         try { audioCtxRef.current.close(); } catch {}

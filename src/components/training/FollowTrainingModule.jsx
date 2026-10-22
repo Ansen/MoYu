@@ -33,7 +33,13 @@ export default function FollowTrainingModule({
 
   // 核心模式与输入设备状态（默认键盘，检测到 CH552G 接入时自动切换为 ch552g）
   const [trainingMode, setTrainingMode] = useState('live'); // 'live' | 'blind' | 'silent'
-  const [inputDevice, setInputDevice] = useState('keyboard'); // 'keyboard' | 'ch552g'
+  const [inputDevice, setInputDevice] = useState(() => {
+    try {
+      return localStorage.getItem('moyu_cw_input_device') || 'keyboard';
+    } catch {
+      return 'keyboard';
+    }
+  }); // 'keyboard' | 'ch552g'
   const inputDeviceRef = useRef(inputDevice);
   inputDeviceRef.current = inputDevice;
 
@@ -182,6 +188,13 @@ export default function FollowTrainingModule({
   const buildTimeline = useCallback(() => {
     if (!activeChapterContent) return null;
     const sessionStartIndex = audioPlayer.session?.startIndex || 0;
+    const isPlayingSession = audioPlayer.playbackState.isPlaying && Array.isArray(audioPlayer.queue) && audioPlayer.queue.length > 0;
+
+    // 若播放过程中动态调整了发报速度 (WPM) 或数码模式，优先触发播放器无缝热重调度
+    if (isPlayingSession && (Number(audioPlayer.playbackConfig.wpm) !== Number(morseSpeed) || audioPlayer.playbackConfig.numberMode !== numberMode)) {
+      audioPlayer.updateConfig({ wpm: morseSpeed, numberMode });
+    }
+
     return generateTargetTimeline({
       text: activeChapterContent,
       wpm: morseSpeed,
@@ -189,7 +202,8 @@ export default function FollowTrainingModule({
       enableMarkers: enableMarkers,
       prefixMarker: prefixMarker,
       suffixMarker: suffixMarker,
-      startIndex: sessionStartIndex
+      startIndex: sessionStartIndex,
+      queue: isPlayingSession ? audioPlayer.queue : null
     });
   }, [activeChapterContent, morseSpeed, numberMode, enableMarkers, prefixMarker, suffixMarker]);
 
@@ -212,6 +226,19 @@ export default function FollowTrainingModule({
     } catch (e) {
       console.warn('[FollowTrainingModule] Failed to generate target timeline:', e);
     }
+  }, [buildTimeline]);
+
+  // 监听底层音频中枢热重调度与队列跃迁，毫秒级同步目标波形
+  useEffect(() => {
+    const unsubscribe = audioPlayer.subscribe(() => {
+      if (audioPlayer.playbackState.isPlaying && Array.isArray(audioPlayer.queue) && audioPlayer.queue.length > 0) {
+        try {
+          const tl = buildTimeline();
+          if (tl) setTargetTimeline(tl);
+        } catch {}
+      }
+    });
+    return () => unsubscribe();
   }, [buildTimeline]);
 
   const isPlayingRef = useRef(isPlaying);
