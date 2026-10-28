@@ -765,6 +765,54 @@ export default function ReaderHeader({
                   </div>
                 )}
 
+                {/* Divider for Export Action */}
+                {onExportAudio && (
+                  <div className="h-px bg-slate-100 dark:bg-[#282828] my-1" />
+                )}
+
+                {/* Row 7: Export Morse Audio Action inside More Menu */}
+                {onExportAudio && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsMoreMenuOpen(false);
+                      onExportAudio();
+                    }}
+                    disabled={isExportingAudio}
+                    className={`w-full flex items-center justify-between py-1.5 px-2 rounded-lg transition-all cursor-pointer select-none border text-left ${
+                      audioExportSuccess
+                        ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800/60 font-semibold shadow-2xs'
+                        : isExportingAudio
+                        ? 'bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-300 border-indigo-200 dark:border-indigo-800 font-medium animate-pulse'
+                        : 'bg-slate-50/60 dark:bg-[#232323]/60 hover:bg-slate-100 dark:hover:bg-[#282828] text-slate-700 dark:text-slate-300 border-slate-200/60 dark:border-[#2f2f2f]'
+                    }`}
+                    title={t('reader.exportAudio', '导出音频 (WAV/LRC)')}
+                  >
+                    <div className="flex items-center gap-2 min-w-0">
+                      <Download size={13} className={audioExportSuccess ? "text-emerald-600 dark:text-emerald-400 shrink-0" : isExportingAudio ? "text-indigo-600 shrink-0" : "text-slate-500 dark:text-slate-400 shrink-0"} />
+                      <div className="flex flex-col min-w-0">
+                        <span className="text-[12px] font-medium leading-tight truncate">
+                          {isExportingAudio
+                            ? t('reader.exportingAudio', '正在导出音频...')
+                            : audioExportSuccess
+                            ? t('reader.exportAudioSuccess', '导出成功 (WAV/LRC)')
+                            : t('reader.exportAudio', '导出音频 (WAV/LRC)')}
+                        </span>
+                        <span className="text-[10px] text-slate-400 dark:text-slate-500 leading-tight mt-0.5 truncate">
+                          {t('generator.ready.wavDesc', '离线 PCM 无损音频 (+LRC)')}
+                        </span>
+                      </div>
+                    </div>
+                    {audioExportSuccess ? (
+                      <Check size={14} className="text-emerald-600 dark:text-emerald-400 shrink-0 stroke-[2.5]" />
+                    ) : (
+                      <span className="text-[10px] font-mono font-semibold px-1.5 py-0.5 rounded bg-slate-100 dark:bg-[#2d2d2d] text-slate-500 dark:text-slate-400 shrink-0 ml-1">
+                        WAV
+                      </span>
+                    )}
+                  </button>
+                )}
+
               </div>
             )}
           </div>
@@ -774,28 +822,6 @@ export default function ReaderHeader({
 
       {/* Right: Playback Controls (Protected with shrink-0, never clipped) */}
       <div className="flex items-center justify-end gap-1.5 sm:gap-2 shrink-0">
-        {onExportAudio && (
-          <button
-            type="button"
-            onClick={onExportAudio}
-            disabled={isExportingAudio}
-            className={`h-8 w-8 rounded-lg font-medium flex items-center justify-center shrink-0 transition-all border shadow-2xs active:scale-95 cursor-pointer whitespace-nowrap ${
-              audioExportSuccess
-                ? 'border-emerald-300 dark:border-emerald-700 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400'
-                : 'border-slate-300/80 dark:border-[#383838] bg-white dark:bg-[#1f1f1f] hover:bg-slate-50 dark:hover:bg-[#282828] text-slate-600 dark:text-[#cccccc] disabled:opacity-40 disabled:pointer-events-none'
-            } ${isExportingAudio ? 'animate-pulse text-indigo-500' : ''}`}
-            title={
-              isExportingAudio
-                ? (t('reader.exportingAudio') || '正在导出音频...')
-                : audioExportSuccess
-                ? (t('reader.exportAudioSuccess') || '导出成功 (WAV/LRC)')
-                : (t('reader.exportAudio') || '导出音频 (WAV/LRC)')
-            }
-          >
-            {audioExportSuccess ? <Check size={14} className="stroke-[2.5]" /> : <Download size={14} />}
-          </button>
-        )}
-
         {onRegenerate && (
           <button
             onClick={() => { stopPlay(); onRegenerate(); }}
