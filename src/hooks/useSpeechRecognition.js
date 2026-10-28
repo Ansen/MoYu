@@ -13,6 +13,7 @@ export function useSpeechRecognition(options = {}) {
   const silenceRestartCountRef = useRef(0);
   const isStartingRef = useRef(false);
   const interimTranscriptRef = useRef('');
+  const lastFinalChunkRef = useRef('');
 
   useEffect(() => {
     onFinalResultRef.current = options.onFinalResult;
@@ -20,11 +21,25 @@ export function useSpeechRecognition(options = {}) {
 
   const flushInterimTranscript = useCallback(() => {
     const leftover = interimTranscriptRef.current.trim();
-    if (leftover && onFinalResultRef.current) {
+    if (leftover && leftover !== lastFinalChunkRef.current && onFinalResultRef.current) {
+      lastFinalChunkRef.current = leftover;
       onFinalResultRef.current(leftover);
     }
     interimTranscriptRef.current = '';
     setTranscript('');
+  }, []);
+
+  const detachAndAbort = useCallback((instance) => {
+    if (!instance) return;
+    try {
+      instance.onstart = null;
+      instance.onresult = null;
+      instance.onerror = null;
+      instance.onend = null;
+      instance.abort();
+    } catch {
+      // ignore
+    }
   }, []);
 
   const initFreshRecognition = useCallback(() => {
@@ -33,15 +48,7 @@ export function useSpeechRecognition(options = {}) {
 
     // Clean up existing instance if any
     if (recognitionRef.current) {
-      try {
-        recognitionRef.current.onstart = null;
-        recognitionRef.current.onresult = null;
-        recognitionRef.current.onerror = null;
-        recognitionRef.current.onend = null;
-        recognitionRef.current.abort();
-      } catch {
-        // ignore
-      }
+      detachAndAbort(recognitionRef.current);
       recognitionRef.current = null;
     }
 
@@ -74,9 +81,14 @@ export function useSpeechRecognition(options = {}) {
       interimTranscriptRef.current = interimChunk;
       setTranscript(interimChunk);
       
-      if (finalChunk.trim() && onFinalResultRef.current) {
+      const trimmedFinal = finalChunk.trim();
+      if (trimmedFinal && onFinalResultRef.current) {
         silenceRestartCountRef.current = 0;
-        onFinalResultRef.current(finalChunk.trim());
+        // Guard against Safari / WKWebView emitting duplicate consecutive isFinal chunks
+        if (trimmedFinal !== lastFinalChunkRef.current) {
+          lastFinalChunkRef.current = trimmedFinal;
+          onFinalResultRef.current(trimmedFinal);
+        }
       }
     };
 
@@ -101,7 +113,7 @@ export function useSpeechRecognition(options = {}) {
 
     recognition.onend = () => {
       isStartingRef.current = false;
-      // Seamless restart on pause for hands-free CW keying operators
+      // Seamless restart on pause for hands-free CW keying operators (especially on macOS WKWebView)
       if (shouldKeepListeningRef.current && !fatalErrorRef.current) {
         flushInterimTranscript();
         if (silenceRestartCountRef.current >= 30) {
@@ -115,6 +127,7 @@ export function useSpeechRecognition(options = {}) {
         restartTimerRef.current = setTimeout(() => {
           if (shouldKeepListeningRef.current && !fatalErrorRef.current) {
             try {
+              lastFinalChunkRef.current = '';
               const fresh = initFreshRecognition();
               if (fresh) {
                 fresh.start();
@@ -134,7 +147,7 @@ export function useSpeechRecognition(options = {}) {
 
     recognitionRef.current = recognition;
     return recognition;
-  }, [flushInterimTranscript]);
+  }, [detachAndAbort, flushInterimTranscript]);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -143,24 +156,17 @@ export function useSpeechRecognition(options = {}) {
       isStartingRef.current = false;
       clearTimeout(restartTimerRef.current);
       if (recognitionRef.current) {
-        try {
-          recognitionRef.current.onstart = null;
-          recognitionRef.current.onresult = null;
-          recognitionRef.current.onerror = null;
-          recognitionRef.current.onend = null;
-          recognitionRef.current.abort();
-        } catch {
-          // ignore
-        }
+        detachAndAbort(recognitionRef.current);
         recognitionRef.current = null;
       }
     };
-  }, []);
+  }, [detachAndAbort]);
 
-  const startListening = useCallback(async () => {
+  const startListening = useCallback(() => {
     if (isListening || isStartingRef.current) return;
     isStartingRef.current = true;
     interimTranscriptRef.current = '';
+    lastFinalChunkRef.current = '';
     setTranscript('');
     setError(null);
     fatalErrorRef.current = false;
@@ -177,50 +183,22 @@ export function useSpeechRecognition(options = {}) {
       return;
     }
 
-    // Proactively check mic permission; only prompt via getUserMedia on non-Windows environments if state is 'prompt'
-    // Avoid opening/closing audio hardware track on Windows WebView2 where SpeechRecognition manages WASAPI capture directly
-    if (navigator.permissions && navigator.permissions.query) {
-      try {
-        const permStatus = await navigator.permissions.query({ name: 'microphone' });
-        if (permStatus.state === 'denied') {
-          isStartingRef.current = false;
-          fatalErrorRef.current = true;
-          shouldKeepListeningRef.current = false;
-          setError('not-allowed');
-          setIsListening(false);
-          return;
-        }
-        const isWindows = typeof navigator !== 'undefined' && /Windows/i.test(navigator.userAgent);
-        if (!isWindows && permStatus.state === 'prompt' && navigator.mediaDevices?.getUserMedia) {
-          const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-          stream.getTracks().forEach(t => t.stop());
-          // Allow audio hardware driver to release cleanly before speech engine starts
-          await new Promise(r => setTimeout(r, 150));
-        }
-      } catch {
-        // Fallback for environments without permissions.query
-      }
-    }
-
-    // Guard against stopListening() called while awaiting permission query
-    if (!shouldKeepListeningRef.current) {
-      isStartingRef.current = false;
-      return;
-    }
-
     const recognition = initFreshRecognition();
     if (!recognition) {
       isStartingRef.current = false;
       return;
     }
 
+    // Invoke recognition.start() synchronously within the user click gesture.
+    // This preserves WebKit UserGestureIndicator on macOS/iOS WKWebView and avoids
+    // CoreAudio / WASAPI hardware lock contention caused by pre-opening getUserMedia.
     try {
       recognition.start();
     } catch (err) {
       console.warn("Initial speech start caught:", err);
       isStartingRef.current = false;
       if (err.name !== 'InvalidStateError') {
-        setError(err.name || 'error');
+        setError(err.name === 'NotAllowedError' ? 'not-allowed' : (err.name || 'error'));
         fatalErrorRef.current = true;
         shouldKeepListeningRef.current = false;
         setIsListening(false);
@@ -237,18 +215,10 @@ export function useSpeechRecognition(options = {}) {
     setIsListening(false);
     
     if (recognitionRef.current) {
-      try {
-        recognitionRef.current.stop();
-      } catch {
-        try {
-          recognitionRef.current.abort();
-        } catch {
-          // ignore
-        }
-      }
+      detachAndAbort(recognitionRef.current);
       recognitionRef.current = null;
     }
-  }, [flushInterimTranscript]);
+  }, [detachAndAbort, flushInterimTranscript]);
 
   const isSupported = typeof window !== 'undefined' && !!(window.SpeechRecognition || window.webkitSpeechRecognition);
 

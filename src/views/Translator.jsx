@@ -51,7 +51,7 @@ export default function TranslatorView() {
     });
   }, [dictionary]);
 
-  const { isListening, transcript, error, startListening, stopListening, isSupported } = useSpeechRecognition({
+  const { isListening, transcript, error, startListening, stopListening } = useSpeechRecognition({
     onFinalResult: handleFinalResult
   });
 
@@ -174,10 +174,6 @@ export default function TranslatorView() {
   };
 
   const toggleMic = () => {
-    if (!isSupported) {
-      alert(t('translator.voice.notsupported'));
-      return;
-    }
     if (isListening) {
       stopListening();
     } else {

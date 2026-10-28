@@ -67,6 +67,7 @@ jobs:
       - name: Init Android Project & Build APK
         run: |
           pnpm tauri android init
+          sed -i 's/<uses-permission android:name="android.permission.INTERNET" \/>/<uses-permission android:name="android.permission.INTERNET" \/>\n    <uses-permission android:name="android.permission.RECORD_AUDIO" \/>/' src-tauri/gen/android/app/src/main/AndroidManifest.xml || true
           if [ "${{ inputs.build_type }}" = "debug" ]; then
             pnpm tauri android build --apk --debug --split-per-abi
             pnpm tauri android build --apk --debug
