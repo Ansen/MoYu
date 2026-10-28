@@ -403,7 +403,9 @@ export function analyzeSession(arg1, arg2 = [], arg3 = 0) {
       timingConsistency: 0,
       overallScore: 0,
       grade: 'D',
-      matchedPulses: []
+      matchedPulses: [],
+      charStats: {},
+      weakestChars: []
     };
   }
 
@@ -535,6 +537,53 @@ export function analyzeSession(arg1, arg2 = [], arg3 = 0) {
   else if (overallScore >= 68) grade = 'B';
   else if (overallScore >= 55) grade = 'C';
 
+  // 10. 字符级命中与失误归因分析 (Character-level Attribution)
+  const tokenGroups = new Map();
+  for (let j = 0; j < baselineTargets.length; j++) {
+    const tp = baselineTargets[j];
+    if (!tp.char || tp.char === ' ') continue;
+    const key = (tp.tokenIndex !== undefined && tp.tokenIndex !== -1)
+      ? ('token_' + tp.tokenIndex)
+      : (tp.id ? tp.id.split('_').slice(0, 2).join('_') : ('p_' + j));
+
+    if (!tokenGroups.has(key)) {
+      tokenGroups.set(key, {
+        char: String(tp.char).toUpperCase(),
+        totalPulses: 0,
+        matchedPulses: 0
+      });
+    }
+    const grp = tokenGroups.get(key);
+    grp.totalPulses++;
+    if (matchedTargetIndices.has(j)) {
+      grp.matchedPulses++;
+    }
+  }
+
+  const charStats = {};
+  for (const grp of tokenGroups.values()) {
+    const ch = grp.char;
+    if (!charStats[ch]) {
+      charStats[ch] = { char: ch, total: 0, correct: 0, errors: 0, errorRate: 0 };
+    }
+    charStats[ch].total++;
+    if (grp.matchedPulses === grp.totalPulses && grp.totalPulses > 0) {
+      charStats[ch].correct++;
+    } else {
+      charStats[ch].errors++;
+    }
+  }
+
+  for (const ch in charStats) {
+    const item = charStats[ch];
+    item.errorRate = item.total > 0 ? Number((item.errors / item.total).toFixed(2)) : 0;
+  }
+
+  const weakestChars = Object.values(charStats)
+    .filter(item => item.errors > 0)
+    .sort((a, b) => b.errorRate - a.errorRate || b.errors - a.errors)
+    .map(item => item.char);
+
   return {
     totalTargetPulses: baselineTargets.length,
     totalUserPulses: userPulses.length,
@@ -555,6 +604,8 @@ export function analyzeSession(arg1, arg2 = [], arg3 = 0) {
     overallScore,
     grade,
     userPulses,
-    userGaps
+    userGaps,
+    charStats,
+    weakestChars
   };
 }

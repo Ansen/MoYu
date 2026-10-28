@@ -18,7 +18,8 @@ import {
   Minus,
   SlidersHorizontal,
   Eye,
-  EyeOff
+  EyeOff,
+  Download
 } from 'lucide-react';
 import { useI18n } from '../../i18n';
 import { getAvailableFonts } from '../../config/fonts';
@@ -54,6 +55,9 @@ export default function ReaderHeader({
   togglePlay,
   stopPlay,
   onRegenerate,
+  onExportAudio,
+  isExportingAudio = false,
+  audioExportSuccess = false,
   interferenceLevel = 0,
   setInterferenceLevel,
   interferenceModes,
@@ -770,6 +774,28 @@ export default function ReaderHeader({
 
       {/* Right: Playback Controls (Protected with shrink-0, never clipped) */}
       <div className="flex items-center justify-end gap-1.5 sm:gap-2 shrink-0">
+        {onExportAudio && (
+          <button
+            type="button"
+            onClick={onExportAudio}
+            disabled={isExportingAudio}
+            className={`h-8 w-8 rounded-lg font-medium flex items-center justify-center shrink-0 transition-all border shadow-2xs active:scale-95 cursor-pointer whitespace-nowrap ${
+              audioExportSuccess
+                ? 'border-emerald-300 dark:border-emerald-700 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400'
+                : 'border-slate-300/80 dark:border-[#383838] bg-white dark:bg-[#1f1f1f] hover:bg-slate-50 dark:hover:bg-[#282828] text-slate-600 dark:text-[#cccccc] disabled:opacity-40 disabled:pointer-events-none'
+            } ${isExportingAudio ? 'animate-pulse text-indigo-500' : ''}`}
+            title={
+              isExportingAudio
+                ? (t('reader.exportingAudio') || '正在导出音频...')
+                : audioExportSuccess
+                ? (t('reader.exportAudioSuccess') || '导出成功 (WAV/LRC)')
+                : (t('reader.exportAudio') || '导出音频 (WAV/LRC)')
+            }
+          >
+            {audioExportSuccess ? <Check size={14} className="stroke-[2.5]" /> : <Download size={14} />}
+          </button>
+        )}
+
         {onRegenerate && (
           <button
             onClick={() => { stopPlay(); onRegenerate(); }}

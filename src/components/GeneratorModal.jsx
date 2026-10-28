@@ -5,6 +5,7 @@ import { useI18n } from '../i18n';
 import { generateStructuredRandomContent } from '../utils/morse/structuredRandom';
 import { exportPdfPractice } from '../services/pdfExportService';
 import { exportEpubPractice } from '../services/epubExportService';
+import { exportMorseAudio } from '../services/audioExportService';
 import ModeSelector from './generator/ModeSelector';
 import GroupLengthSelector from './generator/GroupLengthSelector';
 import GroupCountSelector from './generator/GroupCountSelector';
@@ -48,6 +49,8 @@ export default function GeneratorModal({ isOpen, onClose, onGenerate }) {
   const [isExportingEpub, setIsExportingEpub] = useState(false);
   const [pdfExported, setPdfExported] = useState(false);
   const [epubExported, setEpubExported] = useState(false);
+  const [isExportingWav, setIsExportingWav] = useState(false);
+  const [wavExported, setWavExported] = useState(false);
   const [exportType, setExportType] = useState('pdf'); // 'pdf' | 'epub'
   const [exportProgress, setExportProgress] = useState(null); // { current, total, percent, text }
 
@@ -119,6 +122,7 @@ export default function GeneratorModal({ isOpen, onClose, onGenerate }) {
     setExportProgress(null);
     setPdfExported(false);
     setEpubExported(false);
+    setWavExported(false);
     onClose();
   };
 
@@ -278,8 +282,8 @@ export default function GeneratorModal({ isOpen, onClose, onGenerate }) {
   // 3. Writes selected formats (.pdf and/or .epub) from the identical dataset
   const handleExportSelected = async () => {
     if (!generatedDataset) return;
-    const { pdf, epub } = selectedFormats;
-    if (!pdf && !epub) return;
+    const { pdf, epub, wav } = selectedFormats;
+    if (!pdf && !epub && !wav) return;
 
     const safeFilename = (generatedDataset.title || 'Telegram').replace(/[/\\:*?"<>|]/g, '_');
 
@@ -291,10 +295,15 @@ export default function GeneratorModal({ isOpen, onClose, onGenerate }) {
           filters: [{ name: 'PDF Document', extensions: ['pdf'] }],
           defaultPath: `${safeFilename}.pdf`
         });
-      } else {
+      } else if (epub) {
         chosenPath = await save({
           filters: [{ name: 'EPUB eBook', extensions: ['epub'] }],
           defaultPath: `${safeFilename}.epub`
+        });
+      } else {
+        chosenPath = await save({
+          filters: [{ name: 'WAV Audio', extensions: ['wav'] }],
+          defaultPath: `${safeFilename}.wav`
         });
       }
 
@@ -303,9 +312,10 @@ export default function GeneratorModal({ isOpen, onClose, onGenerate }) {
         return;
       }
 
-      const basePath = String(chosenPath).replace(/\.(pdf|epub)$/i, '');
-      const targetPdfPath = pdf ? String(chosenPath) : `${basePath}.pdf`;
-      const targetEpubPath = !pdf && epub ? String(chosenPath) : `${basePath}.epub`;
+      const basePath = String(chosenPath).replace(/\.(pdf|epub|wav)$/i, '');
+      const targetPdfPath = pdf ? (String(chosenPath).endsWith('.pdf') ? String(chosenPath) : `${basePath}.pdf`) : `${basePath}.pdf`;
+      const targetEpubPath = epub ? (String(chosenPath).endsWith('.epub') ? String(chosenPath) : `${basePath}.epub`) : `${basePath}.epub`;
+      const targetWavPath = wav ? (String(chosenPath).endsWith('.wav') ? String(chosenPath) : `${basePath}.wav`) : `${basePath}.wav`;
 
       // Step 2: Now generate the full multi-page dataset (or reuse if already generated for this batch)
       setExportType(pdf ? 'pdf' : 'epub');
@@ -367,16 +377,57 @@ export default function GeneratorModal({ isOpen, onClose, onGenerate }) {
         setIsExportingEpub(false);
       }
 
-      // Step 5: Complete
+      // Step 5: Export WAV Audio if selected
+      if (wav) {
+        setIsExportingWav(true);
+        setExportType('wav');
+        const fullPracticeText = pages.map(p => p.map(g => Array.isArray(g) ? g.join('') : String(g)).join(' ')).join('\n\n');
+        const prefSpeed = Number(localStorage.getItem('pref_morse_speed')) || 20;
+        const prefFreq = Number(localStorage.getItem('pref_morse_freq')) || 400;
+        await exportMorseAudio({
+          text: fullPracticeText,
+          wpm: prefSpeed,
+          freq: prefFreq,
+          title: generatedDataset.title,
+          includeLrc: true,
+          onProgress: (prog) => {
+            setExportProgress({
+              ...prog,
+              percent: Math.min(99, prog.percent || 70)
+            });
+          },
+          targetFilePath: targetWavPath
+        });
+        setWavExported(true);
+        setIsExportingWav(false);
+      }
+
+      // Step 6: Complete
+      const exportedList = [];
+      if (pdf) exportedList.push('PDF');
+      if (epub) exportedList.push('EPUB');
+      if (wav) exportedList.push('WAV');
+
+      let successText = '';
+      if (exportedList.length > 1) {
+        successText = isEn
+          ? `Successfully exported ${exportedList.join(' & ')} files!`
+          : `已同时导出同名 ${exportedList.join('、')} 文件！`;
+      } else if (wav) {
+        successText = isEn
+          ? 'Morse WAV audio & synced LRC lyrics exported successfully!'
+          : 'WAV 音频与同步歌词导出成功！';
+      } else if (pdf) {
+        successText = t('generator.pdfExport.successToast');
+      } else {
+        successText = t('generator.epubExport.successToast');
+      }
+
       setExportProgress({
         current: exportPages,
         total: exportPages,
         percent: 100,
-        text: pdf && epub
-          ? (isEn ? 'PDF & EPUB exported simultaneously!' : '已同时生成并导出同名 PDF 与 EPUB 报底文件！')
-          : pdf
-          ? t('generator.pdfExport.successToast')
-          : t('generator.epubExport.successToast')
+        text: successText
       });
       setTimeout(() => {
         setExportProgress(null);
@@ -387,6 +438,7 @@ export default function GeneratorModal({ isOpen, onClose, onGenerate }) {
     } finally {
       setIsExportingPdf(false);
       setIsExportingEpub(false);
+      setIsExportingWav(false);
     }
   };
 

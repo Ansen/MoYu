@@ -120,7 +120,8 @@ function shuffle(items, random = Math.random) {
 
 function getProfile(mode, config = {}) {
     if (mode === GENERATOR_MODE.CUSTOM || config.customProfile) {
-        const pool = config.pool && config.pool.length > 0 ? config.pool : '0123456789abcdefghijklmnopqrstuvwxyz'.split('');
+        const rawPool = config.pool && config.pool.length > 0 ? config.pool : '0123456789abcdefghijklmnopqrstuvwxyz';
+        const pool = Array.isArray(rawPool) ? rawPool : String(rawPool).split('');
         const charsPerGroup = Number(config.charsPerGroup) || 4;
         const baseWeights = {};
         pool.forEach(ch => {

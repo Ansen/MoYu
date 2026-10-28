@@ -46,6 +46,7 @@ export default function TrainingScopePanel({
   isPlaying = false,
   isFinished = false,
   onOpenResult,
+  onOpenHistory,
   hasResult = false,
   height = 30,
   sidetoneOffset = 80,
@@ -372,6 +373,18 @@ export default function TrainingScopePanel({
                 <span>{t('training.scope.legendUser', '用户')}</span>
               </span>
             </div>
+          )}
+
+          {/* 历史档案与热力图按钮 */}
+          {onOpenHistory && (
+            <button
+              onClick={onOpenHistory}
+              className="flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold bg-slate-200/80 dark:bg-[#252525] text-slate-700 dark:text-slate-300 border border-slate-300/80 dark:border-[#383838] hover:bg-slate-300 dark:hover:bg-[#303030] transition-colors cursor-pointer shadow-2xs whitespace-nowrap shrink-0"
+              title={t('training.scope.historyTooltip', '查看历史跟发练习档案与易错字符热力图')}
+            >
+              <BarChart2 size={12} className="text-indigo-500" />
+              <span>{t('training.scope.history', '档案')}</span>
+            </button>
           )}
 
           {/* 分析按钮 (精简文案) */}

@@ -9,8 +9,9 @@ import TocSidebar from './reader/TocSidebar';
 import { useI18n } from '../i18n';
 import { ALL_FONTS, getDefaultFontId } from '../config/fonts';
 import FollowTrainingModule from './training/FollowTrainingModule';
+import { exportMorseAudio } from '../services/audioExportService';
 
-export default function Reader({ bookData, onClose, jumpToSibling, jumpToChapter, onRegenerate, isTraining: initialTraining }) {
+export default function Reader({ bookData, onClose, jumpToSibling, jumpToChapter, onRegenerate, loadGeneratedContent, isTraining: initialTraining }) {
   const { t } = useI18n();
   const engineRef = useRef(null);
   
@@ -85,6 +86,68 @@ export default function Reader({ bookData, onClose, jumpToSibling, jumpToChapter
       return next;
     });
   }, []);
+
+  // 离线导出莫尔斯音频 (WAV + 同步 LRC)
+  const [isExportingAudio, setIsExportingAudio] = useState(false);
+  const [audioExportSuccess, setAudioExportSuccess] = useState(false);
+  const exportSuccessTimerRef = useRef(null);
+
+  useEffect(() => {
+    return () => {
+      if (exportSuccessTimerRef.current) clearTimeout(exportSuccessTimerRef.current);
+    };
+  }, []);
+
+  const handleExportAudio = useCallback(async () => {
+    const textToExport = currentChapterText || bookData?.data || '';
+    if (!textToExport.trim()) return;
+
+    setIsExportingAudio(true);
+    setAudioExportSuccess(false);
+    try {
+      const ok = await exportMorseAudio({
+        text: textToExport,
+        wpm: morseSpeed,
+        freq: morseFreq,
+        numberMode,
+        enableMarkers,
+        prefixMarker: enableMarkers ? (prefixMarker || parsedTelegram.startMarker || '') : '',
+        suffixMarker: enableMarkers ? (suffixMarker || parsedTelegram.endMarker || '') : '',
+        title: currentChapterTitle || bookData?.name || 'Telegram',
+        includeLrc: true
+      });
+      if (ok) {
+        setAudioExportSuccess(true);
+        if (exportSuccessTimerRef.current) clearTimeout(exportSuccessTimerRef.current);
+        exportSuccessTimerRef.current = setTimeout(() => {
+          setAudioExportSuccess(false);
+        }, 2500);
+      }
+    } catch (err) {
+      console.error('Audio export failed:', err);
+    } finally {
+      setIsExportingAudio(false);
+    }
+  }, [currentChapterText, bookData, morseSpeed, morseFreq, numberMode, enableMarkers, prefixMarker, suffixMarker, currentChapterTitle, parsedTelegram]);
+
+  // 一键弱项字符针对性强化训练
+  const handleStartWeakPractice = useCallback((weakChars) => {
+    if (!weakChars || weakChars.length === 0) return;
+    if (typeof loadGeneratedContent === 'function') {
+      const pool = Array.from(new Set(weakChars)).map(c => String(c).toLowerCase());
+      loadGeneratedContent({
+        mode: 'custom',
+        pool,
+        charsPerGroup: Math.min(5, Math.max(3, pool.length)),
+        groupCount: 50,
+        allowAdjacentDuplicate: true,
+        customProfile: true,
+        title: `弱项专项强化 (${weakChars.join(' ')})`
+      });
+    } else if (typeof onRegenerate === 'function') {
+      onRegenerate();
+    }
+  }, [loadGeneratedContent, onRegenerate]);
 
   // 隐藏/显示正文 (听抄防偷瞄模式)
   const [isTextHidden, setIsTextHidden] = useState(() => {
@@ -292,6 +355,9 @@ export default function Reader({ bookData, onClose, jumpToSibling, jumpToChapter
         togglePlay={togglePlay}
         stopPlay={stopPlay}
         onRegenerate={bookData.isGenerated ? onRegenerate : undefined}
+        onExportAudio={handleExportAudio}
+        isExportingAudio={isExportingAudio}
+        audioExportSuccess={audioExportSuccess}
         interferenceLevel={interferenceLevel}
         setInterferenceLevel={setInterferenceLevel}
         interferenceModes={interferenceModes}
@@ -350,6 +416,7 @@ export default function Reader({ bookData, onClose, jumpToSibling, jumpToChapter
               activeToken={activePlayToken}
               activeMarker={activeMarker}
               onStopRequest={stopPlay}
+              onStartWeakPractice={handleStartWeakPractice}
             />
           )}
           

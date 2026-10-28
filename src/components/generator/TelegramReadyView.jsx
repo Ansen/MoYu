@@ -1,5 +1,5 @@
 import React from 'react';
-import { Printer, Download, RefreshCw, Check, ChevronLeft, FileText, BookOpen, Layers, Hash, Type } from 'lucide-react';
+import { Printer, Download, RefreshCw, Check, ChevronLeft, FileText, BookOpen, Layers, Hash, Type, Music } from 'lucide-react';
 import { useI18n } from '../../i18n';
 
 /**
@@ -11,8 +11,10 @@ export default function TelegramReadyView({
   onToggleFormat,
   isExportingPdf,
   isExportingEpub,
+  isExportingWav = false,
   pdfExported,
   epubExported,
+  wavExported = false,
   onExportSelected,
   onRegenerate,
   onBackToConfig,
@@ -25,12 +27,13 @@ export default function TelegramReadyView({
   if (!dataset) return null;
 
   const { totalPages, totalGroups, totalChars, previewRows = [], title } = dataset;
-  const isExporting = isExportingPdf || isExportingEpub;
-  const hasSelection = Boolean(selectedFormats.pdf || selectedFormats.epub);
+  const isExporting = isExportingPdf || isExportingEpub || isExportingWav;
+  const hasSelection = Boolean(selectedFormats.pdf || selectedFormats.epub || selectedFormats.wav);
   const allSelectedExported =
     hasSelection &&
     (!selectedFormats.pdf || pdfExported) &&
-    (!selectedFormats.epub || epubExported);
+    (!selectedFormats.epub || epubExported) &&
+    (!selectedFormats.wav || wavExported);
 
   const getExportButtonLabel = () => {
     if (isExporting) {
@@ -39,13 +42,17 @@ export default function TelegramReadyView({
     if (!hasSelection) {
       return isEn ? 'Select Format to Export' : '请勾选导出格式';
     }
-    if (selectedFormats.pdf && selectedFormats.epub) {
-      return isEn ? 'Export Both (PDF + EPUB)' : '导出报底 (PDF + EPUB)';
+    const selCount = (selectedFormats.pdf ? 1 : 0) + (selectedFormats.epub ? 1 : 0) + (selectedFormats.wav ? 1 : 0);
+    if (selCount > 1) {
+      return isEn ? `Export Selected (${selCount} Formats)` : `一键导出已勾选 (${selCount} 种格式)`;
     }
     if (selectedFormats.pdf) {
       return t('generator.btn.exportPdf');
     }
-    return t('generator.btn.exportEpub');
+    if (selectedFormats.epub) {
+      return t('generator.btn.exportEpub');
+    }
+    return t('generator.btn.exportWav', '导出音频 (WAV)');
   };
 
   return (
@@ -145,7 +152,7 @@ export default function TelegramReadyView({
             </span>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
             {/* PDF Checkbox Card */}
             <div
               role="checkbox"
@@ -257,6 +264,63 @@ export default function TelegramReadyView({
                 </div>
               </div>
             </div>
+
+            {/* WAV Audio Checkbox Card */}
+            <div
+              role="checkbox"
+              aria-checked={selectedFormats.wav}
+              tabIndex={0}
+              onClick={() => !isExporting && onToggleFormat?.('wav')}
+              onKeyDown={(e) => {
+                if ((e.key === ' ' || e.key === 'Enter') && !isExporting) {
+                  e.preventDefault();
+                  onToggleFormat?.('wav');
+                }
+              }}
+              className={`p-3.5 rounded-xl border transition-all cursor-pointer flex flex-col justify-between gap-2 shadow-xs select-none ${
+                selectedFormats.wav
+                  ? 'border-sky-500/80 dark:border-sky-600/80 bg-sky-50/35 dark:bg-sky-950/20 ring-1 ring-sky-500/20'
+                  : 'border-slate-200 dark:border-[#333333] bg-white dark:bg-[#222222] opacity-70 hover:opacity-100 hover:border-slate-300 dark:hover:border-[#444]'
+              }`}
+            >
+              <div className="flex items-start justify-between gap-2">
+                <div className="flex items-start gap-2.5">
+                  <div className={`p-2 rounded-lg shrink-0 transition-colors ${
+                    selectedFormats.wav
+                      ? 'bg-sky-500 text-white shadow-xs'
+                      : 'bg-slate-100 dark:bg-[#2d2d2d] text-slate-400'
+                  }`}>
+                    <Music size={17} />
+                  </div>
+                  <div>
+                    <div className="font-bold text-[14px] text-slate-800 dark:text-slate-100 flex items-center gap-1.5 flex-wrap">
+                      <span>{t('generator.ready.wavTitle', 'WAV 音频 (+LRC)')}</span>
+                      {wavExported && (
+                        <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-sky-100 text-sky-700 dark:bg-sky-900/50 dark:text-sky-300">
+                          <Check size={10} className="stroke-[3]" />
+                          {t('generator.ready.exported', '已导出')}
+                        </span>
+                      )}
+                    </div>
+                    <div className="text-[12px] text-slate-500 dark:text-slate-400 leading-snug mt-1">
+                      {t('generator.ready.wavDesc', '离线 PCM 无损莫尔斯音频，附带同步歌词')}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Custom Checkbox Indicator */}
+                <div
+                  className={`w-5 h-5 rounded-md border flex items-center justify-center shrink-0 transition-all mt-0.5 ${
+                    selectedFormats.wav
+                      ? 'bg-sky-500 border-sky-500 text-white shadow-2xs'
+                      : 'border-slate-300 dark:border-[#4a4a4a] bg-white dark:bg-[#1a1a1a]'
+                  }`}
+                >
+                  {selectedFormats.wav && <Check size={13} className="stroke-[3]" />}
+                </div>
+              </div>
+            </div>
+
           </div>
         </div>
 

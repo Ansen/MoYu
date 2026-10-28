@@ -121,6 +121,7 @@ export default function LibraryView({ ebook }) {
           jumpToSibling={jumpToSibling}
           jumpToChapter={jumpToChapter}
           onRegenerate={bookData.isGenerated ? () => loadGeneratedContent(bookData.generatorConfig || bookData.generatorMode) : undefined}
+          loadGeneratedContent={loadGeneratedContent}
         />
       )}
 

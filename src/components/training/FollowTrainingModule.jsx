@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import TrainingScopePanel from './TrainingScopePanel';
 import TrainingResultModal from './TrainingResultModal';
+import TrainingHistoryModal from './TrainingHistoryModal';
+import { saveTrainingSession } from '../../utils/trainingHistoryStore';
 import { useKeyInput } from '../../hooks/useKeyInput';
 import { generateTargetTimeline, analyzeSession } from '../../utils/morseTimingAnalyzer';
 import audioPlayer from '../../utils/audioPlayer';
@@ -26,7 +28,8 @@ export default function FollowTrainingModule({
   prefixMarker = '',
   suffixMarker = '',
   activeToken: _activeToken = null,
-  onStopRequest: _onStopRequest
+  onStopRequest: _onStopRequest,
+  onStartWeakPractice = null
 }) {
   const { lang } = useI18n();
   const isEn = lang === 'en';
@@ -213,6 +216,7 @@ export default function FollowTrainingModule({
   const [targetTimeline, setTargetTimeline] = useState(() => buildTimeline());
   const [analysisResult, setAnalysisResult] = useState(null);
   const [isResultOpen, setIsResultOpen] = useState(false);
+  const [isHistoryOpen, setIsHistoryOpen] = useState(false);
 
   const userEventsRef = useRef([]);
   const lastAnalyzedRef = useRef(false);
@@ -446,6 +450,17 @@ export default function FollowTrainingModule({
           });
           if (res) {
             setAnalysisResult(res);
+            try {
+              saveTrainingSession({
+                ...res,
+                wpm: morseSpeed,
+                mode: trainingMode,
+                inputDevice,
+                chapterTitle: bookData?.name || ''
+              });
+            } catch (saveErr) {
+              console.warn('[FollowTrainingModule] Failed to save session:', saveErr);
+            }
           }
         } catch (err) {
           console.error('[FollowTrainingModule] Failed to analyze session:', err);
@@ -487,6 +502,7 @@ export default function FollowTrainingModule({
         isPaused={isPaused}
         isFinished={!isPlaying && !!analysisResult}
         onOpenResult={() => setIsResultOpen(true)}
+        onOpenHistory={() => setIsHistoryOpen(true)}
         hasResult={!!analysisResult}
         timeWindowSec={timeWindowSec}
         setTimeWindowSec={handleSetTimeWindowSec}
@@ -508,8 +524,17 @@ export default function FollowTrainingModule({
           setUserEvents([]);
           userEventsRef.current = [];
         }}
+        onOpenHistory={() => setIsHistoryOpen(true)}
+        onStartWeakPractice={onStartWeakPractice}
         result={analysisResult}
         wpm={morseSpeed}
+      />
+
+      {/* 练习历史档案与易错字符热力图弹窗 */}
+      <TrainingHistoryModal
+        isOpen={isHistoryOpen}
+        onClose={() => setIsHistoryOpen(false)}
+        onStartWeakPractice={onStartWeakPractice}
       />
     </>
   );
