@@ -1,15 +1,15 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { 
-  Award, 
+
   TrendingUp, 
   BarChart2, 
   Flame, 
   Trash2, 
   X, 
-  Zap, 
-  RotateCcw, 
+
+
   Calendar, 
-  Clock, 
+
   AlertTriangle, 
   CheckCircle2,
   Sparkles

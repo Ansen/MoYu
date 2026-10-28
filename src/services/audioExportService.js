@@ -1,5 +1,6 @@
 import { save } from '@tauri-apps/plugin-dialog';
 import { writeFile } from '@tauri-apps/plugin-fs';
+import { invoke } from '@tauri-apps/api/core';
 import { textToMorseTokens, normalizeMorseTokenGaps, getCharMorseCode } from '../utils/morseCode.js';
 
 /**
@@ -347,8 +348,8 @@ export async function exportMorseAudio({
     try {
       const lrcContent = generateMorseLrc(normalizedQueue, title);
       const lrcPath = String(filePath).replace(/\.wav$/i, '') + '.lrc';
-      const lrcBytes = new TextEncoder().encode(lrcContent);
-      await writeFile(lrcPath, lrcBytes);
+      try { await invoke('save_companion_text', { path: lrcPath, content: lrcContent }); } catch { const lrcBytes = new TextEncoder().encode(lrcContent); await writeFile(lrcPath, lrcBytes); }
+
     } catch (lrcErr) {
       console.warn('Failed to export accompanying .lrc file:', lrcErr);
     }

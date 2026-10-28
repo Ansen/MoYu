@@ -70,11 +70,27 @@ fn generate_epub(
 }
 
 #[tauri::command]
+fn save_companion_text(path: String, content: String) -> Result<(), String> {
+    let lower = path.to_ascii_lowercase();
+    if !lower.ends_with(".lrc") && !lower.ends_with(".txt") {
+        return Err("Only .lrc or .txt companion files are allowed".to_string());
+    }
+    std::fs::write(&path, content.as_bytes()).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 fn toggle_devtools(window: tauri::WebviewWindow) {
-    if window.is_devtools_open() {
-        window.close_devtools();
-    } else {
-        window.open_devtools();
+    #[cfg(desktop)]
+    {
+        if window.is_devtools_open() {
+            window.close_devtools();
+        } else {
+            window.open_devtools();
+        }
+    }
+    #[cfg(not(desktop))]
+    {
+        let _ = window;
     }
 }
 
@@ -91,6 +107,7 @@ pub fn run() {
         .plugin(tauri_plugin_store::Builder::new().build())
         .invoke_handler(tauri::generate_handler![
             generate_epub,
+            save_companion_text,
             toggle_devtools,
             get_serial_status,
             connect_serial_port,

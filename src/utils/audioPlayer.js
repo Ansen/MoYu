@@ -142,7 +142,7 @@ class DesktopAudioPlayer {
     this.listeners.add(listener);
     try {
       listener(this.getSnapshot());
-    } catch (e) {
+    } catch {
       console.error('[MorseAudioCore] Initial subscriber notification error:', e);
     }
     return () => {
@@ -445,7 +445,7 @@ class DesktopAudioPlayer {
       gain.linearRampToValueAtTime(TONE_VOLUME, actualStart + fade);
       gain.setValueAtTime(TONE_VOLUME, actualStart + durationSec - fade);
       gain.linearRampToValueAtTime(0, actualStart + durationSec);
-    } catch (e) {
+    } catch {
       try {
         gain.setValueAtTime(TONE_VOLUME, actualStart);
         gain.setValueAtTime(0, actualStart + durationSec);
@@ -474,7 +474,7 @@ class DesktopAudioPlayer {
         gain.cancelScheduledValues(now);
         gain.setValueAtTime(0, now);
       }
-    } catch (e) {
+    } catch {
       try {
         gain.cancelScheduledValues(now);
         gain.value = 0;
@@ -535,7 +535,7 @@ class DesktopAudioPlayer {
         wakeSource.buffer = wakeBuffer;
         wakeSource.connect(this.masterGain || this.audioContext.destination);
         wakeSource.start(now);
-      } catch (e) {
+      } catch {
         console.warn('Inaudible wake stream error:', e);
       }
     }

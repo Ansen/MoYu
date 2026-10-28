@@ -1182,7 +1182,7 @@ function generateValidSuffix(suffixLen, random = Math.random) {
     return 'ABC'
 }
 
-function generateSingleCallsign(includeSuffix = false, random = Math.random) {
+export function generateSingleCallsign(includeSuffix = false, random = Math.random) {
     let r = random() * TOTAL_PREFIX_WEIGHT
     let item = CALLSIGN_PREFIX_WEIGHTED[0]
     for (const p of CALLSIGN_PREFIX_WEIGHTED) {

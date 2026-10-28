@@ -49,8 +49,8 @@ export default function GeneratorModal({ isOpen, onClose, onGenerate }) {
   const [isExportingEpub, setIsExportingEpub] = useState(false);
   const [pdfExported, setPdfExported] = useState(false);
   const [epubExported, setEpubExported] = useState(false);
-  const [isExportingWav, setIsExportingWav] = useState(false);
-  const [wavExported, setWavExported] = useState(false);
+
+
   const [exportType, setExportType] = useState('pdf'); // 'pdf' | 'epub'
   const [exportProgress, setExportProgress] = useState(null); // { current, total, percent, text }
 
@@ -122,7 +122,7 @@ export default function GeneratorModal({ isOpen, onClose, onGenerate }) {
     setExportProgress(null);
     setPdfExported(false);
     setEpubExported(false);
-    setWavExported(false);
+
     onClose();
   };
 

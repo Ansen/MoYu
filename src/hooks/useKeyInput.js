@@ -760,7 +760,7 @@ export function useKeyInput({
     return () => {
       globalListeners.delete(listener);
     };
-  }, [handleDown, handleUp, onPaddleDit, onPaddleDah]);
+  }, [handleDown, handleUp, onPaddleDit, onPaddleDah, setTone]);
 
   // 当设备为 ch552g 或在 Tauri 环境下挂载时，自动激活静默直连
   useEffect(() => {

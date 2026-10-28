@@ -105,7 +105,7 @@ export function useEbook() {
     });
   }, []);
 
-  const loadFileContent = async (filePath, fileName, siblings = [], currentIndex = 0, folderName = '', folderPath = '', initialChapterIndex = null) => {
+  const loadFileContent = useCallback(async (filePath, fileName, siblings = [], currentIndex = 0, folderName = '', folderPath = '', initialChapterIndex = null) => {
     const isEpub = filePath.toLowerCase().endsWith('.epub');
     const isFolder = Boolean(folderName || (siblings && siblings.length > 0));
     const effectiveFolderName = folderName || (isFolder ? filePath.split(/[/\\]/).filter(Boolean).slice(-2, -1)[0] : '');
@@ -215,9 +215,9 @@ export function useEbook() {
         folderName: effectiveFolderName
       });
     }
-  };
+  }, [recentFiles, saveRecent]);
 
-  const openFileProgrammatically = async (filePath, fileName, isFolder = false) => {
+  const openFileProgrammatically = useCallback(async (filePath, fileName, isFolder = false) => {
     try {
       setLoading(true);
       setError(null);
@@ -280,7 +280,7 @@ export function useEbook() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [recentFiles, loadFileContent, saveRecent]);
 
   const openBookDialog = useCallback(async () => {
     try {
@@ -295,7 +295,7 @@ export function useEbook() {
     } catch (err) {
       console.error(err);
     }
-  }, []);
+  }, [openFileProgrammatically]);
 
   const openFolderDialog = useCallback(async () => {
     try {
@@ -310,7 +310,7 @@ export function useEbook() {
     } catch (err) {
       console.error(err);
     }
-  }, []);
+  }, [openFileProgrammatically]);
 
   const jumpToSibling = useCallback(async (index) => {
     if (!bookData || !bookData.siblings || !bookData.siblings[index]) return;
@@ -339,7 +339,7 @@ export function useEbook() {
     } finally {
       setLoading(false);
     }
-  }, [bookData, saveRecent]);
+  }, [bookData, loadFileContent, saveRecent]);
 
   const loadTextDirectly = useCallback((textData, fileName) => {
     setBookData({

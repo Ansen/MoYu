@@ -470,7 +470,7 @@ export default function FollowTrainingModule({
       wasPlayingRef.current = false;
       setCurrentTime(0);
     }
-  }, [isPlaying, isPaused, targetTimeline, buildTimeline]);
+  }, [isPlaying, isPaused, targetTimeline, buildTimeline, trainingMode, morseSpeed, inputDevice, bookData?.name]);
 
   return (
     <>
