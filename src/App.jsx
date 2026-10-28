@@ -25,7 +25,7 @@ function App() {
   // Lift ebook state up to share between Home and Library
   const ebook = useEbook();
 
-  // 开发者调试工具快捷键 (F12 或 Ctrl+Shift+Alt+D)
+  // 开发者调试工具快捷键 (仅在开发环境中允许 F12 / Ctrl+Shift+I 唤出；正式版本全局拦截并禁用 F12 避免调出控制台)
   useEffect(() => {
     const handleKeyDown = (e) => {
       if (
@@ -34,7 +34,9 @@ function App() {
         (e.ctrlKey && e.shiftKey && e.altKey && (e.key === 'D' || e.key === 'd'))
       ) {
         e.preventDefault();
-        invoke('toggle_devtools').catch(() => {});
+        if (import.meta.env.DEV) {
+          invoke('toggle_devtools').catch(() => {});
+        }
       }
     };
     window.addEventListener('keydown', handleKeyDown);
