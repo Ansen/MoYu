@@ -162,13 +162,6 @@ export default function TranslatorView() {
     }
   }, [inputText, dictionary, mode]);
 
-  // Handle Speech Recognition manual end (flush any leftover interim transcript)
-  useEffect(() => {
-    if (!isListening && transcript.trim() && dictionary) {
-      handleFinalResult(transcript.trim());
-    }
-  }, [isListening, transcript, dictionary, handleFinalResult]);
-
   // Auto scroll chat
   useEffect(() => {
     if (mode === 'voice' && chatScrollRef.current) {
@@ -494,13 +487,20 @@ export default function TranslatorView() {
               </div>
             )}
             {error && (
-              <div className="self-center bg-rose-50 dark:bg-rose-500/10 text-rose-500 border border-rose-200/80 dark:border-rose-800/40 px-4 py-2 rounded-full text-xs md:text-sm mt-4 text-center select-none shadow-2xs">
-                {error === 'not-supported' ? t('translator.voice.notsupported') :
-                 error === 'not-allowed' ? t('translator.voice.notAllowed') :
-                 error === 'service-not-allowed' ? t('translator.voice.serviceNotAllowed') :
-                 error === 'network' ? t('translator.voice.networkError') :
-                 error === 'audio-capture' ? t('translator.voice.audioCapture') :
-                 t('translator.voice.error')}
+              <div className="self-center flex flex-col items-center gap-2 max-w-lg mx-auto text-center mt-4">
+                <div className="bg-rose-50 dark:bg-rose-500/10 text-rose-500 border border-rose-200/80 dark:border-rose-800/40 px-4 py-2 rounded-full text-xs md:text-sm select-none shadow-2xs">
+                  {error === 'not-supported' ? t('translator.voice.notsupported') :
+                   error === 'not-allowed' ? t('translator.voice.notAllowed') :
+                   error === 'service-not-allowed' ? t('translator.voice.serviceNotAllowed') :
+                   error === 'network' ? t('translator.voice.networkError') :
+                   error === 'audio-capture' ? t('translator.voice.audioCapture') :
+                   t('translator.voice.error')}
+                </div>
+                {error === 'network' && (
+                  <p className="text-[12px] text-slate-500 dark:text-[#888888] leading-relaxed px-4">
+                    {t('translator.voice.networkTip')}
+                  </p>
+                )}
               </div>
             )}
           </div>
