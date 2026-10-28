@@ -141,29 +141,29 @@ export default function ReaderHeader({
   );
 
   return (
-    <div className="h-12 bg-slate-100 dark:bg-[#111111] border-b border-slate-300 dark:border-[#333333] flex items-center px-2.5 sm:px-3 shrink-0 shadow-xs z-20 justify-between gap-1.5 sm:gap-2 select-none">
+    <div className="h-13.5 bg-slate-100 dark:bg-[#111111] border-b border-slate-300 dark:border-[#333333] flex items-center px-3 sm:px-4 shrink-0 shadow-xs z-20 justify-between gap-2 select-none">
 
       {/* Left: Nav Action Buttons */}
-      <div className="flex items-center justify-start gap-1.5 shrink-0">
+      <div className="flex items-center justify-start gap-1.5 sm:gap-2 shrink-0">
         <button
           onClick={handleClose}
-          className="h-8 flex items-center gap-1.5 px-2.5 sm:px-3 rounded-lg border border-slate-300/80 dark:border-[#383838] bg-white dark:bg-[#1f1f1f] text-slate-700 dark:text-[#cccccc] hover:bg-slate-50 dark:hover:bg-[#282828] hover:border-slate-400 text-[12px] font-medium transition-all shadow-2xs active:scale-98 cursor-pointer whitespace-nowrap shrink-0"
+          className="h-9 flex items-center gap-1.5 px-3 rounded-lg border border-slate-300/90 dark:border-[#383838] bg-white dark:bg-[#1f1f1f] text-slate-700 dark:text-[#d4d4d4] hover:bg-slate-50 dark:hover:bg-[#282828] hover:border-slate-400 text-[13.5px] font-medium transition-all shadow-2xs active:scale-98 cursor-pointer whitespace-nowrap shrink-0"
           title={t('reader.back')}
         >
-          <ArrowLeft size={14} className="shrink-0" />
+          <ArrowLeft size={15} className="shrink-0" />
           <span className="whitespace-nowrap">{t('reader.back')}</span>
         </button>
 
         {hasToc && (
           <button
             onClick={() => setIsTocOpen(!isTocOpen)}
-            className={`h-8 flex items-center gap-1.5 px-2.5 sm:px-3 rounded-lg border text-[12px] font-medium transition-all cursor-pointer shadow-2xs active:scale-98 whitespace-nowrap shrink-0 ${isTocOpen
+            className={`h-9 flex items-center gap-1.5 px-3 rounded-lg border text-[13.5px] font-medium transition-all cursor-pointer shadow-2xs active:scale-98 whitespace-nowrap shrink-0 ${isTocOpen
                 ? 'border-indigo-300 dark:border-indigo-800 bg-indigo-50/80 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 font-semibold'
-                : 'border-slate-300/80 dark:border-[#383838] bg-white dark:bg-[#1f1f1f] text-slate-700 dark:text-[#cccccc] hover:bg-slate-50 dark:hover:bg-[#282828]'
+                : 'border-slate-300/90 dark:border-[#383838] bg-white dark:bg-[#1f1f1f] text-slate-700 dark:text-[#d4d4d4] hover:bg-slate-50 dark:hover:bg-[#282828]'
               }`}
             title={bookData.isFolder ? t('reader.filelist') : t('reader.toc')}
           >
-            <List size={14} className="shrink-0" />
+            <List size={15} className="shrink-0" />
             <span className="whitespace-nowrap">{bookData.isFolder ? t('reader.filelist') : t('reader.toc')}</span>
           </button>
         )}
@@ -171,19 +171,19 @@ export default function ReaderHeader({
 
       {/* Center: Floating Island Parameter & Tone Console */}
       <div className="flex items-center justify-center shrink-0">
-        <div className="flex items-center gap-1.5 sm:gap-2 bg-slate-200/80 dark:bg-[#181818] px-2.5 py-1 rounded-xl border border-slate-300/70 dark:border-[#2d2d2d] shadow-2xs">
+        <div className="flex items-center gap-1.5 xl:gap-2 bg-slate-200/80 dark:bg-[#181818] px-2.5 py-1.25 rounded-xl border border-slate-300/70 dark:border-[#2d2d2d] shadow-2xs">
 
           {/* Font Size Stepper */}
-          <div className="flex items-center gap-1 shrink-0" title={`${t('reader.font.size')} (${t('reader.tooltip.fontSizeAdjust', '支持点击+-或滚轮微调')})`}>
-            <Type size={13} className="text-slate-500 shrink-0" />
-            <div className="flex items-center bg-white dark:bg-[#252525] border border-slate-300 dark:border-[#383838] rounded-md overflow-hidden shadow-2xs h-7">
+          <div className="flex items-center gap-1.5 shrink-0" title={`${t('reader.font.size')} (${t('reader.tooltip.fontSizeAdjust', '支持点击+-或滚轮微调')})`}>
+            <Type size={15} className="text-slate-600 dark:text-slate-400 shrink-0" />
+            <div className="flex items-center bg-white dark:bg-[#252525] border border-slate-300 dark:border-[#383838] rounded-lg overflow-hidden shadow-2xs h-8">
               <button
                 type="button"
                 onClick={() => setBaseFontSize(Math.max(10, Math.round(baseFontSize) - 1))}
-                className="w-4.5 h-full flex items-center justify-center text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-slate-100 dark:hover:bg-[#333333] transition-colors cursor-pointer select-none active:bg-slate-200 dark:active:bg-[#3a3a3a]"
+                className="w-5.5 h-full flex items-center justify-center text-slate-500 dark:text-slate-300 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-slate-100 dark:hover:bg-[#333333] transition-colors cursor-pointer select-none active:bg-slate-200 dark:active:bg-[#3a3a3a]"
                 title={t('reader.tooltip.fontSizeDec', '减小字号 (-1)')}
               >
-                <Minus size={10} className="stroke-[2.5]" />
+                <Minus size={12} className="stroke-[2.5]" />
               </button>
               <input
                 type="number"
@@ -205,32 +205,32 @@ export default function ReaderHeader({
                     setBaseFontSize(val);
                   }
                 }}
-                className="w-6.5 text-[11.5px] font-bold font-mono text-center bg-transparent focus:outline-hidden text-slate-800 dark:text-[#dddddd] [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none p-0 select-none"
+                className="w-7 text-[13.5px] font-bold font-mono tabular-nums text-center bg-transparent focus:outline-hidden text-slate-800 dark:text-[#e5e5e5] [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none p-0 select-none"
               />
               <button
                 type="button"
                 onClick={() => setBaseFontSize(Math.min(120, Math.round(baseFontSize) + 1))}
-                className="w-4.5 h-full flex items-center justify-center text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-slate-100 dark:hover:bg-[#333333] transition-colors cursor-pointer select-none active:bg-slate-200 dark:active:bg-[#3a3a3a]"
+                className="w-5.5 h-full flex items-center justify-center text-slate-500 dark:text-slate-300 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-slate-100 dark:hover:bg-[#333333] transition-colors cursor-pointer select-none active:bg-slate-200 dark:active:bg-[#3a3a3a]"
                 title={t('reader.tooltip.fontSizeInc', '增大字号 (+1)')}
               >
-                <Plus size={10} className="stroke-[2.5]" />
+                <Plus size={12} className="stroke-[2.5]" />
               </button>
             </div>
           </div>
 
-          <div className="h-3 w-px bg-slate-300 dark:bg-[#333333]"></div>
+          <div className="h-4 w-px bg-slate-300 dark:bg-[#333333]"></div>
 
           {/* Speed Stepper (WPM) */}
-          <div className="flex items-center gap-1 shrink-0" title={`${t('reader.speed')} (${t('reader.tooltip.fontSizeAdjust', '支持点击+-或滚轮微调')})`}>
-            <Activity size={13} className="text-slate-500 shrink-0" />
-            <div className="flex items-center bg-white dark:bg-[#252525] border border-slate-300 dark:border-[#383838] rounded-md overflow-hidden shadow-2xs h-7">
+          <div className="flex items-center gap-1.5 shrink-0" title={`${t('reader.speed')} (${t('reader.tooltip.fontSizeAdjust', '支持点击+-或滚轮微调')})`}>
+            <Activity size={15} className="text-slate-600 dark:text-slate-400 shrink-0" />
+            <div className="flex items-center bg-white dark:bg-[#252525] border border-slate-300 dark:border-[#383838] rounded-lg overflow-hidden shadow-2xs h-8">
               <button
                 type="button"
                 onClick={() => setMorseSpeed(Math.max(5, morseSpeed - 1))}
-                className="w-4.5 h-full flex items-center justify-center text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-slate-100 dark:hover:bg-[#333333] transition-colors cursor-pointer select-none active:bg-slate-200 dark:active:bg-[#3a3a3a]"
+                className="w-5.5 h-full flex items-center justify-center text-slate-500 dark:text-slate-300 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-slate-100 dark:hover:bg-[#333333] transition-colors cursor-pointer select-none active:bg-slate-200 dark:active:bg-[#3a3a3a]"
                 title={t('reader.tooltip.speedDec', '减速 (-1 WPM)')}
               >
-                <Minus size={10} className="stroke-[2.5]" />
+                <Minus size={12} className="stroke-[2.5]" />
               </button>
               <input
                 type="number"
@@ -246,33 +246,33 @@ export default function ReaderHeader({
                   }
                 }}
                 onChange={(e) => setMorseSpeed(Math.max(5, Math.min(60, Number(e.target.value) || 20)))}
-                className="w-5.5 text-[11.5px] font-bold font-mono text-center bg-transparent focus:outline-hidden text-slate-800 dark:text-[#dddddd] [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none p-0 select-none"
+                className="w-6.5 text-[13.5px] font-bold font-mono tabular-nums text-center bg-transparent focus:outline-hidden text-slate-800 dark:text-[#e5e5e5] [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none p-0 select-none"
               />
               <button
                 type="button"
                 onClick={() => setMorseSpeed(Math.min(60, morseSpeed + 1))}
-                className="w-4.5 h-full flex items-center justify-center text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-slate-100 dark:hover:bg-[#333333] transition-colors cursor-pointer select-none active:bg-slate-200 dark:active:bg-[#3a3a3a]"
+                className="w-5.5 h-full flex items-center justify-center text-slate-500 dark:text-slate-300 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-slate-100 dark:hover:bg-[#333333] transition-colors cursor-pointer select-none active:bg-slate-200 dark:active:bg-[#3a3a3a]"
                 title={t('reader.tooltip.speedInc', '加速 (+1 WPM)')}
               >
-                <Plus size={10} className="stroke-[2.5]" />
+                <Plus size={12} className="stroke-[2.5]" />
               </button>
             </div>
-            <span className="text-[10.5px] text-slate-500 dark:text-slate-400 font-semibold select-none">WPM</span>
+            <span className="text-[12px] text-slate-600 dark:text-slate-300 font-semibold select-none">WPM</span>
           </div>
 
-          <div className="h-3 w-px bg-slate-300 dark:bg-[#333333]"></div>
+          <div className="h-4 w-px bg-slate-300 dark:bg-[#333333]"></div>
 
           {/* Frequency Stepper (Hz) */}
-          <div className="flex items-center gap-1 shrink-0" title={`${t('reader.freq')} (${t('reader.tooltip.fontSizeAdjust', '支持点击+-或滚轮微调')})`}>
-            <Music size={13} className="text-slate-500 shrink-0" />
-            <div className="flex items-center bg-white dark:bg-[#252525] border border-slate-300 dark:border-[#383838] rounded-md overflow-hidden shadow-2xs h-7">
+          <div className="flex items-center gap-1.5 shrink-0" title={`${t('reader.freq')} (${t('reader.tooltip.fontSizeAdjust', '支持点击+-或滚轮微调')})`}>
+            <Music size={15} className="text-slate-600 dark:text-slate-400 shrink-0" />
+            <div className="flex items-center bg-white dark:bg-[#252525] border border-slate-300 dark:border-[#383838] rounded-lg overflow-hidden shadow-2xs h-8">
               <button
                 type="button"
                 onClick={() => setMorseFreq(Math.max(100, morseFreq - 20))}
-                className="w-4.5 h-full flex items-center justify-center text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-slate-100 dark:hover:bg-[#333333] transition-colors cursor-pointer select-none active:bg-slate-200 dark:active:bg-[#3a3a3a]"
+                className="w-5.5 h-full flex items-center justify-center text-slate-500 dark:text-slate-300 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-slate-100 dark:hover:bg-[#333333] transition-colors cursor-pointer select-none active:bg-slate-200 dark:active:bg-[#3a3a3a]"
                 title={t('reader.tooltip.freqDec', '降调 (-20 Hz)')}
               >
-                <Minus size={10} className="stroke-[2.5]" />
+                <Minus size={12} className="stroke-[2.5]" />
               </button>
               <input
                 type="number"
@@ -289,21 +289,21 @@ export default function ReaderHeader({
                   }
                 }}
                 onChange={(e) => setMorseFreq(Math.max(100, Math.min(1500, Number(e.target.value) || 380)))}
-                className="w-8.5 text-[11.5px] font-bold font-mono text-center bg-transparent focus:outline-hidden text-slate-800 dark:text-[#dddddd] [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none p-0 select-none"
+                className="w-9 text-[13.5px] font-bold font-mono tabular-nums text-center bg-transparent focus:outline-hidden text-slate-800 dark:text-[#e5e5e5] [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none p-0 select-none"
               />
               <button
                 type="button"
                 onClick={() => setMorseFreq(Math.min(1500, morseFreq + 20))}
-                className="w-4.5 h-full flex items-center justify-center text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-slate-100 dark:hover:bg-[#333333] transition-colors cursor-pointer select-none active:bg-slate-200 dark:active:bg-[#3a3a3a]"
+                className="w-5.5 h-full flex items-center justify-center text-slate-500 dark:text-slate-300 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-slate-100 dark:hover:bg-[#333333] transition-colors cursor-pointer select-none active:bg-slate-200 dark:active:bg-[#3a3a3a]"
                 title={t('reader.tooltip.freqInc', '升调 (+20 Hz)')}
               >
-                <Plus size={10} className="stroke-[2.5]" />
+                <Plus size={12} className="stroke-[2.5]" />
               </button>
             </div>
-            <span className="text-[10.5px] text-slate-500 dark:text-slate-400 font-semibold select-none">Hz</span>
+            <span className="text-[12px] text-slate-600 dark:text-slate-300 font-semibold select-none">Hz</span>
           </div>
 
-          <div className="h-3 w-px bg-slate-300 dark:bg-[#333333]"></div>
+          <div className="h-4 w-px bg-slate-300 dark:bg-[#333333]"></div>
 
           {/* Number Mode Pill Dropdown (Stay outside on main toolbar) */}
           <div className="relative flex items-center shrink-0" ref={numberModeRef}>
@@ -313,14 +313,14 @@ export default function ReaderHeader({
                 setIsNumberModeOpen(!isNumberModeOpen);
                 setIsMoreMenuOpen(false);
               }}
-              className="h-7 flex items-center gap-1 px-2 rounded-md bg-white dark:bg-[#252525] border border-slate-300 dark:border-[#383838] text-slate-700 dark:text-[#cccccc] text-[11.5px] font-medium hover:border-indigo-400 dark:hover:border-indigo-500/50 hover:text-indigo-600 dark:hover:text-indigo-400 transition-all cursor-pointer whitespace-nowrap shadow-2xs"
+              className="h-8 flex items-center gap-1.5 px-2.5 rounded-lg bg-white dark:bg-[#252525] border border-slate-300 dark:border-[#383838] text-slate-700 dark:text-[#d4d4d4] text-[13px] font-medium hover:border-indigo-400 dark:hover:border-indigo-500/50 hover:text-indigo-600 dark:hover:text-indigo-400 transition-all cursor-pointer whitespace-nowrap shadow-2xs"
               title={t('reader.number.mode')}
             >
-              <Hash size={12} className="text-slate-400 shrink-0" />
+              <Hash size={14} className="text-slate-500 dark:text-slate-400 shrink-0" />
               <span>
                 {numberMode === 'long' ? t('reader.number.long') : (numberMode === 'short5' ? t('reader.number.short5') : t('reader.number.short10'))}
               </span>
-              <ChevronDown size={11} className={`opacity-60 transition-transform duration-200 ${isNumberModeOpen ? 'rotate-180' : ''}`} />
+              <ChevronDown size={13} className={`opacity-65 transition-transform duration-200 ${isNumberModeOpen ? 'rotate-180' : ''}`} />
             </button>
 
             {isNumberModeOpen && (
@@ -329,90 +329,72 @@ export default function ReaderHeader({
                   className="fixed inset-0 z-40"
                   onMouseDown={() => setIsNumberModeOpen(false)}
                 />
-                <div className="absolute top-full right-0 mt-2 w-32 bg-white dark:bg-[#1e1e1e] border border-slate-200 dark:border-[#333333] shadow-xl py-1.5 z-50 rounded-xl overflow-hidden animate-in fade-in slide-in-from-top-1 duration-150 select-none">
+                <div className="absolute top-full right-0 mt-2 w-36 bg-white dark:bg-[#1e1e1e] border border-slate-200 dark:border-[#333333] shadow-xl py-1.5 z-50 rounded-xl overflow-hidden animate-in fade-in slide-in-from-top-1 duration-150 select-none">
                   <button
                     type="button"
                     onClick={() => { setNumberMode('long'); setIsNumberModeOpen(false); }}
-                    className="w-full text-left px-3.5 py-2 hover:bg-slate-50 dark:hover:bg-[#2a2a2a] flex justify-between items-center text-[12px] text-slate-700 dark:text-[#cccccc] transition-colors cursor-pointer"
+                    className="w-full text-left px-3.5 py-2 hover:bg-slate-50 dark:hover:bg-[#2a2a2a] flex justify-between items-center text-[13px] text-slate-700 dark:text-[#d4d4d4] transition-colors cursor-pointer"
                   >
                     <span>{t('reader.number.long')}</span>
-                    {numberMode === 'long' && <Check size={13} className="text-indigo-500" />}
+                    {numberMode === 'long' && <Check size={14} className="text-indigo-500" />}
                   </button>
                   <button
                     type="button"
                     onClick={() => { setNumberMode('short5'); setIsNumberModeOpen(false); }}
-                    className="w-full text-left px-3.5 py-2 hover:bg-slate-50 dark:hover:bg-[#2a2a2a] flex justify-between items-center text-[12px] text-slate-700 dark:text-[#cccccc] transition-colors cursor-pointer"
+                    className="w-full text-left px-3.5 py-2 hover:bg-slate-50 dark:hover:bg-[#2a2a2a] flex justify-between items-center text-[13px] text-slate-700 dark:text-[#d4d4d4] transition-colors cursor-pointer"
                   >
                     <span>{t('reader.number.short5')}</span>
-                    {numberMode === 'short5' && <Check size={13} className="text-indigo-500" />}
+                    {numberMode === 'short5' && <Check size={14} className="text-indigo-500" />}
                   </button>
                   <button
                     type="button"
                     onClick={() => { setNumberMode('short10'); setIsNumberModeOpen(false); }}
-                    className="w-full text-left px-3.5 py-2 hover:bg-slate-50 dark:hover:bg-[#2a2a2a] flex justify-between items-center text-[12px] text-slate-700 dark:text-[#cccccc] transition-colors cursor-pointer"
+                    className="w-full text-left px-3.5 py-2 hover:bg-slate-50 dark:hover:bg-[#2a2a2a] flex justify-between items-center text-[13px] text-slate-700 dark:text-[#d4d4d4] transition-colors cursor-pointer"
                   >
                     <span>{t('reader.number.short10')}</span>
-                    {numberMode === 'short10' && <Check size={13} className="text-indigo-500" />}
+                    {numberMode === 'short10' && <Check size={14} className="text-indigo-500" />}
                   </button>
                 </div>
               </>
             )}
           </div>
 
-          <div className="h-3 w-px bg-slate-300 dark:bg-[#333333]"></div>
+          <div className="h-4 w-px bg-slate-300 dark:bg-[#333333]"></div>
 
           {/* Follow Training Toggle Switch (跟发训练模式轻量开关: 与目录/更多一致的淡紫优雅高亮) */}
           <button
             type="button"
             onClick={() => setIsTraining && setIsTraining(!isTraining)}
-            className={`h-7 flex items-center gap-1.5 px-2.5 rounded-md text-[11.5px] font-medium transition-all cursor-pointer whitespace-nowrap select-none border shrink-0 shadow-2xs ${isTraining
+            className={`h-8 flex items-center gap-1.5 px-2.5 rounded-lg text-[13px] font-medium transition-all cursor-pointer whitespace-nowrap select-none border shrink-0 shadow-2xs ${isTraining
                 ? 'bg-indigo-50/80 dark:bg-indigo-950/40 border-indigo-300 dark:border-indigo-800 text-indigo-600 dark:text-indigo-400 font-semibold'
-                : 'bg-white dark:bg-[#252525] border-slate-300 dark:border-[#383838] text-slate-700 dark:text-[#cccccc] hover:border-slate-400 dark:hover:border-[#4a4a4a] hover:text-slate-900 dark:hover:text-white'
+                : 'bg-white dark:bg-[#252525] border-slate-300 dark:border-[#383838] text-slate-700 dark:text-[#d4d4d4] hover:border-slate-400 dark:hover:border-[#4a4a4a] hover:text-slate-900 dark:hover:text-white'
               }`}
             title={t('reader.followTraining.desc')}
           >
             <Radio
-              size={12}
-              className={`shrink-0 transition-colors ${isTraining ? 'text-indigo-600 dark:text-indigo-400' : 'text-slate-400'
+              size={14}
+              className={`shrink-0 transition-colors ${isTraining ? 'text-indigo-600 dark:text-indigo-400' : 'text-slate-500 dark:text-slate-400'
                 }`}
             />
             <span>{t('reader.followTraining.toggle')}</span>
 
             {/* 微型开关指示器 (Micro Switch Pill) */}
             <span
-              className={`inline-flex items-center w-5 h-3 rounded-full transition-colors duration-200 p-0.5 ml-0.5 shrink-0 ${isTraining
+              className={`inline-flex items-center w-6 h-3.5 rounded-full transition-colors duration-200 p-0.5 ml-0.5 shrink-0 ${isTraining
                   ? 'bg-indigo-600 dark:bg-indigo-500'
-                  : 'bg-slate-200 dark:bg-[#444444]'
+                  : 'bg-slate-300 dark:bg-[#444444]'
                 }`}
             >
               <span
-                className={`inline-block w-2 h-2 rounded-full bg-white shadow-2xs transition-transform duration-200 ${isTraining ? 'translate-x-2' : 'translate-x-0'
+                className={`inline-block w-2.5 h-2.5 rounded-full bg-white shadow-2xs transition-transform duration-200 ${isTraining ? 'translate-x-2.5' : 'translate-x-0'
                   }`}
               />
             </span>
           </button>
-          <div className="h-3 w-px bg-slate-300 dark:bg-[#333333]"></div>
 
-          {/* Text Visibility Toggle (纯图标按钮) */}
-          <button
-            type="button"
-            onClick={() => setIsTextHidden && setIsTextHidden(!isTextHidden)}
-            className={`h-7 w-7 flex items-center justify-center rounded-md transition-all cursor-pointer select-none border shrink-0 shadow-2xs ${isTextHidden
-                ? 'bg-indigo-50/80 dark:bg-indigo-950/40 border-indigo-300 dark:border-indigo-800 text-indigo-600 dark:text-indigo-400 font-semibold'
-                : 'bg-white dark:bg-[#252525] border-slate-300 dark:border-[#383838] text-slate-500 dark:text-slate-400 hover:border-slate-400 dark:hover:border-[#4a4a4a] hover:text-slate-800 dark:hover:text-white'
-              }`}
-            title={isTextHidden ? t('reader.textVisibility.showTooltip') : t('reader.textVisibility.hideTooltip')}
-          >
-            {isTextHidden ? (
-              <EyeOff size={13} className="shrink-0" />
-            ) : (
-              <Eye size={13} className="shrink-0" />
-            )}
-          </button>
+          <div className="h-4 w-px bg-slate-300 dark:bg-[#333333]"></div>
 
-          <div className="h-3 w-px bg-slate-300 dark:bg-[#333333]"></div>
-
-          {/* More Settings Dropdown Menu (Contains Layout Mode, Harmonics, Font Selector & Markers) */}
+          {/* More Settings Dropdown Menu (Pure Icon Button on Toolbar, Contains Text Visibility, Layout Mode, Harmonics, Font Selector & Markers) */}
           <div
             className="relative flex items-center shrink-0"
             ref={moreMenuRef}
@@ -425,41 +407,73 @@ export default function ReaderHeader({
                 setIsMoreMenuOpen(!isMoreMenuOpen);
                 setIsNumberModeOpen(false);
               }}
-              className={`h-7 flex items-center gap-1.5 px-2.5 rounded-md text-[11.5px] font-medium transition-all cursor-pointer whitespace-nowrap select-none border ${isMoreMenuOpen
+              className={`relative h-8 w-8 flex items-center justify-center rounded-lg transition-all cursor-pointer select-none border shrink-0 ${isMoreMenuOpen || isTextHidden
                   ? 'bg-indigo-50 dark:bg-indigo-950/60 border-indigo-300 dark:border-indigo-700 text-indigo-600 dark:text-indigo-300 font-semibold shadow-2xs'
-                  : 'bg-white dark:bg-[#252525] border-slate-300 dark:border-[#383838] text-slate-600 dark:text-slate-400 hover:border-slate-400 dark:hover:border-[#4a4a4a] hover:text-slate-800 dark:hover:text-[#dddddd] shadow-2xs'
+                  : 'bg-white dark:bg-[#252525] border-slate-300 dark:border-[#383838] text-slate-600 dark:text-slate-300 hover:border-slate-400 dark:hover:border-[#4a4a4a] hover:text-slate-900 dark:hover:text-white shadow-2xs'
                 }`}
               title={t('reader.more')}
+              aria-label={t('reader.more')}
             >
-              <SlidersHorizontal size={12} className={isMoreMenuOpen ? "text-indigo-500 shrink-0" : "text-slate-400 shrink-0"} />
-              <span>{t('reader.more')}</span>
-              <ChevronDown size={11} className={`opacity-60 transition-transform duration-200 ${isMoreMenuOpen ? 'rotate-180' : ''}`} />
+              <SlidersHorizontal size={15} className={isMoreMenuOpen || isTextHidden ? "text-indigo-600 dark:text-indigo-400 shrink-0" : "text-slate-600 dark:text-slate-300 shrink-0"} />
+              {(isTextHidden || interferenceLevel > 0) && !isMoreMenuOpen && (
+                <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-indigo-600 dark:bg-indigo-400 ring-2 ring-white dark:ring-[#181818]" />
+              )}
             </button>
 
             {isMoreMenuOpen && (
               <div
-                className="absolute top-full right-0 mt-1.5 w-64 bg-white/95 dark:bg-[#1c1c1c]/95 backdrop-blur-md border border-slate-200 dark:border-[#333333] shadow-2xl rounded-xl p-2 z-50 animate-in fade-in slide-in-from-top-1 duration-150 select-none text-slate-800 dark:text-slate-200 space-y-1 before:absolute before:-top-2 before:left-0 before:right-0 before:h-2"
+                className="absolute top-full right-0 mt-1.5 w-72 bg-white/95 dark:bg-[#1c1c1c]/95 backdrop-blur-md border border-slate-200 dark:border-[#333333] shadow-2xl rounded-xl p-2.5 z-50 animate-in fade-in slide-in-from-top-1 duration-150 select-none text-slate-800 dark:text-slate-200 space-y-1.5 before:absolute before:-top-2 before:left-0 before:right-0 before:h-2"
                 onMouseEnter={handleMoreMenuMouseEnter}
                 onMouseLeave={handleMoreMenuMouseLeave}
               >
 
+                {/* Row 0: Text Visibility Toggle (隐藏正文 / 盲听防偷瞄) */}
+                {setIsTextHidden && (
+                  <div
+                    className="flex items-center justify-between py-1.5 px-2 rounded-lg hover:bg-slate-50 dark:hover:bg-[#252525]/60 transition-colors"
+                    title={isTextHidden ? t('reader.textVisibility.showTooltip') : t('reader.textVisibility.hideTooltip')}
+                  >
+                    <div className="flex items-center gap-2">
+                      {isTextHidden ? (
+                        <EyeOff size={14} className="text-indigo-600 dark:text-indigo-400 shrink-0" />
+                      ) : (
+                        <Eye size={14} className="text-slate-400 shrink-0" />
+                      )}
+                      <span className="text-[13px] text-slate-700 dark:text-slate-200 font-medium">
+                        {t('reader.textVisibility.hide', '隐藏正文')}
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setIsTextHidden(!isTextHidden)}
+                      className={`h-5 w-9 shrink-0 rounded-full transition-colors relative cursor-pointer ${isTextHidden ? 'bg-indigo-600' : 'bg-slate-300 dark:bg-[#3e3e3e]'
+                        }`}
+                    >
+                      <span
+                        className={`absolute top-0.5 left-0.5 h-4 w-4 rounded-full bg-white transition-transform shadow-xs ${isTextHidden ? 'translate-x-4' : 'translate-x-0'
+                          }`}
+                      />
+                    </button>
+                  </div>
+                )}
+
                 {/* Row 1: Radio Harmonics Switch */}
                 {setUseHarmonics && (
-                  <div className="flex items-center justify-between py-1 px-1.5 rounded-lg hover:bg-slate-50 dark:hover:bg-[#252525]/60 transition-colors">
-                    <div className="flex items-center gap-1.5">
-                      <Radio size={13} className={useHarmonics ? "text-indigo-600 dark:text-indigo-400" : "text-slate-400"} />
-                      <span className="text-[12px] text-slate-700 dark:text-slate-300 font-medium">
+                  <div className="flex items-center justify-between py-1.5 px-2 rounded-lg hover:bg-slate-50 dark:hover:bg-[#252525]/60 transition-colors">
+                    <div className="flex items-center gap-2">
+                      <Radio size={14} className={useHarmonics ? "text-indigo-600 dark:text-indigo-400" : "text-slate-400"} />
+                      <span className="text-[13px] text-slate-700 dark:text-slate-200 font-medium">
                         {t('reader.harmonics.short')}
                       </span>
                     </div>
                     <button
                       type="button"
                       onClick={() => setUseHarmonics(!useHarmonics)}
-                      className={`h-4.5 w-8 shrink-0 rounded-full transition-colors relative cursor-pointer ${useHarmonics ? 'bg-indigo-600' : 'bg-slate-300 dark:bg-[#3e3e3e]'
+                      className={`h-5 w-9 shrink-0 rounded-full transition-colors relative cursor-pointer ${useHarmonics ? 'bg-indigo-600' : 'bg-slate-300 dark:bg-[#3e3e3e]'
                         }`}
                     >
                       <span
-                        className={`absolute top-0.5 left-0.5 h-3.5 w-3.5 rounded-full bg-white transition-transform shadow-xs ${useHarmonics ? 'translate-x-3.5' : 'translate-x-0'
+                        className={`absolute top-0.5 left-0.5 h-4 w-4 rounded-full bg-white transition-transform shadow-xs ${useHarmonics ? 'translate-x-4' : 'translate-x-0'
                           }`}
                       />
                     </button>
@@ -468,17 +482,17 @@ export default function ReaderHeader({
 
                 {/* Row 2: Radio Interference (QRN/QRM) Slider & Progress */}
                 {setInterferenceLevel && (
-                  <div className="py-2 px-2 rounded-lg bg-slate-50/80 dark:bg-[#232323]/80 border border-slate-200/70 dark:border-[#2f2f2f] transition-all space-y-1.5">
+                  <div className="py-2 px-2.5 rounded-lg bg-slate-50/80 dark:bg-[#232323]/80 border border-slate-200/70 dark:border-[#2f2f2f] transition-all space-y-2">
                     <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-1.5">
-                        <Radio size={13} className={interferenceLevel > 0 ? "text-indigo-600 dark:text-indigo-400" : "text-slate-400"} />
-                        <span className="text-[12px] text-slate-700 dark:text-slate-300 font-medium">
+                      <div className="flex items-center gap-2">
+                        <Radio size={14} className={interferenceLevel > 0 ? "text-indigo-600 dark:text-indigo-400" : "text-slate-400"} />
+                        <span className="text-[13px] text-slate-700 dark:text-slate-200 font-medium">
                           {t('reader.interference.short', '通联干扰')}
                         </span>
                       </div>
-                      <div className="flex items-center gap-1">
-                        <span className={`text-[10.5px] font-mono font-bold px-1.5 py-0.2 rounded transition-colors ${interferenceLevel === 0
-                            ? 'text-slate-400 bg-slate-100 dark:bg-[#282828]'
+                      <div className="flex items-center gap-1.5">
+                        <span className={`text-[11.5px] font-mono font-bold px-1.5 py-0.5 rounded transition-colors ${interferenceLevel === 0
+                            ? 'text-slate-500 bg-slate-100 dark:bg-[#282828]'
                             : 'text-indigo-600 dark:text-indigo-300 bg-indigo-50 dark:bg-indigo-950/60 border border-indigo-200/60 dark:border-indigo-800/50'
                           }`}>
                           {interferenceLevel === 0 ? t('reader.interference.clean', '纯净') : `${interferenceLevel}%`}
@@ -490,7 +504,7 @@ export default function ReaderHeader({
                               e.stopPropagation();
                               setInterferenceLevel(0);
                             }}
-                            className="text-[10px] text-slate-400 hover:text-rose-500 dark:hover:text-rose-400 px-1 rounded hover:bg-slate-200 dark:hover:bg-[#333333] transition-colors cursor-pointer"
+                            className="text-[11px] text-slate-400 hover:text-rose-500 dark:hover:text-rose-400 px-1 rounded hover:bg-slate-200 dark:hover:bg-[#333333] transition-colors cursor-pointer"
                             title={t('reader.interference.clean', '重置为 0%')}
                           >
                             ✕
@@ -516,7 +530,7 @@ export default function ReaderHeader({
                             setInterferenceLevel(Math.max(0, interferenceLevel - 5));
                           }
                         }}
-                        className="w-full h-1.5 bg-slate-200 dark:bg-[#333333] rounded-lg appearance-none cursor-pointer accent-indigo-600 dark:accent-indigo-500 focus:outline-hidden"
+                        className="w-full h-2 bg-slate-200 dark:bg-[#333333] rounded-lg appearance-none cursor-pointer accent-indigo-600 dark:accent-indigo-500 focus:outline-hidden"
                         style={{
                           background: `linear-gradient(to right, ${interferenceLevel > 75 ? '#f43f5e' : '#6366f1'
                             } ${interferenceLevel}%, rgba(148, 163, 184, 0.25) ${interferenceLevel}%)`
@@ -525,7 +539,7 @@ export default function ReaderHeader({
                     </div>
 
                     {/* Subtle scale indicators */}
-                    <div className="flex justify-between items-center text-[10px] text-slate-400 dark:text-slate-500 px-0.5">
+                    <div className="flex justify-between items-center text-[11px] text-slate-500 dark:text-slate-400 px-0.5">
                       <span className={interferenceLevel === 0 ? 'text-indigo-600 dark:text-indigo-400 font-bold' : ''}>
                         0%
                       </span>
@@ -542,67 +556,67 @@ export default function ReaderHeader({
 
                     {/* Sub-mode selector pills (底噪, QSB, QRH, QRM) */}
                     {interferenceLevel > 0 && toggleInterferenceMode && (
-                      <div className="pt-1.5 grid grid-cols-2 gap-1 border-t border-slate-200/60 dark:border-[#2d2d2d] select-none">
+                      <div className="pt-1.5 grid grid-cols-2 gap-1.5 border-t border-slate-200/60 dark:border-[#2d2d2d] select-none">
                         <button
                           type="button"
                           onClick={() => toggleInterferenceMode('noise')}
-                          className={`flex items-center justify-between px-2 py-1 rounded-md text-[11px] transition-all cursor-pointer border ${interferenceModes?.noise
+                          className={`flex items-center justify-between px-2.5 py-1.5 rounded-md text-[12px] transition-all cursor-pointer border ${interferenceModes?.noise
                               ? 'bg-indigo-50/80 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 border-indigo-200/80 dark:border-indigo-800/60 font-semibold shadow-2xs hover:bg-indigo-100/70 dark:hover:bg-indigo-900/50'
-                              : 'bg-slate-100/60 dark:bg-[#1e1e1e]/60 text-slate-400 dark:text-slate-500 border-slate-200/50 dark:border-[#2d2d2d] hover:bg-slate-100 dark:hover:bg-[#272727] hover:text-slate-600 dark:hover:text-slate-400'
+                              : 'bg-slate-100/60 dark:bg-[#1e1e1e]/60 text-slate-500 dark:text-slate-400 border-slate-200/50 dark:border-[#2d2d2d] hover:bg-slate-100 dark:hover:bg-[#272727] hover:text-slate-700 dark:hover:text-slate-300'
                             }`}
                           title={t('reader.interference.mode.noiseDesc', '电离层窄带背景噪声与雷电瞬态')}
                         >
                           <span>{t('reader.interference.mode.noise', '底噪 (QRN)')}</span>
-                          <span className={`h-1.5 w-1.5 rounded-full transition-colors ${interferenceModes?.noise ? 'bg-indigo-600 dark:bg-indigo-400 shadow-xs shadow-indigo-500/50' : 'bg-slate-300 dark:bg-[#3d3d3d]'}`} />
+                          <span className={`h-2 w-2 rounded-full transition-colors ${interferenceModes?.noise ? 'bg-indigo-600 dark:bg-indigo-400 shadow-xs shadow-indigo-500/50' : 'bg-slate-300 dark:bg-[#3d3d3d]'}`} />
                         </button>
 
                         <button
                           type="button"
                           onClick={() => toggleInterferenceMode('qsb')}
-                          className={`flex items-center justify-between px-2 py-1 rounded-md text-[11px] transition-all cursor-pointer border ${interferenceModes?.qsb
+                          className={`flex items-center justify-between px-2.5 py-1.5 rounded-md text-[12px] transition-all cursor-pointer border ${interferenceModes?.qsb
                               ? 'bg-indigo-50/80 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 border-indigo-200/80 dark:border-indigo-800/60 font-semibold shadow-2xs hover:bg-indigo-100/70 dark:hover:bg-indigo-900/50'
-                              : 'bg-slate-100/60 dark:bg-[#1e1e1e]/60 text-slate-400 dark:text-slate-500 border-slate-200/50 dark:border-[#2d2d2d] hover:bg-slate-100 dark:hover:bg-[#272727] hover:text-slate-600 dark:hover:text-slate-400'
+                              : 'bg-slate-100/60 dark:bg-[#1e1e1e]/60 text-slate-500 dark:text-slate-400 border-slate-200/50 dark:border-[#2d2d2d] hover:bg-slate-100 dark:hover:bg-[#272727] hover:text-slate-700 dark:hover:text-slate-300'
                             }`}
                           title={t('reader.interference.mode.qsbDesc', '信号周期性忽大忽小自然衰落')}
                         >
                           <span>{t('reader.interference.mode.qsb', '衰落 (QSB)')}</span>
-                          <span className={`h-1.5 w-1.5 rounded-full transition-colors ${interferenceModes?.qsb ? 'bg-indigo-600 dark:bg-indigo-400 shadow-xs shadow-indigo-500/50' : 'bg-slate-300 dark:bg-[#3d3d3d]'}`} />
+                          <span className={`h-2 w-2 rounded-full transition-colors ${interferenceModes?.qsb ? 'bg-indigo-600 dark:bg-indigo-400 shadow-xs shadow-indigo-500/50' : 'bg-slate-300 dark:bg-[#3d3d3d]'}`} />
                         </button>
 
                         <button
                           type="button"
                           onClick={() => toggleInterferenceMode('qrh')}
-                          className={`flex items-center justify-between px-2 py-1 rounded-md text-[11px] transition-all cursor-pointer border ${interferenceModes?.qrh
+                          className={`flex items-center justify-between px-2.5 py-1.5 rounded-md text-[12px] transition-all cursor-pointer border ${interferenceModes?.qrh
                               ? 'bg-indigo-50/80 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 border-indigo-200/80 dark:border-indigo-800/60 font-semibold shadow-2xs hover:bg-indigo-100/70 dark:hover:bg-indigo-900/50'
-                              : 'bg-slate-100/60 dark:bg-[#1e1e1e]/60 text-slate-400 dark:text-slate-500 border-slate-200/50 dark:border-[#2d2d2d] hover:bg-slate-100 dark:hover:bg-[#272727] hover:text-slate-600 dark:hover:text-slate-400'
+                              : 'bg-slate-100/60 dark:bg-[#1e1e1e]/60 text-slate-500 dark:text-slate-400 border-slate-200/50 dark:border-[#2d2d2d] hover:bg-slate-100 dark:hover:bg-[#272727] hover:text-slate-700 dark:hover:text-slate-300'
                             }`}
                           title={t('reader.interference.mode.qrhDesc', '老式发报机真空管温漂与变调')}
                         >
                           <span>{t('reader.interference.mode.qrh', '频漂 (QRH)')}</span>
-                          <span className={`h-1.5 w-1.5 rounded-full transition-colors ${interferenceModes?.qrh ? 'bg-indigo-600 dark:bg-indigo-400 shadow-xs shadow-indigo-500/50' : 'bg-slate-300 dark:bg-[#3d3d3d]'}`} />
+                          <span className={`h-2 w-2 rounded-full transition-colors ${interferenceModes?.qrh ? 'bg-indigo-600 dark:bg-indigo-400 shadow-xs shadow-indigo-500/50' : 'bg-slate-300 dark:bg-[#3d3d3d]'}`} />
                         </button>
 
                         <button
                           type="button"
                           onClick={() => toggleInterferenceMode('qrm')}
-                          className={`flex items-center justify-between px-2 py-1 rounded-md text-[11px] transition-all cursor-pointer border ${interferenceModes?.qrm
+                          className={`flex items-center justify-between px-2.5 py-1.5 rounded-md text-[12px] transition-all cursor-pointer border ${interferenceModes?.qrm
                               ? 'bg-indigo-50/80 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 border-indigo-200/80 dark:border-indigo-800/60 font-semibold shadow-2xs hover:bg-indigo-100/70 dark:hover:bg-indigo-900/50'
-                              : 'bg-slate-100/60 dark:bg-[#1e1e1e]/60 text-slate-400 dark:text-slate-500 border-slate-200/50 dark:border-[#2d2d2d] hover:bg-slate-100 dark:hover:bg-[#272727] hover:text-slate-600 dark:hover:text-slate-400'
+                              : 'bg-slate-100/60 dark:bg-[#1e1e1e]/60 text-slate-500 dark:text-slate-400 border-slate-200/50 dark:border-[#2d2d2d] hover:bg-slate-100 dark:hover:bg-[#272727] hover:text-slate-700 dark:hover:text-slate-300'
                             }`}
                           title={t('reader.interference.mode.qrmDesc', '邻近频点其他电台的弱呼叫干扰')}
                         >
                           <span>{t('reader.interference.mode.qrm', '邻台 (QRM)')}</span>
-                          <span className={`h-1.5 w-1.5 rounded-full transition-colors ${interferenceModes?.qrm ? 'bg-indigo-600 dark:bg-indigo-400 shadow-xs shadow-indigo-500/50' : 'bg-slate-300 dark:bg-[#3d3d3d]'}`} />
+                          <span className={`h-2 w-2 rounded-full transition-colors ${interferenceModes?.qrm ? 'bg-indigo-600 dark:bg-indigo-400 shadow-xs shadow-indigo-500/50' : 'bg-slate-300 dark:bg-[#3d3d3d]'}`} />
                         </button>
                       </div>
                     )}
                   </div>
                 )}
 
-                {/* Row 2: Layout Mode Segmented Control */}
+                {/* Row 3: Layout Mode Segmented Control */}
                 {setViewMode && (
-                  <div className="flex items-center justify-between py-1 px-1.5 rounded-lg hover:bg-slate-50 dark:hover:bg-[#252525]/60 transition-colors">
-                    <span className="text-[12px] text-slate-700 dark:text-slate-300 font-medium">
+                  <div className="flex items-center justify-between py-1.5 px-2 rounded-lg hover:bg-slate-50 dark:hover:bg-[#252525]/60 transition-colors">
+                    <span className="text-[13px] text-slate-700 dark:text-slate-200 font-medium">
                       {t('reader.more.layout')}
                     </span>
                     <div className="flex items-center p-0.5 rounded-lg bg-slate-100 dark:bg-[#252525] border border-slate-200/80 dark:border-[#333333]">
@@ -610,9 +624,9 @@ export default function ReaderHeader({
                         type="button"
                         onClick={() => { if (isGridEligible) setViewMode('grid'); }}
                         disabled={!isGridEligible}
-                        className={`px-2 py-0.5 text-[11px] font-medium rounded-md transition-all cursor-pointer ${viewMode === 'grid' && isGridEligible
+                        className={`px-2.5 py-1 text-[12px] font-medium rounded-md transition-all cursor-pointer ${viewMode === 'grid' && isGridEligible
                             ? 'bg-white dark:bg-[#383838] text-indigo-600 dark:text-indigo-400 shadow-2xs font-semibold'
-                            : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
+                            : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
                           } ${!isGridEligible ? 'opacity-40 cursor-not-allowed' : ''}`}
                       >
                         {t('reader.view.grid')}
@@ -620,9 +634,9 @@ export default function ReaderHeader({
                       <button
                         type="button"
                         onClick={() => setViewMode('text')}
-                        className={`px-2 py-0.5 text-[11px] font-medium rounded-md transition-all cursor-pointer ${viewMode === 'text'
+                        className={`px-2.5 py-1 text-[12px] font-medium rounded-md transition-all cursor-pointer ${viewMode === 'text'
                             ? 'bg-white dark:bg-[#383838] text-indigo-600 dark:text-indigo-400 shadow-2xs font-semibold'
-                            : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
+                            : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
                           }`}
                       >
                         {t('reader.view.text')}
@@ -631,7 +645,7 @@ export default function ReaderHeader({
                   </div>
                 )}
 
-                {/* Row 3: Font Family Flyout Submenu */}
+                {/* Row 4: Font Family Flyout Submenu */}
                 {setFontFamily && (
                   <div
                     className="relative"
@@ -641,26 +655,26 @@ export default function ReaderHeader({
                     <button
                       type="button"
                       onClick={() => setIsFontSubmenuOpen(!isFontSubmenuOpen)}
-                      className={`w-full flex items-center justify-between py-1 px-1.5 rounded-lg transition-colors cursor-pointer ${isFontSubmenuOpen
+                      className={`w-full flex items-center justify-between py-1.5 px-2 rounded-lg transition-colors cursor-pointer ${isFontSubmenuOpen
                           ? 'bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 font-medium'
-                          : 'hover:bg-slate-50 dark:hover:bg-[#252525]/60 text-slate-700 dark:text-slate-300'
+                          : 'hover:bg-slate-50 dark:hover:bg-[#252525]/60 text-slate-700 dark:text-slate-200'
                         }`}
                     >
-                      <span className="text-[12px] font-medium">
+                      <span className="text-[13px] font-medium">
                         {t('reader.more.font')}
                       </span>
                       <div className="flex items-center gap-1">
-                        <span className="text-[11px] text-slate-400 dark:text-slate-500 font-mono">
+                        <span className="text-[12px] text-slate-500 dark:text-slate-400 font-mono">
                           {availableFonts.find(f => f.id === fontFamily)?.shortName || fontFamily}
                         </span>
-                        <ChevronRight size={13} className="text-slate-400 opacity-70" />
+                        <ChevronRight size={14} className="text-slate-400 opacity-75" />
                       </div>
                     </button>
 
                     {/* Font Flyout Submenu to the Left */}
                     {isFontSubmenuOpen && (
                       <div
-                        className="absolute right-full top-0 mr-1.5 w-max min-w-[180px] flex flex-col gap-0.5 p-1.5 bg-white/98 dark:bg-[#1e1e1e]/98 backdrop-blur-md border border-slate-200 dark:border-[#333333] rounded-xl shadow-2xl z-50 animate-in fade-in zoom-in-95 duration-100 select-none text-slate-800 dark:text-slate-200 before:absolute before:-right-2 before:top-0 before:bottom-0 before:w-2"
+                        className="absolute right-full top-0 mr-1.5 w-max min-w-[190px] flex flex-col gap-0.5 p-1.5 bg-white/98 dark:bg-[#1e1e1e]/98 backdrop-blur-md border border-slate-200 dark:border-[#333333] rounded-xl shadow-2xl z-50 animate-in fade-in zoom-in-95 duration-100 select-none text-slate-800 dark:text-slate-200 before:absolute before:-right-2 before:top-0 before:bottom-0 before:w-2"
                         onMouseEnter={() => {
                           handleMoreMenuMouseEnter();
                           handleFontMouseEnter();
@@ -670,7 +684,7 @@ export default function ReaderHeader({
                           handleMoreMenuMouseLeave();
                         }}
                       >
-                        <div className="px-2 py-1 text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
+                        <div className="px-2.5 py-1 text-[11px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
                           {t('reader.more.font')}
                         </div>
                         {availableFonts.map((font) => {
@@ -683,19 +697,19 @@ export default function ReaderHeader({
                                 setFontFamily(font.id);
                                 setIsFontSubmenuOpen(false);
                               }}
-                              className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-left transition-all cursor-pointer ${isSelected
+                              className={`w-full flex items-center justify-between px-2.5 py-2 rounded-lg text-left transition-all cursor-pointer ${isSelected
                                   ? 'bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 font-semibold'
                                   : 'text-slate-700 dark:text-slate-300 hover:bg-slate-100/80 dark:hover:bg-[#282828]'
                                 }`}
                             >
                               <span
-                                className="text-[12px]"
+                                className="text-[13px]"
                                 style={{ fontFamily: font.fontFamily }}
                               >
                                 {font.shortName}
                               </span>
                               {isSelected && (
-                                <Check size={13} className="text-indigo-600 dark:text-indigo-400 ml-2 shrink-0" />
+                                <Check size={14} className="text-indigo-600 dark:text-indigo-400 ml-2 shrink-0" />
                               )}
                             </button>
                           );
@@ -710,32 +724,32 @@ export default function ReaderHeader({
                   <div className="h-px bg-slate-100 dark:bg-[#282828] my-1" />
                 )}
 
-                {/* Row 4: Transmission Markers Enable Toggle */}
+                {/* Row 5: Transmission Markers Enable Toggle */}
                 {setEnableMarkers && (
                   <div className="space-y-1">
-                    <div className="flex items-center justify-between py-1 px-1.5 rounded-lg hover:bg-slate-50 dark:hover:bg-[#252525]/60 transition-colors">
-                      <span className="text-[12px] text-slate-700 dark:text-slate-300 font-medium">
+                    <div className="flex items-center justify-between py-1.5 px-2 rounded-lg hover:bg-slate-50 dark:hover:bg-[#252525]/60 transition-colors">
+                      <span className="text-[13px] text-slate-700 dark:text-slate-200 font-medium">
                         {t('reader.markers.title')}
                       </span>
                       <button
                         type="button"
                         onClick={() => setEnableMarkers(!enableMarkers)}
-                        className={`h-4.5 w-8 shrink-0 rounded-full transition-colors relative cursor-pointer ${enableMarkers ? 'bg-indigo-600' : 'bg-slate-300 dark:bg-[#3e3e3e]'
+                        className={`h-5 w-9 shrink-0 rounded-full transition-colors relative cursor-pointer ${enableMarkers ? 'bg-indigo-600' : 'bg-slate-300 dark:bg-[#3e3e3e]'
                           }`}
                       >
                         <span
-                          className={`absolute top-0.5 left-0.5 h-3.5 w-3.5 rounded-full bg-white transition-transform shadow-xs ${enableMarkers ? 'translate-x-3.5' : 'translate-x-0'
+                          className={`absolute top-0.5 left-0.5 h-4 w-4 rounded-full bg-white transition-transform shadow-xs ${enableMarkers ? 'translate-x-4' : 'translate-x-0'
                             }`}
                         />
                       </button>
                     </div>
 
-                    {/* Row 5 & 6: Prefix & Suffix Single Compact Input Rows (No Pills, 0 Horizontal Scrollbar) */}
+                    {/* Row 6 & 7: Prefix & Suffix Single Compact Input Rows (No Pills, 0 Horizontal Scrollbar) */}
                     {enableMarkers && (
-                      <div className="space-y-1 pt-0.5">
+                      <div className="space-y-1.5 pt-0.5">
                         {/* Prefix Single Row */}
-                        <div className="flex items-center justify-between py-0.5 px-1.5 rounded-lg hover:bg-slate-50 dark:hover:bg-[#252525]/60 transition-colors">
-                          <span className="text-[11px] text-slate-500 dark:text-slate-400">
+                        <div className="flex items-center justify-between py-0.5 px-2 rounded-lg hover:bg-slate-50 dark:hover:bg-[#252525]/60 transition-colors">
+                          <span className="text-[12px] text-slate-600 dark:text-slate-400">
                             {t('reader.markers.prefix')}
                           </span>
                           <input
@@ -743,13 +757,13 @@ export default function ReaderHeader({
                             value={prefixMarker || ''}
                             onChange={(e) => setPrefixMarker && setPrefixMarker(e.target.value)}
                             placeholder="=== / KA"
-                            className="w-24 h-6 px-2 text-[11.5px] font-mono text-right rounded-md bg-slate-100 dark:bg-[#252525] border border-slate-200/80 dark:border-[#333333] text-slate-800 dark:text-slate-200 focus:outline-hidden focus:border-indigo-500 shadow-2xs transition-all"
+                            className="w-28 h-7 px-2.5 text-[12.5px] font-mono text-right rounded-md bg-slate-100 dark:bg-[#252525] border border-slate-200/80 dark:border-[#333333] text-slate-800 dark:text-slate-200 focus:outline-hidden focus:border-indigo-500 shadow-2xs transition-all"
                           />
                         </div>
 
                         {/* Suffix Single Row */}
-                        <div className="flex items-center justify-between py-0.5 px-1.5 rounded-lg hover:bg-slate-50 dark:hover:bg-[#252525]/60 transition-colors">
-                          <span className="text-[11px] text-slate-500 dark:text-slate-400">
+                        <div className="flex items-center justify-between py-0.5 px-2 rounded-lg hover:bg-slate-50 dark:hover:bg-[#252525]/60 transition-colors">
+                          <span className="text-[12px] text-slate-600 dark:text-slate-400">
                             {t('reader.markers.suffix')}
                           </span>
                           <input
@@ -757,7 +771,7 @@ export default function ReaderHeader({
                             value={suffixMarker || ''}
                             onChange={(e) => setSuffixMarker && setSuffixMarker(e.target.value)}
                             placeholder="iii + / AR"
-                            className="w-24 h-6 px-2 text-[11.5px] font-mono text-right rounded-md bg-slate-100 dark:bg-[#252525] border border-slate-200/80 dark:border-[#333333] text-slate-800 dark:text-slate-200 focus:outline-hidden focus:border-indigo-500 shadow-2xs transition-all"
+                            className="w-28 h-7 px-2.5 text-[12.5px] font-mono text-right rounded-md bg-slate-100 dark:bg-[#252525] border border-slate-200/80 dark:border-[#333333] text-slate-800 dark:text-slate-200 focus:outline-hidden focus:border-indigo-500 shadow-2xs transition-all"
                           />
                         </div>
                       </div>
@@ -770,7 +784,7 @@ export default function ReaderHeader({
                   <div className="h-px bg-slate-100 dark:bg-[#282828] my-1" />
                 )}
 
-                {/* Row 7: Export Morse Audio Action inside More Menu */}
+                {/* Row 8: Export Morse Audio Action inside More Menu */}
                 {onExportAudio && (
                   <button
                     type="button"
@@ -779,34 +793,34 @@ export default function ReaderHeader({
                       onExportAudio();
                     }}
                     disabled={isExportingAudio}
-                    className={`w-full flex items-center justify-between py-1.5 px-2 rounded-lg transition-all cursor-pointer select-none border text-left ${
+                    className={`w-full flex items-center justify-between py-2 px-2.5 rounded-lg transition-all cursor-pointer select-none border text-left ${
                       audioExportSuccess
                         ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800/60 font-semibold shadow-2xs'
                         : isExportingAudio
                         ? 'bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-300 border-indigo-200 dark:border-indigo-800 font-medium animate-pulse'
-                        : 'bg-slate-50/60 dark:bg-[#232323]/60 hover:bg-slate-100 dark:hover:bg-[#282828] text-slate-700 dark:text-slate-300 border-slate-200/60 dark:border-[#2f2f2f]'
+                        : 'bg-slate-50/60 dark:bg-[#232323]/60 hover:bg-slate-100 dark:hover:bg-[#282828] text-slate-700 dark:text-slate-200 border-slate-200/60 dark:border-[#2f2f2f]'
                     }`}
                     title={t('reader.exportAudio', '导出音频 (WAV/LRC)')}
                   >
                     <div className="flex items-center gap-2 min-w-0">
-                      <Download size={13} className={audioExportSuccess ? "text-emerald-600 dark:text-emerald-400 shrink-0" : isExportingAudio ? "text-indigo-600 shrink-0" : "text-slate-500 dark:text-slate-400 shrink-0"} />
+                      <Download size={14} className={audioExportSuccess ? "text-emerald-600 dark:text-emerald-400 shrink-0" : isExportingAudio ? "text-indigo-600 shrink-0" : "text-slate-500 dark:text-slate-400 shrink-0"} />
                       <div className="flex flex-col min-w-0">
-                        <span className="text-[12px] font-medium leading-tight truncate">
+                        <span className="text-[13px] font-medium leading-tight truncate">
                           {isExportingAudio
                             ? t('reader.exportingAudio', '正在导出音频...')
                             : audioExportSuccess
                             ? t('reader.exportAudioSuccess', '导出成功 (WAV/LRC)')
                             : t('reader.exportAudio', '导出音频 (WAV/LRC)')}
                         </span>
-                        <span className="text-[10px] text-slate-400 dark:text-slate-500 leading-tight mt-0.5 truncate">
+                        <span className="text-[11px] text-slate-500 dark:text-slate-400 leading-tight mt-0.5 truncate">
                           {t('generator.ready.wavDesc', '离线 PCM 无损音频 (+LRC)')}
                         </span>
                       </div>
                     </div>
                     {audioExportSuccess ? (
-                      <Check size={14} className="text-emerald-600 dark:text-emerald-400 shrink-0 stroke-[2.5]" />
+                      <Check size={15} className="text-emerald-600 dark:text-emerald-400 shrink-0 stroke-[2.5]" />
                     ) : (
-                      <span className="text-[10px] font-mono font-semibold px-1.5 py-0.5 rounded bg-slate-100 dark:bg-[#2d2d2d] text-slate-500 dark:text-slate-400 shrink-0 ml-1">
+                      <span className="text-[11px] font-mono font-semibold px-1.5 py-0.5 rounded bg-slate-100 dark:bg-[#2d2d2d] text-slate-600 dark:text-slate-300 shrink-0 ml-1">
                         WAV
                       </span>
                     )}
@@ -826,10 +840,10 @@ export default function ReaderHeader({
           <button
             onClick={() => { stopPlay(); onRegenerate(); }}
             disabled={isPlaying}
-            className="h-8 w-8 rounded-lg font-medium flex items-center justify-center shrink-0 transition-all border border-slate-300/80 dark:border-[#383838] bg-white dark:bg-[#1f1f1f] hover:bg-slate-50 dark:hover:bg-[#282828] text-slate-600 dark:text-[#cccccc] disabled:opacity-30 disabled:pointer-events-none shadow-2xs active:scale-95 cursor-pointer whitespace-nowrap"
+            className="h-9 w-9 rounded-lg font-medium flex items-center justify-center shrink-0 transition-all border border-slate-300/90 dark:border-[#383838] bg-white dark:bg-[#1f1f1f] hover:bg-slate-50 dark:hover:bg-[#282828] text-slate-600 dark:text-[#d4d4d4] disabled:opacity-30 disabled:pointer-events-none shadow-2xs active:scale-95 cursor-pointer whitespace-nowrap"
             title={t('reader.regenerate')}
           >
-            <RefreshCw size={14} />
+            <RefreshCw size={15} />
           </button>
         )}
 
@@ -837,13 +851,13 @@ export default function ReaderHeader({
         <button
           onClick={stopPlay}
           disabled={!isPlaying}
-          className={`h-8 w-8 rounded-lg font-medium flex items-center justify-center shrink-0 transition-all border whitespace-nowrap ${isPlaying
-              ? 'border-slate-300/80 dark:border-[#383838] bg-white dark:bg-[#202020] text-slate-500 dark:text-slate-400 hover:text-rose-500 dark:hover:text-rose-400 hover:border-rose-300 dark:hover:border-rose-800/60 hover:bg-rose-50/50 dark:hover:bg-rose-950/30 shadow-2xs active:scale-95 cursor-pointer'
+          className={`h-9 w-9 rounded-lg font-medium flex items-center justify-center shrink-0 transition-all border whitespace-nowrap ${isPlaying
+              ? 'border-slate-300/90 dark:border-[#383838] bg-white dark:bg-[#202020] text-slate-600 dark:text-slate-300 hover:text-rose-500 dark:hover:text-rose-400 hover:border-rose-300 dark:hover:border-rose-800/60 hover:bg-rose-50/50 dark:hover:bg-rose-950/30 shadow-2xs active:scale-95 cursor-pointer'
               : 'border-slate-200 dark:border-[#2d2d2d] bg-slate-100/50 dark:bg-[#181818] text-slate-300 dark:text-[#444444] opacity-50 cursor-not-allowed pointer-events-none'
             }`}
           title={t('reader.stop')}
         >
-          <Square size={13} className="fill-current" />
+          <Square size={14} className="fill-current" />
         </button>
 
         {/* Primary Play / Pause / Resume Button */}
@@ -851,7 +865,7 @@ export default function ReaderHeader({
           type="button"
           onMouseDown={(e) => e.preventDefault()}
           onClick={togglePlay}
-          className={`h-8 px-3 min-w-[78px] sm:min-w-[84px] rounded-lg font-medium flex items-center justify-center gap-1.5 shrink-0 transition-all shadow-xs active:scale-95 cursor-pointer select-none text-[12.5px] whitespace-nowrap ${isPlaying && !isPaused
+          className={`h-9 px-3.5 min-w-[80px] sm:min-w-[88px] rounded-lg font-semibold flex items-center justify-center gap-1.5 shrink-0 transition-all shadow-xs active:scale-95 cursor-pointer select-none text-[13.5px] whitespace-nowrap ${isPlaying && !isPaused
               ? 'bg-amber-500/15 dark:bg-amber-500/20 text-amber-700 dark:text-amber-300 border border-amber-300/70 dark:border-amber-700/60 hover:bg-amber-500/25 dark:hover:bg-amber-500/30'
               : isPaused
                 ? 'bg-emerald-500/15 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border border-emerald-300/70 dark:border-emerald-700/60 hover:bg-emerald-500/25 dark:hover:bg-emerald-500/30'
@@ -859,9 +873,9 @@ export default function ReaderHeader({
             }`}
         >
           {isPlaying && !isPaused ? (
-            <Pause size={13} className="stroke-[2.5]" />
+            <Pause size={14} className="stroke-[2.5]" />
           ) : (
-            <Play size={13} className="stroke-[2.5] ml-0.5 fill-current" />
+            <Play size={14} className="stroke-[2.5] ml-0.5 fill-current" />
           )}
           <span>
             {isPlaying && !isPaused ? t('reader.pause') : isPaused ? t('reader.resume') : (isTraining ? (t('training.start') || '开始') : t('reader.play'))}

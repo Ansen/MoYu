@@ -421,17 +421,17 @@ export default function Reader({ bookData, onClose, jumpToSibling, jumpToChapter
           )}
           
           {/* Bottom Unified Status Bar */}
-          <div className="h-10 border-t border-slate-200 dark:border-[#2d2d2d] bg-slate-50/90 dark:bg-[#181818]/90 backdrop-blur px-4 flex items-center justify-between shrink-0 select-none text-[12px] text-slate-500 dark:text-[#888888]">
+          <div className="h-11 border-t border-slate-200 dark:border-[#2d2d2d] bg-slate-50/90 dark:bg-[#181818]/90 backdrop-blur px-4 flex items-center justify-between shrink-0 select-none text-[13px] text-slate-500 dark:text-[#888888]">
             {/* Left Section: Document Type / Active Marker Pulse Capsule */}
-            <div className="flex items-center gap-2 text-[12px] min-w-0">
+            <div className="flex items-center gap-2 text-[13px] min-w-0">
               {activeMarker ? (
                 activeMarker.type === 'prefix' ? (
-                  <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11.5px] font-mono font-semibold bg-indigo-50 text-indigo-600 dark:bg-indigo-950/80 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 shadow-2xs animate-pulse">
+                  <div className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full text-[12.5px] font-mono font-semibold bg-indigo-50 text-indigo-600 dark:bg-indigo-950/80 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 shadow-2xs animate-pulse">
                     <Radio size={12} className="text-indigo-500 animate-spin shrink-0" style={{ animationDuration: '3s' }} />
                     <span className="truncate">{t('reader.marker.prefixSending', { marker: activeMarker.text }, `报头起始符: ${activeMarker.text} (发送中)`)}</span>
                   </div>
                 ) : (
-                  <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11.5px] font-mono font-semibold bg-emerald-50 text-emerald-600 dark:bg-emerald-950/80 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 shadow-2xs animate-pulse">
+                  <div className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full text-[12.5px] font-mono font-semibold bg-emerald-50 text-emerald-600 dark:bg-emerald-950/80 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 shadow-2xs animate-pulse">
                     <Radio size={12} className="text-emerald-500 animate-spin shrink-0" style={{ animationDuration: '3s' }} />
                     <span className="truncate">{t('reader.marker.suffixSending', { marker: activeMarker.text }, `报尾结束符: ${activeMarker.text} (发送中)`)}</span>
                   </div>
@@ -474,7 +474,7 @@ export default function Reader({ bookData, onClose, jumpToSibling, jumpToChapter
                 <button 
                   onClick={handlePrev}
                   disabled={bookData.type === 'epub' ? (bookData.currentChapterIndex <= 0) : (bookData.currentIndex <= 0)}
-                  className={`h-7 px-3 rounded-lg flex items-center gap-1.5 transition-colors text-[12px] font-medium ${
+                  className={`h-8 px-3.5 rounded-lg flex items-center gap-1.5 transition-colors text-[13px] font-medium ${
                     (bookData.type === 'epub' ? (bookData.currentChapterIndex > 0) : (bookData.currentIndex > 0))
                       ? 'hover:bg-slate-200 dark:hover:bg-[#282828] text-slate-700 dark:text-[#cccccc] active:scale-95 cursor-pointer'
                       : 'opacity-30 cursor-not-allowed text-slate-400 dark:text-slate-600'
@@ -484,7 +484,7 @@ export default function Reader({ bookData, onClose, jumpToSibling, jumpToChapter
                 </button>
 
                 {paginationLabel && (
-                  <span className="font-mono text-slate-700 dark:text-[#dddddd] font-semibold text-[12px] px-2.5 py-1 rounded-md bg-slate-200/80 dark:bg-[#252525] border border-slate-300/60 dark:border-[#383838] shadow-2xs">
+                  <span className="font-mono text-slate-700 dark:text-[#dddddd] font-semibold text-[13px] px-3 py-1 rounded-md bg-slate-200/80 dark:bg-[#252525] border border-slate-300/60 dark:border-[#383838] shadow-2xs">
                     {paginationLabel}
                   </span>
                 )}
@@ -496,7 +496,7 @@ export default function Reader({ bookData, onClose, jumpToSibling, jumpToChapter
                       ? ((bookData.currentChapterIndex || 0) >= (bookData.toc?.length || 1) - 1)
                       : (bookData.currentIndex >= (bookData.siblings?.length || 1) - 1)
                   }
-                  className={`h-7 px-3 rounded-lg flex items-center gap-1.5 transition-colors text-[12px] font-medium ${
+                  className={`h-8 px-3.5 rounded-lg flex items-center gap-1.5 transition-colors text-[13px] font-medium ${
                     (bookData.type === 'epub'
                       ? ((bookData.currentChapterIndex || 0) < (bookData.toc?.length || 1) - 1)
                       : (bookData.currentIndex < (bookData.siblings?.length || 1) - 1))
@@ -508,22 +508,22 @@ export default function Reader({ bookData, onClose, jumpToSibling, jumpToChapter
                 </button>
               </div>
             ) : (
-              <div className="font-mono text-slate-600 dark:text-slate-400 text-[12px] font-medium shrink-0">
+              <div className="font-mono text-slate-600 dark:text-slate-400 text-[13px] font-medium shrink-0">
                 {t('reader.stats.totalChars', { count: (parsedTelegram.cleanText ? parsedTelegram.cleanText.replace(/\s+/g, '').length : (bookData.data?.length || 0)).toLocaleString() }, `共 ${(parsedTelegram.cleanText ? parsedTelegram.cleanText.replace(/\s+/g, '').length : (bookData.data?.length || 0)).toLocaleString()} 字符`)}
               </div>
             )}
 
             {/* Right Section: Keyboard Shortcuts */}
-            <div className="flex items-center gap-2.5 text-slate-400 dark:text-[#888888] text-[12px] shrink-0">
+            <div className="flex items-center gap-2.5 text-slate-500 dark:text-[#999999] text-[12.5px] shrink-0">
               {isTraining ? (
                 <>
                   <span className="flex items-center gap-1.5">
-                    <kbd className="px-1.5 py-0.5 rounded bg-slate-200/90 dark:bg-[#252525] text-[11px] font-mono text-slate-700 dark:text-slate-300 border border-slate-300/80 dark:border-[#383838] shadow-2xs">Space</kbd>
+                    <kbd className="px-2 py-0.5 rounded bg-slate-200/90 dark:bg-[#252525] text-[11.5px] font-mono text-slate-700 dark:text-slate-300 border border-slate-300/80 dark:border-[#383838] shadow-2xs">Space</kbd>
                     <span>{t('reader.shortcuts.keying', '发报')}</span>
                   </span>
                   <span className="text-slate-300 dark:text-slate-700">·</span>
                   <span className="flex items-center gap-1.5">
-                    <kbd className="px-1.5 py-0.5 rounded bg-slate-200/90 dark:bg-[#252525] text-[11px] font-mono text-slate-700 dark:text-slate-300 border border-slate-300/80 dark:border-[#383838] shadow-2xs">Enter</kbd>
+                    <kbd className="px-2 py-0.5 rounded bg-slate-200/90 dark:bg-[#252525] text-[11.5px] font-mono text-slate-700 dark:text-slate-300 border border-slate-300/80 dark:border-[#383838] shadow-2xs">Enter</kbd>
                     <span>{isPlaying && !isPaused ? t('reader.pause') : isPaused ? t('reader.resume') : (t('training.start') || '开始')}</span>
                   </span>
                 </>
@@ -531,18 +531,18 @@ export default function Reader({ bookData, onClose, jumpToSibling, jumpToChapter
                 (bookData.siblings && bookData.siblings.length > 1)) ? (
                 <>
                   <span className="flex items-center gap-1.5">
-                    <kbd className="px-1.5 py-0.5 rounded bg-slate-200/90 dark:bg-[#252525] text-[11px] font-mono text-slate-700 dark:text-slate-300 border border-slate-300/80 dark:border-[#383838] shadow-2xs">← / →</kbd>
+                    <kbd className="px-2 py-0.5 rounded bg-slate-200/90 dark:bg-[#252525] text-[11.5px] font-mono text-slate-700 dark:text-slate-300 border border-slate-300/80 dark:border-[#383838] shadow-2xs">← / →</kbd>
                     <span>{t('reader.shortcut.flip')}</span>
                   </span>
                   <span className="text-slate-300 dark:text-slate-700">·</span>
                   <span className="flex items-center gap-1.5">
-                    <kbd className="px-1.5 py-0.5 rounded bg-slate-200/90 dark:bg-[#252525] text-[11px] font-mono text-slate-700 dark:text-slate-300 border border-slate-300/80 dark:border-[#383838] shadow-2xs">Space</kbd>
+                    <kbd className="px-2 py-0.5 rounded bg-slate-200/90 dark:bg-[#252525] text-[11.5px] font-mono text-slate-700 dark:text-slate-300 border border-slate-300/80 dark:border-[#383838] shadow-2xs">Space</kbd>
                     <span>{t('reader.shortcut.play')}</span>
                   </span>
                 </>
               ) : (
-                <div className="flex items-center gap-1.5 text-slate-400 dark:text-[#888888] text-[12px]">
-                  <kbd className="px-1.5 py-0.5 rounded bg-slate-200/90 dark:bg-[#252525] text-[11px] font-mono text-slate-700 dark:text-slate-300 border border-slate-300/80 dark:border-[#383838] shadow-2xs">Space</kbd>
+                <div className="flex items-center gap-1.5 text-slate-500 dark:text-[#999999] text-[12.5px]">
+                  <kbd className="px-2 py-0.5 rounded bg-slate-200/90 dark:bg-[#252525] text-[11.5px] font-mono text-slate-700 dark:text-slate-300 border border-slate-300/80 dark:border-[#383838] shadow-2xs">Space</kbd>
                   <span>{t('reader.shortcut.playPause')}</span>
                 </div>
               )}

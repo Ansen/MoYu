@@ -96,8 +96,8 @@ export default function TrainingScopePanel({
         </div>
       )}
 
-      {/* 示波器顶栏轻量控制条: 严控单行不折行，极简专业排版 */}
-      <div className="h-8 px-3 sm:px-4 flex items-center justify-between text-xs border-b border-slate-200/50 dark:border-[#222222] whitespace-nowrap overflow-x-auto overflow-y-hidden custom-scrollbar select-none gap-2">
+      {/* 示波器顶栏轻量控制条: 适度放大字号与热区，兼顾全年龄段清晰可读与专业仪器精致感 */}
+      <div className="h-9.5 px-3 sm:px-4 flex items-center justify-between text-[12px] border-b border-slate-200/50 dark:border-[#222222] whitespace-nowrap overflow-x-auto overflow-y-hidden custom-scrollbar select-none gap-2">
         
         {/* 左侧：电键指示灯(支持触控打键)、硬件/键盘模式徽章、手键/自动键切换、模式胶囊、侧音频率微调 */}
         <div className="flex items-center gap-2 shrink-0">
@@ -122,15 +122,15 @@ export default function TrainingScopePanel({
               e.preventDefault();
               onManualUp?.();
             }}
-            className={`h-6 w-[58px] px-1.5 rounded-md font-mono text-[10.5px] font-semibold flex items-center justify-center gap-1.5 transition-colors shadow-2xs whitespace-nowrap shrink-0 cursor-pointer select-none active:scale-95 ${
+            className={`h-7 w-[64px] px-2 rounded-md font-mono text-[12px] font-semibold flex items-center justify-center gap-1.5 transition-colors shadow-2xs whitespace-nowrap shrink-0 cursor-pointer select-none active:scale-95 ${
               isKeyDown 
                 ? 'bg-emerald-500 text-white shadow-emerald-500/30' 
-                : 'bg-slate-200/80 dark:bg-[#252525] text-slate-600 dark:text-slate-400 hover:bg-slate-300 dark:hover:bg-[#303030]'
+                : 'bg-slate-200/80 dark:bg-[#252525] text-slate-600 dark:text-slate-300 hover:bg-slate-300 dark:hover:bg-[#303030]'
             }`}
             title={isKeyDown ? t('training.scope.keyDown', '电键按下 (支持长按发报)') : t('training.scope.keyUp', '电键待命 (点击或长按可虚拟发报)')}
           >
             <span className={`w-2 h-2 rounded-full shrink-0 ${isKeyDown ? 'bg-white animate-ping' : 'bg-slate-400 dark:bg-slate-500'}`} />
-            <span className="font-mono text-[10.5px] tabular-nums">
+            <span className="font-mono text-[12px] tabular-nums">
               {pressDuration > 0 ? `${pressDuration}ms` : '--'}
             </span>
           </div>
@@ -148,7 +148,7 @@ export default function TrainingScopePanel({
                 setInputDevice?.('keyboard');
               }
             }}
-            className={`h-6 px-2 rounded-md flex items-center gap-1.5 text-[11px] font-medium border transition-all cursor-pointer whitespace-nowrap shrink-0 ${
+            className={`h-7 px-2.5 rounded-md flex items-center gap-1.5 text-[12px] font-medium border transition-all cursor-pointer whitespace-nowrap shrink-0 ${
               inputDevice === 'ch552g'
                 ? isSerialConnected
                   ? 'bg-emerald-50 text-emerald-700 border-emerald-300 dark:bg-emerald-950/60 dark:text-emerald-300 dark:border-emerald-700/80 shadow-2xs'
@@ -166,12 +166,12 @@ export default function TrainingScopePanel({
             {inputDevice === 'ch552g' ? (
               <>
                 <span
-                  className={`w-1.5 h-1.5 rounded-full shrink-0 ${
+                  className={`w-2 h-2 rounded-full shrink-0 ${
                     isSerialConnected ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'
                   }`}
                 />
-                <Cpu size={12} className="shrink-0" />
-                <span className="text-[10.5px] font-semibold">
+                <Cpu size={13.5} className="shrink-0" />
+                <span className="text-[12px] font-semibold">
                   {isSerialConnected
                     ? `CH552G${serialPortName && serialPortName !== 'USB' ? ` · ${serialPortName}` : ''}`
                     : isEn
@@ -181,8 +181,8 @@ export default function TrainingScopePanel({
               </>
             ) : (
               <>
-                <Keyboard size={12} className="shrink-0 text-indigo-500 dark:text-indigo-400" />
-                <span className="text-[10.5px] font-semibold">
+                <Keyboard size={13.5} className="shrink-0 text-indigo-500 dark:text-indigo-400" />
+                <span className="text-[12px] font-semibold">
                   {isEn ? 'Keyboard' : '键盘模式'}
                 </span>
               </>
@@ -190,11 +190,11 @@ export default function TrainingScopePanel({
           </button>
 
           {/* 电键模式切换胶囊: 手键 (直键) ↔ 自动键 (双桨) */}
-          <div className="flex items-center bg-slate-200/80 dark:bg-[#222222] p-0.5 rounded-lg border border-slate-300/60 dark:border-[#333333] shrink-0 h-6 text-[10.5px]">
+          <div className="flex items-center bg-slate-200/80 dark:bg-[#222222] p-0.5 rounded-lg border border-slate-300/60 dark:border-[#333333] shrink-0 h-7 text-[12px]">
             <button
               type="button"
               onClick={() => setKeyType?.('straight')}
-              className={`h-full px-1.5 rounded-md flex items-center justify-center font-medium transition-colors cursor-pointer select-none ${
+              className={`h-full px-2 rounded-md flex items-center justify-center font-medium transition-colors cursor-pointer select-none ${
                 keyType === 'straight'
                   ? 'bg-white dark:bg-[#181818] text-indigo-600 dark:text-indigo-400 font-semibold shadow-2xs'
                   : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
@@ -206,7 +206,7 @@ export default function TrainingScopePanel({
             <button
               type="button"
               onClick={() => setKeyType?.('paddle')}
-              className={`h-full px-1.5 rounded-md flex items-center justify-center font-medium transition-colors cursor-pointer select-none ${
+              className={`h-full px-2 rounded-md flex items-center justify-center font-medium transition-colors cursor-pointer select-none ${
                 keyType === 'paddle'
                   ? 'bg-white dark:bg-[#181818] text-indigo-600 dark:text-indigo-400 font-semibold shadow-2xs'
                   : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
@@ -220,7 +220,7 @@ export default function TrainingScopePanel({
               <button
                 type="button"
                 onClick={() => setPaddleReverse?.((prev) => !prev)}
-                className="h-full px-1.5 border-l border-slate-300/80 dark:border-[#333333] ml-0.5 flex items-center justify-center font-mono text-[9.5px] font-semibold text-slate-500 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors cursor-pointer select-none"
+                className="h-full px-2 border-l border-slate-300/80 dark:border-[#333333] ml-0.5 flex items-center justify-center font-mono text-[11px] font-semibold text-slate-600 dark:text-slate-300 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors cursor-pointer select-none"
                 title={paddleReverse 
                   ? t('training.scope.paddleReverseTooltip', '自动键极性反转：P14=点(Dit) / P15=划(Dah) [点击切换为标准]') 
                   : t('training.scope.paddleNormalTooltip', '自动键标准极性：P14=划(Dah) / P15=点(Dit) [点击切换为反转]')}
@@ -231,7 +231,7 @@ export default function TrainingScopePanel({
           </div>
 
           {/* 模式选择胶囊 (纯图标切换: 实时 / 盲跟 / 静音) */}
-          <div className="flex items-center bg-slate-200/80 dark:bg-[#222222] p-0.5 rounded-lg border border-slate-300/60 dark:border-[#333333] shrink-0 h-6">
+          <div className="flex items-center bg-slate-200/80 dark:bg-[#222222] p-0.5 rounded-lg border border-slate-300/60 dark:border-[#333333] shrink-0 h-7">
             <button
               onClick={() => setTrainingMode('live')}
               className={`h-full px-2 rounded-md flex items-center justify-center transition-colors cursor-pointer ${
@@ -241,7 +241,7 @@ export default function TrainingScopePanel({
               }`}
               title={t('training.scope.modeLive', '实时模式：听发同步，完整展示系统电码波形')}
             >
-              <Eye size={13} />
+              <Eye size={14} />
             </button>
             <button
               onClick={() => setTrainingMode('blind')}
@@ -252,7 +252,7 @@ export default function TrainingScopePanel({
               }`}
               title={t('training.scope.modeBlind', '盲跟模式：隐藏系统电码波形，盲听跟发')}
             >
-              <EyeOff size={13} />
+              <EyeOff size={14} />
             </button>
             <button
               onClick={() => setTrainingMode(trainingMode === 'silent' ? 'live' : 'silent')}
@@ -263,16 +263,16 @@ export default function TrainingScopePanel({
               }`}
               title={trainingMode === 'silent' ? t('training.scope.modeSilentRestore', '伴听已静音：点击恢复播放') : t('training.scope.modeSilent', '静音模式：仅保留自身侧音，静音系统伴听')}
             >
-              <VolumeX size={13} />
+              <VolumeX size={14} />
             </button>
           </div>
 
           {/* 示波器走纸视角模式: 走纸 (右侧 85%) ↔ 前瞻 (左侧 20%) */}
-          <div className="flex items-center bg-slate-200/80 dark:bg-[#222222] p-0.5 rounded-lg border border-slate-300/60 dark:border-[#333333] shrink-0 h-6 text-[10.5px]">
+          <div className="flex items-center bg-slate-200/80 dark:bg-[#222222] p-0.5 rounded-lg border border-slate-300/60 dark:border-[#333333] shrink-0 h-7 text-[12px]">
             <button
               type="button"
               onClick={() => setPlayheadPosition?.('right')}
-              className={`h-full px-1.5 rounded-md flex items-center justify-center font-medium transition-colors cursor-pointer select-none ${
+              className={`h-full px-2 rounded-md flex items-center justify-center font-medium transition-colors cursor-pointer select-none ${
                 playheadPosition === 'right'
                   ? 'bg-white dark:bg-[#181818] text-indigo-600 dark:text-indigo-400 font-semibold shadow-2xs'
                   : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
@@ -284,7 +284,7 @@ export default function TrainingScopePanel({
             <button
               type="button"
               onClick={() => setPlayheadPosition?.('left')}
-              className={`h-full px-1.5 rounded-md flex items-center justify-center font-medium transition-colors cursor-pointer select-none ${
+              className={`h-full px-2 rounded-md flex items-center justify-center font-medium transition-colors cursor-pointer select-none ${
                 playheadPosition === 'left'
                   ? 'bg-white dark:bg-[#181818] text-indigo-600 dark:text-indigo-400 font-semibold shadow-2xs'
                   : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
@@ -297,11 +297,11 @@ export default function TrainingScopePanel({
 
           {/* 示波器时基窗口微调: 控制流淌速度 (4s-16s，默认8s) */}
           <div 
-            className="flex items-center bg-slate-200/80 dark:bg-[#222222] px-2 py-0.5 rounded-lg border border-slate-300/60 dark:border-[#333333] text-[11px] font-mono shrink-0 gap-1.5 h-6"
+            className="flex items-center bg-slate-200/80 dark:bg-[#222222] px-2 py-0.5 rounded-lg border border-slate-300/60 dark:border-[#333333] text-[12px] font-mono shrink-0 gap-1.5 h-7"
             title={t('training.scope.timeWindowTooltip', { sec: timeWindowSec }, `示波器时基窗口: ${timeWindowSec}秒 (数值越大波形流速越慢，20~30 WPM更清晰)`)}
           >
             <span className="flex items-center gap-1 text-slate-700 dark:text-slate-300 font-semibold">
-              <Clock size={12} className="text-indigo-500 dark:text-indigo-400 shrink-0" />
+              <Clock size={13.5} className="text-indigo-500 dark:text-indigo-400 shrink-0" />
               <span>{timeWindowSec}s</span>
             </span>
             {setTimeWindowSec && (
@@ -310,7 +310,7 @@ export default function TrainingScopePanel({
                   type="button"
                   onClick={() => setTimeWindowSec((prev) => Math.max(4, prev - 2))}
                   disabled={timeWindowSec <= 4}
-                  className="w-3.5 h-3.5 flex items-center justify-center rounded hover:bg-white dark:hover:bg-[#333] text-slate-600 dark:text-slate-300 font-bold transition-colors cursor-pointer text-[10px] disabled:opacity-30 disabled:cursor-not-allowed"
+                  className="w-5 h-5 flex items-center justify-center rounded hover:bg-white dark:hover:bg-[#333] text-slate-600 dark:text-slate-300 font-bold transition-colors cursor-pointer text-[12px] disabled:opacity-30 disabled:cursor-not-allowed"
                   title={t('training.scope.timeWindowDec', '缩短时基 (-2秒，拉长波形/加快流速)')}
                 >
                   -
@@ -319,7 +319,7 @@ export default function TrainingScopePanel({
                   type="button"
                   onClick={() => setTimeWindowSec((prev) => Math.min(16, prev + 2))}
                   disabled={timeWindowSec >= 16}
-                  className="w-3.5 h-3.5 flex items-center justify-center rounded hover:bg-white dark:hover:bg-[#333] text-slate-600 dark:text-slate-300 font-bold transition-colors cursor-pointer text-[10px] disabled:opacity-30 disabled:cursor-not-allowed"
+                  className="w-5 h-5 flex items-center justify-center rounded hover:bg-white dark:hover:bg-[#333] text-slate-600 dark:text-slate-300 font-bold transition-colors cursor-pointer text-[12px] disabled:opacity-30 disabled:cursor-not-allowed"
                   title={t('training.scope.timeWindowInc', '放宽时基 (+2秒，放缓流速/更易看清高WPM)')}
                 >
                   +
@@ -330,25 +330,25 @@ export default function TrainingScopePanel({
 
           {/* 侧音频率微调 (纯图标+Hz数值) */}
           <div 
-            className="flex items-center bg-slate-200/80 dark:bg-[#222222] px-2 py-0.5 rounded-lg border border-slate-300/60 dark:border-[#333333] text-[11px] font-mono shrink-0 gap-1.5 h-6"
+            className="flex items-center bg-slate-200/80 dark:bg-[#222222] px-2 py-0.5 rounded-lg border border-slate-300/60 dark:border-[#333333] text-[12px] font-mono shrink-0 gap-1.5 h-7"
             title={t('training.scope.sidetoneTooltip', { freq: effectiveSidetoneFreq, offset: `${sidetoneOffset >= 0 ? '+' : ''}${sidetoneOffset}`, base: morseFreq }, `拍发侧音频率: ${effectiveSidetoneFreq}Hz (偏置 ${sidetoneOffset >= 0 ? '+' : ''}${sidetoneOffset}Hz) | 播放频率: ${morseFreq}Hz`)}
           >
             <span className="flex items-center gap-1 text-slate-700 dark:text-slate-300 font-semibold">
-              <Volume2 size={13} className="text-indigo-500 dark:text-indigo-400 shrink-0" />
+              <Volume2 size={14} className="text-indigo-500 dark:text-indigo-400 shrink-0" />
               <span>{effectiveSidetoneFreq}Hz</span>
             </span>
             {setSidetoneOffset && (
               <div className="flex items-center border-l border-slate-300/80 dark:border-[#333333] pl-1 gap-0.5">
                 <button
                   onClick={() => setSidetoneOffset((prev) => prev - 10)}
-                  className="w-3.5 h-3.5 flex items-center justify-center rounded hover:bg-white dark:hover:bg-[#333] text-slate-600 dark:text-slate-300 font-bold transition-colors cursor-pointer text-[10px]"
+                  className="w-5 h-5 flex items-center justify-center rounded hover:bg-white dark:hover:bg-[#333] text-slate-600 dark:text-slate-300 font-bold transition-colors cursor-pointer text-[12px]"
                   title={t('training.scope.sidetoneDec', '降低侧音 (-10Hz)')}
                 >
                   -
                 </button>
                 <button
                   onClick={() => setSidetoneOffset((prev) => prev + 10)}
-                  className="w-3.5 h-3.5 flex items-center justify-center rounded hover:bg-white dark:hover:bg-[#333] text-slate-600 dark:text-slate-300 font-bold transition-colors cursor-pointer text-[10px]"
+                  className="w-5 h-5 flex items-center justify-center rounded hover:bg-white dark:hover:bg-[#333] text-slate-600 dark:text-slate-300 font-bold transition-colors cursor-pointer text-[12px]"
                   title={t('training.scope.sidetoneInc', '提高侧音 (+10Hz)')}
                 >
                   +
@@ -363,13 +363,13 @@ export default function TrainingScopePanel({
           
           {/* 精简图例 (系统/用户) */}
           {!isCollapsed && (
-            <div className="hidden sm:flex items-center gap-2.5 text-[10.5px] text-slate-500 dark:text-slate-400 shrink-0 whitespace-nowrap select-none">
+            <div className="hidden sm:flex items-center gap-2.5 text-[11.5px] text-slate-500 dark:text-slate-400 shrink-0 whitespace-nowrap select-none">
               <span className="flex items-center gap-1" title={t('training.scope.legendSystemTooltip', '系统标准电码波形')}>
-                <span className="w-1.5 h-1.5 rounded-full bg-indigo-600 dark:bg-cyan-400" />
+                <span className="w-2 h-2 rounded-full bg-indigo-600 dark:bg-cyan-400" />
                 <span>{t('training.scope.legendSystem', '系统')}</span>
               </span>
               <span className="flex items-center gap-1" title={t('training.scope.legendUserTooltip', '用户实际打键脉冲')}>
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                <span className="w-2 h-2 rounded-full bg-emerald-500" />
                 <span>{t('training.scope.legendUser', '用户')}</span>
               </span>
             </div>
@@ -379,10 +379,10 @@ export default function TrainingScopePanel({
           {onOpenHistory && (
             <button
               onClick={onOpenHistory}
-              className="flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold bg-slate-200/80 dark:bg-[#252525] text-slate-700 dark:text-slate-300 border border-slate-300/80 dark:border-[#383838] hover:bg-slate-300 dark:hover:bg-[#303030] transition-colors cursor-pointer shadow-2xs whitespace-nowrap shrink-0"
+              className="h-7 flex items-center gap-1.5 px-2.5 rounded-md text-[12px] font-semibold bg-slate-200/80 dark:bg-[#252525] text-slate-700 dark:text-slate-300 border border-slate-300/80 dark:border-[#383838] hover:bg-slate-300 dark:hover:bg-[#303030] transition-colors cursor-pointer shadow-2xs whitespace-nowrap shrink-0"
               title={t('training.scope.historyTooltip', '查看历史跟发练习档案与易错字符热力图')}
             >
-              <BarChart2 size={12} className="text-indigo-500" />
+              <BarChart2 size={13.5} className="text-indigo-500" />
               <span>{t('training.scope.history', '档案')}</span>
             </button>
           )}
@@ -391,10 +391,10 @@ export default function TrainingScopePanel({
           {hasResult && (
             <button
               onClick={onOpenResult}
-              className="flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold bg-indigo-50 text-indigo-600 dark:bg-indigo-950/60 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 transition-colors cursor-pointer shadow-2xs whitespace-nowrap shrink-0"
+              className="h-7 flex items-center gap-1.5 px-2.5 rounded-md text-[12px] font-semibold bg-indigo-50 text-indigo-600 dark:bg-indigo-950/60 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 transition-colors cursor-pointer shadow-2xs whitespace-nowrap shrink-0"
               title={t('training.scope.analysisTooltip', '查看本次跟发节奏与准确度分析')}
             >
-              <BarChart2 size={12} />
+              <BarChart2 size={13.5} />
               <span>{t('training.scope.analysis', '分析')}</span>
             </button>
           )}
@@ -402,10 +402,10 @@ export default function TrainingScopePanel({
           {/* 折叠/展开示波器 */}
           <button
             onClick={onToggleCollapse}
-            className="p-1 rounded-md text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-200 dark:hover:bg-[#252525] transition-colors cursor-pointer shrink-0"
+            className="w-7 h-7 flex items-center justify-center rounded-md text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 hover:bg-slate-200 dark:hover:bg-[#252525] transition-colors cursor-pointer shrink-0"
             title={isCollapsed ? t('training.scope.expand', '展开示波器') : t('training.scope.collapse', '收起示波器')}
           >
-            {isCollapsed ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+            {isCollapsed ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
           </button>
         </div>
 
