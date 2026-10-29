@@ -1,6 +1,6 @@
 [package]
 name = "moyu"
-version = "0.1.29"
+version = "0.1.30"
 description = "MoYu Reader"
 authors = ["you"]
 license = ""
@@ -28,6 +28,8 @@ tauri-plugin-dialog = "2"
 tauri-plugin-fs = "2"
 tauri-plugin-persisted-scope = "2.3.7"
 tauri-plugin-process = "2"
+tauri-plugin-updater = "2"
+serialport = { version = "4.7", default-features = false }
 epub-builder = "0.7"
 
 # Optimizations for the final release build (reduces binary size significantly)
@@ -37,7 +39,3 @@ codegen-units = 1 # Compile crates one after another so the compiler can optimiz
 lto = true # Enables link to optimizations
 opt-level = "s" # Optimize for binary size
 strip = true # Remove debug symbols
-
-[target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
-tauri-plugin-updater = "2"
-serialport = { version = "4.7", default-features = false }

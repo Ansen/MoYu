@@ -10,7 +10,7 @@ export function getPlatform() {
   const ua = (navigator.userAgent || '').toLowerCase();
   const platform = (navigator.platform || '').toLowerCase();
   if (platform.includes('mac') || ua.includes('macintosh') || ua.includes('mac os')) return 'mac';
-  if (platform.includes('linux') || ua.includes('android')) return 'linux';
+  if (platform.includes('linux')) return 'linux';
   return 'windows';
 }
 

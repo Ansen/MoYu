@@ -37,11 +37,9 @@ impl Default for SerialManagerState {
 /// - 0x16C0: MoYu CH552G USB CDC 官方固件 VID (PID: 0xBA8B)
 /// - 0x1209: MorseLink / 开源 CH552G 电键固件 VID (PID: 0xC550)
 /// - 0x1A86: WCH (沁恒官方 CH552G / CH55x VID)
-#[cfg(not(any(target_os = "android", target_os = "ios")))]
 const CH552_VIDS: &[u16] = &[0x16C0, 0x1209, 0x1A86];
 
 /// 匹配到的串口设备信息
-#[cfg(not(any(target_os = "android", target_os = "ios")))]
 struct MatchedSerialPort {
     port_name: String,
     device_name: String,
@@ -108,7 +106,6 @@ fn find_linux_sysfs_port() -> Option<MatchedSerialPort> {
 }
 
 /// 扫描系统可用串口并自动匹配 CH552G 硬件设备
-#[cfg(not(any(target_os = "android", target_os = "ios")))]
 fn find_ch552g_port() -> Option<MatchedSerialPort> {
     if let Ok(ports) = serialport::available_ports() {
         let mut best_match: Option<MatchedSerialPort> = None;
@@ -171,7 +168,6 @@ fn find_ch552g_port() -> Option<MatchedSerialPort> {
 }
 
 /// 检查指定端口在系统中是否仍然存在（用于辅助检测热拔出）
-#[cfg(not(any(target_os = "android", target_os = "ios")))]
 #[allow(dead_code)]
 fn port_still_exists(port_name: &str) -> bool {
     #[cfg(target_os = "linux")]
@@ -189,7 +185,6 @@ fn port_still_exists(port_name: &str) -> bool {
 }
 
 /// 启动后台常驻 CH552G 串口热插拔探测与低延迟字节流读取线程
-#[cfg(not(any(target_os = "android", target_os = "ios")))]
 pub fn spawn_serial_monitor(app_handle: AppHandle, state: &SerialManagerState) {
     let connected = Arc::clone(&state.connected);
     let current_port = Arc::clone(&state.current_port);
@@ -341,8 +336,6 @@ pub fn spawn_serial_monitor(app_handle: AppHandle, state: &SerialManagerState) {
     });
 }
 
-#[cfg(any(target_os = "android", target_os = "ios"))]
-pub fn spawn_serial_monitor(_app_handle: AppHandle, _state: &SerialManagerState) {}
 
 /// 查询当前 Rust 串口连接状态
 #[tauri::command]

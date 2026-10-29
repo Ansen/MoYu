@@ -57,7 +57,7 @@ const translations = {
     "feat.3.title": "专业电台音效仿真",
     "feat.3.desc": "自定义 WPM 报速、侧音频偏 Hz、点划间隔比，更支持老式电子管电台过载失真 (谐波) 音效模拟，还原真实通联。",
     "feat.4.title": "轻量极速 · 跨平台架构",
-    "feat.4.desc": "基于 Rust + Tauri 原生构建，内存占用不足百兆，秒级极速启动，全平台 Windows / macOS / Linux / Android 统一体验。",
+    "feat.4.desc": "基于 Rust + Tauri 原生构建，内存占用不足百兆，秒级极速启动，全平台 Windows / macOS / Linux 统一体验。",
 
     "gallery.badge": "界面设计",
     "gallery.title": "极简大方，专为专注而生",
@@ -139,7 +139,7 @@ const translations = {
     "feat.3.title": "Radio Audio Simulation",
     "feat.3.desc": "Customize WPM speed, side-tone Hz, and vintage radio tube overdrive harmonic distortion for authentic on-air listening practice.",
     "feat.4.title": "Ultra-lightweight Architecture",
-    "feat.4.desc": "Built with Rust + Tauri, consuming under 100MB RAM, instant launch, and unified experience across Windows, macOS, Linux, and Android.",
+    "feat.4.desc": "Built with Rust + Tauri, consuming under 100MB RAM, instant launch, and unified experience across Windows, macOS, and Linux.",
 
     "gallery.badge": "Interface",
     "gallery.title": "Clean, Modern, and Distraction-free",

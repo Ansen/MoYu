@@ -80,31 +80,24 @@ fn save_companion_text(path: String, content: String) -> Result<(), String> {
 
 #[tauri::command]
 fn toggle_devtools(window: tauri::WebviewWindow) {
-    #[cfg(desktop)]
-    {
-        if window.is_devtools_open() {
-            window.close_devtools();
-        } else {
-            window.open_devtools();
-        }
-    }
-    #[cfg(not(desktop))]
-    {
-        let _ = window;
+    if window.is_devtools_open() {
+        window.close_devtools();
+    } else {
+        window.open_devtools();
     }
 }
 
-#[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let serial_state = SerialManagerState::default();
 
-    let mut builder = tauri::Builder::default()
+    let builder = tauri::Builder::default()
         .manage(serial_state)
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_persisted_scope::init())
         .plugin(tauri_plugin_store::Builder::new().build())
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .invoke_handler(tauri::generate_handler![
             generate_epub,
             save_companion_text,
@@ -113,11 +106,6 @@ pub fn run() {
             connect_serial_port,
             disconnect_serial_port
         ]);
-
-    #[cfg(desktop)]
-    {
-        builder = builder.plugin(tauri_plugin_updater::Builder::new().build());
-    }
 
     builder
         .setup(|app| {

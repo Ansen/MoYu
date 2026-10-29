@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from 'react';
-import { X, Mail, Globe, Info } from 'lucide-react';
+import { X, Mail, Globe, Info, Smartphone } from 'lucide-react';
 import { getVersion } from '@tauri-apps/api/app';
 import { checkForUpdates, installUpdate } from '../utils/updater';
 import { useI18n } from '../i18n';
 import { handleDevtoolsEasterEgg } from '../utils/easterEgg';
+import hamToolsQr from '../assets/ham-tools.jpg';
 
 const GithubIcon = ({ size = 16, className = "" }) => (
   <svg 
@@ -29,6 +30,7 @@ export default function AboutModal({ isOpen, onClose }) {
   const [latestVer, setLatestVer] = useState('');
   const [updateObj, setUpdateObj] = useState(null);
   const [installProgress, setInstallProgress] = useState(null);
+  const [showQr, setShowQr] = useState(false);
 
   useEffect(() => {
     try {
@@ -180,6 +182,36 @@ export default function AboutModal({ isOpen, onClose }) {
                 </a>
               </div>
             </div>
+
+            <div 
+              onClick={() => setShowQr(prev => !prev)}
+              className="flex items-center gap-3 p-3 rounded-xl bg-emerald-50/70 dark:bg-emerald-950/20 border border-emerald-100 dark:border-emerald-800/30 cursor-pointer hover:bg-emerald-100/60 dark:hover:bg-emerald-950/40 transition-colors select-none"
+            >
+              <div className="w-8 h-8 rounded-full bg-emerald-100 dark:bg-emerald-900/40 flex items-center justify-center shrink-0">
+                <Smartphone size={16} className="text-emerald-600 dark:text-emerald-400" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5">
+                    <p className="text-[11px] text-emerald-600 dark:text-emerald-400 font-semibold uppercase tracking-wider">{t('about.miniprogram.title')}</p>
+                    <span className="text-[9px] px-1.5 py-0.5 rounded bg-emerald-100 dark:bg-emerald-900/60 text-emerald-700 dark:text-emerald-300 font-medium">随时随地</span>
+                  </div>
+                  <span className="text-[11px] text-emerald-600 dark:text-emerald-400 font-medium">
+                    {showQr ? t('about.miniprogram.hide_qr', '收起码') : t('about.miniprogram.show_qr', '扫码')}
+                  </span>
+                </div>
+                <p className="text-[13px] font-medium text-slate-700 dark:text-[#cccccc] truncate">
+                  {t('about.miniprogram.desc')}
+                </p>
+              </div>
+            </div>
+
+            {showQr && (
+              <div className="flex flex-col items-center p-3.5 rounded-xl bg-white dark:bg-[#1a1a1a] border border-emerald-200 dark:border-emerald-900/50 shadow-xs">
+                <img src={hamToolsQr} alt="HAM百宝箱" className="w-32 h-32 rounded-lg object-contain shadow-xs border border-slate-100 dark:border-[#2a2a2a]" />
+                <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-2 font-medium">微信扫一扫 · 打开「HAM百宝箱」即刻练习</p>
+              </div>
+            )}
           </div>
           
           <div className="mt-6 flex flex-col items-center">
@@ -211,23 +243,12 @@ export default function AboutModal({ isOpen, onClose }) {
                 )}
 
                 <div className="flex gap-2 w-full">
-                  {updateObj?.isAndroid ? (
-                    <a 
-                      href={updateObj.downloadUrl || 'https://moyu-dl.wjzhx.com/Ansen/MoYu/releases/latest'}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex-1 px-3 py-2 text-xs font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg transition-colors text-center shadow-xs inline-block"
-                    >
-                      {t('update.download.apk')}
-                    </a>
-                  ) : (
-                    <button 
-                      onClick={handleInstall}
-                      className="flex-1 px-3 py-2 text-xs font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg transition-colors text-center shadow-xs"
-                    >
-                      {t('update.install.restart')}
-                    </button>
-                  )}
+                  <button 
+                    onClick={handleInstall}
+                    className="flex-1 px-3 py-2 text-xs font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg transition-colors text-center shadow-xs cursor-pointer"
+                  >
+                    {t('update.install.restart')}
+                  </button>
                 </div>
               </div>
             ) : updateStatus === 'installing' ? (
