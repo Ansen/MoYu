@@ -1,28 +1,42 @@
 import React, { useState, useEffect } from 'react';
 import { X, Save } from 'lucide-react';
 import { useI18n } from '../i18n/index';
+import { loadRememberWindowState, saveRememberWindowState } from '../utils/windowStatePrefs';
 
 export default function SettingsModal({ isOpen, onClose }) {
   const [morseSpeed, setMorseSpeed] = useState(20);
   const [morseFreq, setMorseFreq] = useState(700);
   const [startupBehavior, setStartupBehavior] = useState('restore');
+  const [rememberWindowState, setRememberWindowState] = useState(true);
 
   const { t } = useI18n();
 
-  // 模拟读取保存的设置
+  // 读取保存的设置（打开弹窗时刷新一次）
   useEffect(() => {
+    if (!isOpen) return;
+    let active = true;
+
     const savedSpeed = localStorage.getItem('pref_morse_speed');
     const savedFreq = localStorage.getItem('pref_morse_freq');
     const savedStartup = localStorage.getItem('pref_startup');
     if (savedSpeed) setMorseSpeed(Number(savedSpeed));
     if (savedFreq) setMorseFreq(Number(savedFreq));
     if (savedStartup) setStartupBehavior(savedStartup);
+
+    loadRememberWindowState().then((val) => {
+      if (active) setRememberWindowState(val);
+    });
+
+    return () => {
+      active = false;
+    };
   }, [isOpen]);
 
-  const handleSave = () => {
+  const handleSave = async () => {
     localStorage.setItem('pref_morse_speed', morseSpeed);
     localStorage.setItem('pref_morse_freq', morseFreq);
     localStorage.setItem('pref_startup', startupBehavior);
+    await saveRememberWindowState(rememberWindowState);
 
     // 通知其他组件设置已更改
     window.dispatchEvent(new Event('moyu_settings_changed'));
@@ -47,7 +61,7 @@ export default function SettingsModal({ isOpen, onClose }) {
         <div className="p-6 space-y-6 text-[13px] text-slate-700 dark:text-[#cccccc]">
 
           {/* Startup Behavior */}
-          <div className="space-y-2">
+          <div className="space-y-3">
             <label className="font-bold block">{t('settings.startup')}</label>
             <select
               value={startupBehavior}
@@ -57,6 +71,17 @@ export default function SettingsModal({ isOpen, onClose }) {
               <option value="home">{t('settings.startup.home')}</option>
               <option value="restore">{t('settings.startup.restore')}</option>
             </select>
+            <label className="flex items-center gap-2.5 pt-0.5 cursor-pointer group">
+              <input
+                type="checkbox"
+                checked={rememberWindowState}
+                onChange={(e) => setRememberWindowState(e.target.checked)}
+                className="w-4 h-4 rounded accent-indigo-600 cursor-pointer shrink-0"
+              />
+              <span className="text-[12.5px] text-slate-600 dark:text-[#bbbbbb] group-hover:text-slate-900 dark:group-hover:text-white transition-colors">
+                {t('settings.startup.rememberWindow')}
+              </span>
+            </label>
           </div>
 
           <div className="h-px w-full bg-slate-200 dark:bg-[#333333]"></div>

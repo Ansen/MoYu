@@ -11,6 +11,7 @@ import { testStructuredRandom } from './structured_random.test.js';
 import { testRadioInterferenceLogic } from './radio_interference.test.js';
 import { testFollowTrainingLogic } from './follow_training.test.js';
 import { testTrainingHistoryAndExport } from './training_history_and_export.test.js';
+import { testWindowStateSettings } from './window_state_settings.test.js';
 
 console.log('========================================');
 console.log('    MoYu Reader Unit Test Suite        ');
@@ -28,6 +29,7 @@ async function main() {
     testRadioInterferenceLogic();
     testFollowTrainingLogic();
     testTrainingHistoryAndExport();
+    await testWindowStateSettings();
     testEpubExportFormatting();
     testPdfExport();
     testDatasetExportConsistency();

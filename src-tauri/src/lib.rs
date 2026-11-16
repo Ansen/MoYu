@@ -2,9 +2,13 @@ use epub_builder::{EpubBuilder, EpubContent, ReferenceType, ZipLibrary};
 use tauri::Manager;
 
 mod serial;
+mod window_state;
 use serial::{
     connect_serial_port, disconnect_serial_port, get_serial_status, spawn_serial_monitor,
     SerialManagerState,
+};
+use window_state::{
+    get_remember_window_state, set_remember_window_state, setup_main_window, WindowStateManager,
 };
 
 #[tauri::command]
@@ -89,9 +93,11 @@ fn toggle_devtools(window: tauri::WebviewWindow) {
 
 pub fn run() {
     let serial_state = SerialManagerState::default();
+    let window_state = WindowStateManager::default();
 
     let builder = tauri::Builder::default()
         .manage(serial_state)
+        .manage(window_state)
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_dialog::init())
@@ -104,7 +110,9 @@ pub fn run() {
             toggle_devtools,
             get_serial_status,
             connect_serial_port,
-            disconnect_serial_port
+            disconnect_serial_port,
+            get_remember_window_state,
+            set_remember_window_state
         ]);
 
     builder
@@ -116,6 +124,9 @@ pub fn run() {
                         .build(),
                 )?;
             }
+
+            // 恢复窗口几何位置与最大化状态后统一显示窗口，避免冷启动闪屏
+            setup_main_window(app);
 
             let state = app.state::<SerialManagerState>();
             spawn_serial_monitor(app.handle().clone(), &state);
