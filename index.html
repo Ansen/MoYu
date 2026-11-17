@@ -17,6 +17,18 @@
     <meta property="og:title" content="摩语 (MoYu) - 摩尔斯密码与中文互译工具" />
     <meta property="og:description" content="在无声的电波中，传递我们的专属密语。支持中文汉字与摩尔斯码毫秒级极速互译。" />
     <meta property="og:site_name" content="摩语 (MoYu)" />
+    <script>
+      (function () {
+        try {
+          var t = localStorage.getItem('theme');
+          var isDark = t === 'dark' || ((!t || t === 'system') && window.matchMedia('(prefers-color-scheme: dark)').matches);
+          var root = document.documentElement;
+          root.classList.remove('light', 'dark');
+          root.classList.add(isDark ? 'dark' : 'light');
+          root.style.backgroundColor = isDark ? '#1e1e1e' : '#ffffff';
+        } catch (e) {}
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

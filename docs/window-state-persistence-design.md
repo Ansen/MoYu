@@ -40,19 +40,25 @@
 
 ```mermaid
 flowchart TD
-    S["App 启动 setup()"] --> R["读取 moyu-reader-settings.json"]
+    S["App 启动 setup()"] --> R["读取 moyu-reader-settings.json 并按系统主题预设原生底色"]
     R --> C{"pref_remember_window_state 为 true?"}
-    C -- "false" --> SH["保持默认居中 1010x680 -> window.show()"]
+    C -- "false" --> W["保持默认居中 1010x680，继续隐藏等待前端首帧"]
     C -- "true" --> H{"存在有效的 window_state?"}
-    H -- "否" --> SH
+    H -- "否" --> W
     H -- "是" --> M["校验矩形与 available_monitors() work_area 交集"]
-    M -- "在当前显示器工作区内" --> AP["clamp 顶部防标题栏出界 -> set_size & set_position"]
+    M -- "在当前显示器工作区内" --> AP["clamp 顶部防标题栏出界 -> set_position & set_size"]
     M -- "已无对应显示器(如拔掉副屏)" --> FB["按主屏工作区限制尺寸并 window.center()"]
     AP --> MX{"maximized == true?"}
     FB --> MX
     MX -- "是" --> DO_MX["window.maximize()"]
-    MX -- "否" --> SH2["window.show() + set_focus()"]
-    DO_MX --> SH2
+    MX -- "否" --> W
+    DO_MX --> W
+    W --> FE["React 首帧同步主题/语言/视图后 invoke(show_main_window)"]
+    W --> TO["或兜底超时触发 reveal_main_window (dev 15s / release 6s)"]
+    FE --> CL["Windows: DWMWA_CLOAK 保持隐身 -> window.show() 唤醒 GPU 合成"]
+    CL --> RF["等待 3 个 requestAnimationFrame 后 invoke(uncloak_main_window) (含 250ms 兜底)"]
+    RF --> SH2["解除 DWM 遮罩，首帧即完整 UI + set_focus()"]
+    TO --> SH2
 ```
 
 ### 3.2 运行期事件与开关联动
@@ -97,7 +103,7 @@ sequenceDiagram
 
 ### 4.3 关键配置变更
 
-- [src-tauri/tauri.conf.json](file:///g:/Code/github/MoYu/src-tauri/tauri.conf.json)：主窗口配置增加 `"visible": false`，由 Rust `setup()` 阶段恢复窗口位置/尺寸/最大化状态后统一调用 `window.show()`，消除冷启动闪屏。
+- [src-tauri/tauri.conf.json](file:///g:/Code/github/MoYu/src-tauri/tauri.conf.json)：主窗口配置增加 `"visible": false` 与 `"backgroundThrottling": "disabled"`，由 Rust `setup()` 阶段恢复窗口位置/尺寸/最大化状态后，待前端 React 完成首帧主题与视图渲染再调用 `show_main_window` 显示窗口（Windows 下借助 `DWMWA_CLOAK` 保持视觉隐身唤醒 WebView2 GPU 合成首帧，等 3 个绘制帧后由 `uncloak_main_window` 瞬时揭开，并配 `250ms` 兜底解封与 `debug 15s / release 6s` 显窗兜底定时器），消除冷启动白屏、黑屏与尺寸闪屏。
 
 ---
 
@@ -126,7 +132,7 @@ sequenceDiagram
 
 | 风险点 | 防护措施 | 回滚预案 |
 | :--- | :--- | :--- |
-| **`visible: false` 导致窗口无法显示** | `setup()` 中所有恢复逻辑均使用容错降级处理，不使用 `?` 提前退出；恢复函数结束前无条件调用 `window.show()` | 移除 `tauri.conf.json` 中的 `"visible": false` 即可立即恢复默认直接显示 |
+| **`visible: false` 导致窗口无法显示** | `setup()` 中所有恢复逻辑均使用容错降级处理，并启动显窗兜底定时器（debug 15s / release 6s）与 DWM 解封兜底（250ms）双重保障 | 移除 `tauri.conf.json` 中的 `"visible": false` 即可立即恢复默认直接显示 |
 | **损坏或极端的窗口尺寸数据** | 反序列化后强制校验宽高下限（如 `width >= 400 && height >= 300`），并受 `tauri.conf.json` `minWidth: 800, minHeight: 600` 约束 | 删除用户数据目录中 `moyu-reader-settings.json` 内的 `window_state` 键或关闭设置开关 |
 | **最大化时误覆盖普通窗口尺寸** | `Resized` / `Moved` 仅在 `!is_maximized && !is_minimized && !is_fullscreen` 时更新 `x/y/width/height`；最大化时仅翻转 `maximized = true` | 可直接退回未启用窗口状态监听的 `lib.rs` 版本 |
 | **高频率拖拽窗口引发频繁磁盘 I/O** | 移动/缩放仅更新内存快照并触发 500ms 防抖保存，关闭时执行一次最终同步落盘 | 可随时将防抖落盘改为仅 `CloseRequested` 落盘 |

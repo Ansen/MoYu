@@ -12,13 +12,42 @@ import { useEbook } from './hooks/useEbook';
 import { checkForUpdates, installUpdate } from './utils/updater';
 import { useI18n } from './i18n';
 
+function getInitialTheme() {
+  try {
+    return localStorage.getItem('theme') || 'system';
+  } catch {
+    return 'system';
+  }
+}
+
+function getInitialView() {
+  try {
+    const startupBehavior = localStorage.getItem('pref_startup') || 'restore';
+    if (startupBehavior === 'restore') {
+      const lastView = localStorage.getItem('moyu_last_view');
+      if (lastView && ['home', 'translator', 'library'].includes(lastView)) {
+        return lastView;
+      }
+    }
+  } catch {
+    // 忽略存储异常
+  }
+  return 'home';
+}
+
+function resolveIsDark(targetTheme) {
+  if (targetTheme === 'system') {
+    return typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: dark)').matches;
+  }
+  return targetTheme === 'dark';
+}
+
 function App() {
-  const [currentView, setView] = useState('home');
+  const [currentView, setView] = useState(getInitialView);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [isHelpModalOpen, setIsHelpModalOpen] = useState(false);
   const [isAboutOpen, setIsAboutOpen] = useState(false);
-  const [theme, setTheme] = useState('system');
-  const [isReady, setIsReady] = useState(false);
+  const [theme, setTheme] = useState(getInitialTheme);
   const [updateInfo, setUpdateInfo] = useState(null);
   const { t } = useI18n();
 
@@ -44,11 +73,6 @@ function App() {
   }, []);
 
   useEffect(() => {
-    const storedTheme = localStorage.getItem('theme');
-    if (storedTheme) setTheme(storedTheme);
-
-    const startupBehavior = localStorage.getItem('pref_startup') || 'restore';
-    
     // Check if it's the very first time launch
     const hasSeenGuide = localStorage.getItem('moyu_has_seen_guide');
     if (!hasSeenGuide) {
@@ -56,16 +80,7 @@ function App() {
       setIsHelpModalOpen(true);
       localStorage.setItem('moyu_has_seen_guide', 'true');
     }
-    
-    if (startupBehavior === 'restore') {
-      const lastView = localStorage.getItem('moyu_last_view');
-      if (lastView && ['home', 'translator', 'library'].includes(lastView)) {
-        setView(lastView);
-      }
-    }
-    setIsReady(true);
 
-    // Silent update check
     // Silent update check
     setTimeout(() => {
       checkForUpdates().then(({ hasUpdate, updateInfo }) => {
@@ -78,10 +93,8 @@ function App() {
 
   // Save current view on change
   useEffect(() => {
-    if (isReady) {
-      localStorage.setItem('moyu_last_view', currentView);
-    }
-  }, [currentView, isReady]);
+    localStorage.setItem('moyu_last_view', currentView);
+  }, [currentView]);
 
   const themeRef = useRef(theme);
   themeRef.current = theme;
@@ -89,21 +102,97 @@ function App() {
   // Apply theme to document root element
   const applyDocumentTheme = (targetTheme) => {
     const root = window.document.documentElement;
-    let isDark = false;
-    if (targetTheme === 'system') {
-      isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-    } else {
-      isDark = targetTheme === 'dark';
-    }
+    const isDark = resolveIsDark(targetTheme);
 
     if (isDark) {
       root.classList.remove('light');
       root.classList.add('dark');
+      root.style.backgroundColor = '#1e1e1e';
     } else {
       root.classList.remove('dark');
       root.classList.add('light');
+      root.style.backgroundColor = '#ffffff';
     }
   };
+
+  // 首帧挂载并等待字体与布局稳定后通知 Rust 端显示主窗口，消除冷启动白屏/黑屏
+  useEffect(() => {
+    if (typeof window === 'undefined' || !('__TAURI_INTERNALS__' in window)) {
+      return;
+    }
+
+    let cancelled = false;
+    let rafId = null;
+    let timerId = null;
+
+    const waitPaintFrames = (frameCount) =>
+      new Promise((resolve) => {
+        let remaining = frameCount;
+        const step = () => {
+          if (cancelled) {
+            resolve();
+            return;
+          }
+          remaining -= 1;
+          if (remaining <= 0) {
+            resolve();
+          } else {
+            rafId = requestAnimationFrame(step);
+          }
+        };
+        rafId = requestAnimationFrame(step);
+      });
+
+    const revealWithCompositorWarmup = async () => {
+      if (cancelled) return;
+      // 强制同步刷新一次布局，确保 Tailwind 样式已计算
+      void document.documentElement.offsetHeight;
+
+      const isDark = resolveIsDark(themeRef.current);
+      try {
+        // 先以 DWM Cloak 状态 show() 唤醒 WebView2 GPU 合成器绘制首帧，随后等待合成提交再解除遮罩
+        await invoke('show_main_window', { isDark });
+        if (cancelled) return;
+        let raceTimer = null;
+        try {
+          await Promise.race([
+            waitPaintFrames(3),
+            new Promise((resolve) => {
+              raceTimer = setTimeout(resolve, 120);
+              timerId = raceTimer;
+            }),
+          ]);
+        } finally {
+          if (raceTimer !== null) clearTimeout(raceTimer);
+        }
+        if (!cancelled) {
+          await invoke('uncloak_main_window');
+        }
+      } catch {
+        // 忽略窗口控制异常，后端设有兜底解封超时
+      }
+    };
+
+    const fontsReady =
+      document.fonts?.ready && typeof document.fonts.ready.then === 'function'
+        ? Promise.race([
+            document.fonts.ready.catch(() => {}),
+            new Promise((resolve) => setTimeout(resolve, 120)),
+          ])
+        : Promise.resolve();
+
+    fontsReady.then(() => {
+      if (!cancelled) {
+        timerId = setTimeout(revealWithCompositorWarmup, 16);
+      }
+    });
+
+    return () => {
+      cancelled = true;
+      if (rafId !== null) cancelAnimationFrame(rafId);
+      if (timerId !== null) clearTimeout(timerId);
+    };
+  }, []);
 
   // 1. Sync theme changes to DOM and persistence
   useEffect(() => {
@@ -158,15 +247,15 @@ function App() {
         <Sidebar currentView={currentView} setView={setView} openAbout={() => setIsAboutOpen(true)} />
         
         <main className="flex-1 relative overflow-hidden bg-white dark:bg-[#1e1e1e]">
-          {isReady && currentView === 'home' && (
+          {currentView === 'home' && (
             <HomeView 
               setView={setView} 
               recentFiles={ebook.recentFiles} 
               openFileProgrammatically={ebook.openFileProgrammatically} 
             />
           )}
-          {isReady && currentView === 'translator' && <TranslatorView />}
-          {isReady && currentView === 'library' && <LibraryView ebook={ebook} />}
+          {currentView === 'translator' && <TranslatorView />}
+          {currentView === 'library' && <LibraryView ebook={ebook} />}
         </main>
       </div>
 

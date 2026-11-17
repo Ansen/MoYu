@@ -22,6 +22,7 @@
         "resizable": true,
         "fullscreen": false,
         "visible": false,
+        "backgroundThrottling": "disabled",
         "decorations": false,
         "transparent": false,
         "additionalBrowserArgs": "--autoplay-policy=no-user-gesture-required --disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection,msSpeechRecognitionServiceUseCetoService"

@@ -3,8 +3,8 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{mpsc, Arc, Mutex};
 use std::time::Duration;
 use tauri::{
-    AppHandle, Manager, Monitor, PhysicalPosition, PhysicalSize, Position, Size, State,
-    WebviewWindow, WindowEvent,
+    window::Color, AppHandle, Manager, Monitor, PhysicalPosition, PhysicalSize, Position, Size,
+    State, Theme, WebviewWindow, WindowEvent,
 };
 use tauri_plugin_store::StoreExt;
 
@@ -29,6 +29,14 @@ const MIN_VISIBLE_OVERLAP_HEIGHT: i64 = 48;
 
 /// 拖拽移动或缩放窗口后的防抖落盘延迟
 const SAVE_DEBOUNCE_MS: u64 = 500;
+/// 前端首帧就绪超时兜底显窗时长（防止极端加载异常导致窗口永久隐藏；dev 模式需给 Vite 冷编译留足时间）
+#[cfg(debug_assertions)]
+const REVEAL_FALLBACK_TIMEOUT_MS: u64 = 15_000;
+#[cfg(not(debug_assertions))]
+const REVEAL_FALLBACK_TIMEOUT_MS: u64 = 6_000;
+/// Windows DWM 隐身预热（cloaking）解封兜底超时时长
+#[cfg(target_os = "windows")]
+const UNCLOAK_FALLBACK_TIMEOUT_MS: u64 = 250;
 
 /// 持久化存储的窗口几何与最大化状态（均使用物理像素）
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -103,6 +111,10 @@ pub struct LiveWindowSample {
 pub struct WindowStateManager {
     /// 是否启用窗口状态记忆（默认 true）
     enabled: Arc<AtomicBool>,
+    /// 主窗口是否已完成首帧显窗（确保只触发一次且忽略显窗前的瞬态尺寸事件）
+    shown: Arc<AtomicBool>,
+    /// 主窗口是否已完成 DWM 解封显示（仅触发一次）
+    uncloaked: Arc<AtomicBool>,
     /// 内存中保存的最近一次有效窗口快照（最大化和还原时保护普通尺寸不被覆盖）
     snapshot: Arc<Mutex<Option<PersistedWindowState>>>,
     /// 串口化磁盘写入锁，避免后台防抖线程与同步关闭/开关变更产生写入竞态
@@ -115,6 +127,8 @@ impl Default for WindowStateManager {
     fn default() -> Self {
         Self {
             enabled: Arc::new(AtomicBool::new(true)),
+            shown: Arc::new(AtomicBool::new(false)),
+            uncloaked: Arc::new(AtomicBool::new(false)),
             snapshot: Arc::new(Mutex::new(None)),
             persist_lock: Arc::new(Mutex::new(())),
             save_tx: Mutex::new(None),
@@ -126,6 +140,25 @@ impl WindowStateManager {
     /// 读取当前内存中的启用状态
     pub fn is_enabled(&self) -> bool {
         self.enabled.load(Ordering::Acquire)
+    }
+
+    /// 读取窗口是否已经显示
+    pub fn is_shown(&self) -> bool {
+        self.shown.load(Ordering::Acquire)
+    }
+
+    /// 原子标记窗口已显示，仅首次返回 true
+    fn mark_shown_once(&self) -> bool {
+        self.shown
+            .compare_exchange(false, true, Ordering::AcqRel, Ordering::Acquire)
+            .is_ok()
+    }
+
+    /// 原子标记窗口已完成解封，仅首次返回 true
+    fn mark_uncloaked_once(&self) -> bool {
+        self.uncloaked
+            .compare_exchange(false, true, Ordering::AcqRel, Ordering::Acquire)
+            .is_ok()
     }
 
     /// 设置内存中的启用状态
@@ -402,11 +435,152 @@ fn sample_live_window(window: &WebviewWindow) -> Option<LiveWindowSample> {
     })
 }
 
-/// 启动阶段：恢复主窗口尺寸/位置/最大化状态并显示窗口，同时挂载事件监听
+/// Windows DWM 窗口遮罩（Cloak）辅助：允许窗口先以 WS_VISIBLE 唤醒 WebView2 GPU 合成首帧，再瞬时揭开呈现
+#[cfg(target_os = "windows")]
+mod win_cloak {
+    use std::ffi::{c_char, c_void};
+    use std::sync::OnceLock;
+    use tauri::WebviewWindow;
+
+    const DWMWA_CLOAK: u32 = 13;
+
+    type DwmSetWindowAttributeFn = unsafe extern "system" fn(
+        hwnd: *mut c_void,
+        dw_attribute: u32,
+        pv_attribute: *const c_void,
+        cb_attribute: u32,
+    ) -> i32;
+
+    extern "system" {
+        fn LoadLibraryA(lp_lib_file_name: *const c_char) -> *mut c_void;
+        fn GetProcAddress(h_module: *mut c_void, lp_proc_name: *const c_char) -> *mut c_void;
+    }
+
+    fn resolve_dwm_set_window_attribute() -> Option<DwmSetWindowAttributeFn> {
+        static FN_CACHE: OnceLock<Option<DwmSetWindowAttributeFn>> = OnceLock::new();
+        *FN_CACHE.get_or_init(|| unsafe {
+            let module = LoadLibraryA(c"dwmapi.dll".as_ptr());
+            if module.is_null() {
+                return None;
+            }
+            let proc_addr = GetProcAddress(module, c"DwmSetWindowAttribute".as_ptr());
+            if proc_addr.is_null() {
+                return None;
+            }
+            Some(std::mem::transmute::<*mut c_void, DwmSetWindowAttributeFn>(
+                proc_addr,
+            ))
+        })
+    }
+
+    pub fn set_window_cloaked(window: &WebviewWindow, cloaked: bool) -> bool {
+        let Some(func) = resolve_dwm_set_window_attribute() else {
+            return false;
+        };
+        let Ok(hwnd) = window.hwnd() else {
+            return false;
+        };
+        let value: i32 = if cloaked { 1 } else { 0 };
+        // SAFETY: hwnd 与 value 指针及长度均按 Win32 DwmSetWindowAttribute(DWMWA_CLOAK) 规范传入
+        let hr = unsafe {
+            func(
+                hwnd.0,
+                DWMWA_CLOAK,
+                (&value as *const i32).cast::<c_void>(),
+                std::mem::size_of::<i32>() as u32,
+            )
+        };
+        hr == 0
+    }
+}
+
+#[cfg(not(target_os = "windows"))]
+mod win_cloak {
+    use tauri::WebviewWindow;
+
+    pub fn set_window_cloaked(_window: &WebviewWindow, _cloaked: bool) -> bool {
+        false
+    }
+}
+
+/// 获取与当前主题对应的原生窗口底色（对齐前端 App.jsx 背景色）
+fn theme_background_color(is_dark: bool) -> Color {
+    if is_dark {
+        Color(0x1e, 0x1e, 0x1e, 255)
+    } else {
+        Color(0xff, 0xff, 0xff, 255)
+    }
+}
+
+/// 幂等地解除 Windows DWM 窗口遮罩，确保首帧合成后再完整呈现给用户
+fn uncloak_window_once(window: &WebviewWindow, state: &WindowStateManager) {
+    if !state.mark_uncloaked_once() {
+        return;
+    }
+    win_cloak::set_window_cloaked(window, false);
+    let _ = window.set_focus();
+}
+
+/// 幂等地显示主窗口，并在首次启动尚无基线时记录默认几何快照
+fn reveal_main_window(
+    window: &WebviewWindow,
+    state: &WindowStateManager,
+    is_dark: Option<bool>,
+    from_frontend: bool,
+) {
+    if !state.mark_shown_once() {
+        return;
+    }
+
+    log::info!(
+        "显示主窗口 (来源: {}, is_dark: {:?})",
+        if from_frontend { "frontend" } else { "fallback_timeout" },
+        is_dark
+    );
+
+    if let Some(dark) = is_dark {
+        let _ = window.set_background_color(Some(theme_background_color(dark)));
+    }
+
+    // Windows 下先通过 DWM Cloak 保持视觉隐身再 show()，让 WebView2 唤醒合成器画完首帧后再揭开
+    let cloaked = from_frontend && win_cloak::set_window_cloaked(window, true);
+
+    let _ = window.show();
+    if !cloaked {
+        state.mark_uncloaked_once();
+        let _ = window.set_focus();
+    } else {
+        #[cfg(target_os = "windows")]
+        {
+            let app_handle = window.app_handle().clone();
+            std::thread::spawn(move || {
+                std::thread::sleep(Duration::from_millis(UNCLOAK_FALLBACK_TIMEOUT_MS));
+                let state = app_handle.state::<WindowStateManager>();
+                if let Some(win) = app_handle.get_webview_window("main") {
+                    uncloak_window_once(&win, &state);
+                }
+            });
+        }
+    }
+
+    // 若开启记忆且尚未有基线快照（例如首次启动），采样当前默认窗口作为后续还原基线
+    if state.is_enabled() && state.get_snapshot().is_none() {
+        if let Some(sample) = sample_live_window(window) {
+            let initial = merge_window_snapshot(None, &sample);
+            state.set_snapshot(initial);
+        }
+    }
+}
+
+/// 启动阶段：恢复主窗口尺寸/位置/最大化状态（保持隐藏等待首帧就绪后显示），并挂载事件监听
 pub fn setup_main_window(app: &tauri::App) {
     let Some(window) = app.get_webview_window("main") else {
         return;
     };
+
+    // 启动初期先按系统主题设置窗口容器底色，配合前端首帧就绪后显窗，避免白屏闪现
+    let system_dark = matches!(window.theme(), Ok(Theme::Dark));
+    let _ = window.set_background_color(Some(theme_background_color(system_dark)));
 
     let app_handle = app.handle().clone();
     let manager = app.state::<WindowStateManager>();
@@ -479,17 +653,17 @@ pub fn setup_main_window(app: &tauri::App) {
         }
     }
 
-    // 无论恢复是否成功或开关是否开启，均保证最终显示窗口，避免 visible: false 隐身卡死
-    let _ = window.show();
-    let _ = window.set_focus();
-
-    // 若开启记忆且尚未有基线快照（例如首次启动），采样当前默认窗口作为后续还原基线
-    if enabled && manager.get_snapshot().is_none() {
-        if let Some(sample) = sample_live_window(&window) {
-            let initial = merge_window_snapshot(None, &sample);
-            manager.set_snapshot(initial);
+    // 超时兜底显窗：即使前端脚本异常未及时通知，也能保证窗口不会永久隐身
+    let fallback_app = app_handle.clone();
+    std::thread::spawn(move || {
+        std::thread::sleep(Duration::from_millis(REVEAL_FALLBACK_TIMEOUT_MS));
+        let state = fallback_app.state::<WindowStateManager>();
+        if !state.is_shown() {
+            if let Some(win) = fallback_app.get_webview_window("main") {
+                reveal_main_window(&win, &state, None, false);
+            }
         }
-    }
+    });
 
     manager.ensure_debounce_worker(app_handle.clone());
 
@@ -498,7 +672,8 @@ pub fn setup_main_window(app: &tauri::App) {
         let state = app_handle.state::<WindowStateManager>();
         match event {
             WindowEvent::Moved(_) | WindowEvent::Resized(_) => {
-                if !state.is_enabled() {
+                // 显窗前忽略操作系统或布局初始化触发的瞬态事件，防止覆盖已恢复快照
+                if !state.is_shown() || !state.is_enabled() {
                     return;
                 }
                 if let Some(sample) = sample_live_window(&window_clone) {
@@ -537,6 +712,22 @@ pub fn setup_main_window(app: &tauri::App) {
             _ => {}
         }
     });
+}
+
+/// 前端首帧渲染就绪后调用：同步主题底色并显示主窗口（幂等，仅首次生效）
+#[tauri::command]
+pub fn show_main_window(
+    window: WebviewWindow,
+    state: State<'_, WindowStateManager>,
+    is_dark: Option<bool>,
+) {
+    reveal_main_window(&window, &state, is_dark, true);
+}
+
+/// 前端确认 GPU 合成器完成首帧绘制后调用：解除 DWM 遮罩以零白屏呈现窗口
+#[tauri::command]
+pub fn uncloak_main_window(window: WebviewWindow, state: State<'_, WindowStateManager>) {
+    uncloak_window_once(&window, &state);
 }
 
 /// 读取“记住窗口大小与位置”开关状态
@@ -835,5 +1026,20 @@ mod tests {
             resolve_restored_geometry(&corrupted, &[primary], Some(primary)),
             None
         );
+    }
+
+    #[test]
+    fn test_window_state_manager_mark_shown_once_is_idempotent() {
+        let mgr = WindowStateManager::default();
+        assert!(!mgr.is_shown());
+        assert!(mgr.mark_shown_once());
+        assert!(mgr.is_shown());
+        assert!(!mgr.mark_shown_once());
+    }
+
+    #[test]
+    fn test_theme_background_color_matches_dark_and_light() {
+        assert_eq!(theme_background_color(true), Color(0x1e, 0x1e, 0x1e, 255));
+        assert_eq!(theme_background_color(false), Color(0xff, 0xff, 0xff, 255));
     }
 }

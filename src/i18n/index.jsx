@@ -35,30 +35,39 @@ export function useI18n() {
   return context || defaultContextValue;
 }
 
+function getInitialLangSetting() {
+  try {
+    return localStorage.getItem('app_language') || 'system';
+  } catch {
+    return 'system';
+  }
+}
+
+function resolveActiveLang(setting) {
+  if (setting === 'system') {
+    const navLang =
+      typeof navigator !== 'undefined' && navigator.language
+        ? navigator.language.toLowerCase()
+        : 'zh';
+    return navLang.startsWith('en') ? 'en' : 'zh';
+  }
+  return setting;
+}
+
 export function I18nProvider({ children }) {
-  // language state: 'zh', 'en', 'system'
-  const [langSetting, setLangSetting] = useState('system');
-  const [activeLang, setActiveLang] = useState('zh');
+  // 首帧同步读取语言设置，避免切换语言前闪烁默认中文
+  const [langSetting, setLangSetting] = useState(getInitialLangSetting);
+  const activeLang = resolveActiveLang(langSetting);
 
   useEffect(() => {
-    const saved = localStorage.getItem('app_language');
-    if (saved) {
-      setLangSetting(saved);
-    }
-  }, []);
-
-  useEffect(() => {
-    if (langSetting === 'system') {
-      const isEn = navigator.language.toLowerCase().startsWith('en');
-      setActiveLang(isEn ? 'en' : 'zh');
-    } else {
-      setActiveLang(langSetting);
-    }
-    
-    if (langSetting !== 'system') {
-      localStorage.setItem('app_language', langSetting);
-    } else {
-      localStorage.removeItem('app_language');
+    try {
+      if (langSetting !== 'system') {
+        localStorage.setItem('app_language', langSetting);
+      } else {
+        localStorage.removeItem('app_language');
+      }
+    } catch {
+      // 忽略存储异常
     }
   }, [langSetting]);
 

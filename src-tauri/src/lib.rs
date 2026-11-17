@@ -8,7 +8,8 @@ use serial::{
     SerialManagerState,
 };
 use window_state::{
-    get_remember_window_state, set_remember_window_state, setup_main_window, WindowStateManager,
+    get_remember_window_state, set_remember_window_state, setup_main_window, show_main_window,
+    uncloak_main_window, WindowStateManager,
 };
 
 #[tauri::command]
@@ -112,7 +113,9 @@ pub fn run() {
             connect_serial_port,
             disconnect_serial_port,
             get_remember_window_state,
-            set_remember_window_state
+            set_remember_window_state,
+            show_main_window,
+            uncloak_main_window
         ]);
 
     builder
