@@ -1,16 +1,19 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, Suspense, lazy } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import Titlebar from './components/layout/Titlebar';
 import Sidebar from './components/layout/Sidebar';
-import TranslatorView from './views/Translator';
-import LibraryView from './views/Library';
 import HomeView from './views/Home';
-import SettingsModal from './components/SettingsModal';
-import HelpModal from './components/HelpModal';
-import AboutModal from './components/AboutModal';
 import { useEbook } from './hooks/useEbook';
-import { checkForUpdates, installUpdate } from './utils/updater';
 import { useI18n } from './i18n';
+
+const loadTranslatorView = () => import('./views/Translator');
+const loadLibraryView = () => import('./views/Library');
+
+const TranslatorView = lazy(loadTranslatorView);
+const LibraryView = lazy(loadLibraryView);
+const SettingsModal = lazy(() => import('./components/SettingsModal'));
+const HelpModal = lazy(() => import('./components/HelpModal'));
+const AboutModal = lazy(() => import('./components/AboutModal'));
 
 function getInitialTheme() {
   try {
@@ -82,13 +85,17 @@ function App() {
     }
 
     // Silent update check
-    setTimeout(() => {
-      checkForUpdates().then(({ hasUpdate, updateInfo }) => {
-        if (hasUpdate) {
-          setUpdateInfo(updateInfo);
-        }
-      }).catch(() => {});
+    const updateTimer = setTimeout(() => {
+      import('./utils/updater')
+        .then(({ checkForUpdates }) => checkForUpdates())
+        .then(({ hasUpdate, updateInfo }) => {
+          if (hasUpdate) {
+            setUpdateInfo(updateInfo);
+          }
+        })
+        .catch(() => {});
     }, 2000); // Wait 2s to not block startup
+    return () => clearTimeout(updateTimer);
   }, []);
 
   // Save current view on change
@@ -115,7 +122,7 @@ function App() {
     }
   };
 
-  // 首帧挂载并等待字体与布局稳定后通知 Rust 端显示主窗口，消除冷启动白屏/黑屏
+  // 首帧挂载后立即通过 DWM Cloak 唤醒 WebView2 GPU 合成首帧，确认绘制完成即瞬时揭开
   useEffect(() => {
     if (typeof window === 'undefined' || !('__TAURI_INTERNALS__' in window)) {
       return;
@@ -123,7 +130,8 @@ function App() {
 
     let cancelled = false;
     let rafId = null;
-    let timerId = null;
+    let raceTimer = null;
+    let prefetchTimer = null;
 
     const waitPaintFrames = (frameCount) =>
       new Promise((resolve) => {
@@ -144,53 +152,59 @@ function App() {
       });
 
     const revealWithCompositorWarmup = async () => {
+      // 若启动恢复到非首页视图，等待目标懒加载视图就绪并完成 React 提交后再统计布局
+      const initialView = getInitialView();
+      if (initialView === 'translator') {
+        await loadTranslatorView();
+        if (cancelled) return;
+        await new Promise((resolve) => setTimeout(resolve, 0));
+      } else if (initialView === 'library') {
+        await loadLibraryView();
+        if (cancelled) return;
+        await new Promise((resolve) => setTimeout(resolve, 0));
+      }
       if (cancelled) return;
-      // 强制同步刷新一次布局，确保 Tailwind 样式已计算
+
+      // 强制同步刷新一次布局，确保首帧样式已计算
       void document.documentElement.offsetHeight;
 
       const isDark = resolveIsDark(themeRef.current);
       try {
-        // 先以 DWM Cloak 状态 show() 唤醒 WebView2 GPU 合成器绘制首帧，随后等待合成提交再解除遮罩
         await invoke('show_main_window', { isDark });
         if (cancelled) return;
-        let raceTimer = null;
         try {
           await Promise.race([
-            waitPaintFrames(3),
+            waitPaintFrames(2),
             new Promise((resolve) => {
-              raceTimer = setTimeout(resolve, 120);
-              timerId = raceTimer;
+              raceTimer = setTimeout(resolve, 80);
             }),
           ]);
         } finally {
-          if (raceTimer !== null) clearTimeout(raceTimer);
+          if (raceTimer !== null) {
+            clearTimeout(raceTimer);
+            raceTimer = null;
+          }
         }
         if (!cancelled) {
           await invoke('uncloak_main_window');
+          // 窗口可见后空闲预热其余子视图，兼顾冷启动速度与切换即时感
+          prefetchTimer = setTimeout(() => {
+            loadTranslatorView().catch(() => {});
+            loadLibraryView().catch(() => {});
+          }, 1200);
         }
       } catch {
         // 忽略窗口控制异常，后端设有兜底解封超时
       }
     };
 
-    const fontsReady =
-      document.fonts?.ready && typeof document.fonts.ready.then === 'function'
-        ? Promise.race([
-            document.fonts.ready.catch(() => {}),
-            new Promise((resolve) => setTimeout(resolve, 120)),
-          ])
-        : Promise.resolve();
-
-    fontsReady.then(() => {
-      if (!cancelled) {
-        timerId = setTimeout(revealWithCompositorWarmup, 16);
-      }
-    });
+    revealWithCompositorWarmup();
 
     return () => {
       cancelled = true;
       if (rafId !== null) cancelAnimationFrame(rafId);
-      if (timerId !== null) clearTimeout(timerId);
+      if (raceTimer !== null) clearTimeout(raceTimer);
+      if (prefetchTimer !== null) clearTimeout(prefetchTimer);
     };
   }, []);
 
@@ -254,23 +268,33 @@ function App() {
               openFileProgrammatically={ebook.openFileProgrammatically} 
             />
           )}
-          {currentView === 'translator' && <TranslatorView />}
-          {currentView === 'library' && <LibraryView ebook={ebook} />}
+          <Suspense fallback={null}>
+            {currentView === 'translator' && <TranslatorView />}
+            {currentView === 'library' && <LibraryView ebook={ebook} />}
+          </Suspense>
         </main>
       </div>
 
-      <SettingsModal 
-        isOpen={settingsOpen} 
-        onClose={() => setSettingsOpen(false)} 
-      />
-      <HelpModal 
-        isOpen={isHelpModalOpen} 
-        onClose={() => setIsHelpModalOpen(false)} 
-      />
-      <AboutModal 
-        isOpen={isAboutOpen} 
-        onClose={() => setIsAboutOpen(false)} 
-      />
+      <Suspense fallback={null}>
+        {settingsOpen && (
+          <SettingsModal 
+            isOpen={settingsOpen} 
+            onClose={() => setSettingsOpen(false)} 
+          />
+        )}
+        {isHelpModalOpen && (
+          <HelpModal 
+            isOpen={isHelpModalOpen} 
+            onClose={() => setIsHelpModalOpen(false)} 
+          />
+        )}
+        {isAboutOpen && (
+          <AboutModal 
+            isOpen={isAboutOpen} 
+            onClose={() => setIsAboutOpen(false)} 
+          />
+        )}
+      </Suspense>
       
       {/* Update Banner */}
       {updateInfo && (
@@ -301,6 +325,7 @@ function App() {
                 const btn = document.getElementById('btn-silent-update');
                 if (btn) btn.innerText = t('update.downloading');
                 try {
+                  const { installUpdate } = await import('./utils/updater');
                   await installUpdate(updateInfo);
                 } catch {
                   if (btn) btn.innerText = t('update.failed');

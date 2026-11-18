@@ -3,9 +3,6 @@ import { save } from '@tauri-apps/plugin-dialog';
 import { X, Sparkles, CheckCircle2 } from 'lucide-react';
 import { useI18n } from '../i18n';
 import { generateStructuredRandomContent } from '../utils/morse/structuredRandom';
-import { exportPdfPractice } from '../services/pdfExportService';
-import { exportEpubPractice } from '../services/epubExportService';
-import { exportMorseAudio } from '../services/audioExportService';
 import ModeSelector from './generator/ModeSelector';
 import GroupLengthSelector from './generator/GroupLengthSelector';
 import GroupCountSelector from './generator/GroupCountSelector';
@@ -325,6 +322,7 @@ export default function GeneratorModal({ isOpen, onClose, onGenerate }) {
       if (pdf) {
         setIsExportingPdf(true);
         setExportType('pdf');
+        const { exportPdfPractice } = await import('../services/pdfExportService');
         await exportPdfPractice({
           exportPages: generatedDataset.totalPages,
           presetMode,
@@ -353,6 +351,7 @@ export default function GeneratorModal({ isOpen, onClose, onGenerate }) {
       if (epub) {
         setIsExportingEpub(true);
         setExportType('epub');
+        const { exportEpubPractice } = await import('../services/epubExportService');
         await exportEpubPractice({
           exportPages: generatedDataset.totalPages,
           presetMode,
@@ -384,6 +383,7 @@ export default function GeneratorModal({ isOpen, onClose, onGenerate }) {
         const fullPracticeText = pages.map(p => p.map(g => Array.isArray(g) ? g.join('') : String(g)).join(' ')).join('\n\n');
         const prefSpeed = Number(localStorage.getItem('pref_morse_speed')) || 20;
         const prefFreq = Number(localStorage.getItem('pref_morse_freq')) || 400;
+        const { exportMorseAudio } = await import('../services/audioExportService');
         await exportMorseAudio({
           text: fullPracticeText,
           wpm: prefSpeed,

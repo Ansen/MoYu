@@ -126,7 +126,7 @@ export default function Titlebar({ theme, setTheme, openSettings, openHelp, open
             onClick={() => setActiveMenu(activeMenu === 'app' ? null : 'app')} 
             className={`px-2 py-1 rounded flex items-center gap-1.5 transition-colors ${activeMenu === 'app' ? 'bg-slate-200 dark:bg-white/10 text-black dark:text-white' : 'hover:bg-slate-100 dark:hover:bg-white/5'}`}
           >
-            <img src="/logo.png" className="w-4 h-4 object-contain" alt="MoYu" />
+            <img src="/logo-sm.png" className="w-4 h-4 object-contain" alt="MoYu" />
             <span className="font-bold text-slate-900 dark:text-white tracking-wide">{t('app.name')}</span>
             <ChevronDown size={13} className="text-slate-400 dark:text-slate-500" />
           </button>

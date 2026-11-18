@@ -1,11 +1,12 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, Suspense, lazy } from 'react';
 import { chineseToCodes, morseToCodes, codesToChinese, isMainlyMorse, isMainlyCodes } from '../utils/translator';
 import { useI18n } from '../i18n/index';
 import { Edit3, MessageSquare, Hash, Wand2, Upload, Trash2, ChevronDown, Mic, Keyboard } from 'lucide-react';
-import ImportDictModal from '../components/ImportDictModal';
 import OutputCard from '../components/common/OutputCard';
 import FontSizeAdjuster from '../components/common/FontSizeAdjuster';
 import { useSpeechRecognition } from '../hooks/useSpeechRecognition';
+
+const ImportDictModal = lazy(() => import('../components/ImportDictModal'));
 
 export default function TranslatorView() {
   const [inputText, setInputText] = useState(() => localStorage.getItem('moyu_translator_last_input') || '');
@@ -527,11 +528,15 @@ export default function TranslatorView() {
         </div>
       )}
       
-      <ImportDictModal 
-        isOpen={isImportModalOpen} 
-        onClose={() => setIsImportModalOpen(false)} 
-        onImport={handleImportFile} 
-      />
+      {isImportModalOpen && (
+        <Suspense fallback={null}>
+          <ImportDictModal 
+            isOpen={isImportModalOpen} 
+            onClose={() => setIsImportModalOpen(false)} 
+            onImport={handleImportFile} 
+          />
+        </Suspense>
+      )}
     </div>
   );
 }

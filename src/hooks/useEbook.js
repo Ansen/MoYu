@@ -1,8 +1,15 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback } from 'react';
 import { open } from '@tauri-apps/plugin-dialog';
 import { readFile, readTextFile, readDir } from '@tauri-apps/plugin-fs';
-import { generatePracticeText } from '../utils/morse/structuredRandom';
-import ePub from 'epubjs';
+
+function getInitialRecentFiles() {
+  try {
+    const saved = localStorage.getItem('moyu_recent_files');
+    return saved ? JSON.parse(saved) : [];
+  } catch {
+    return [];
+  }
+}
 
 function extractTextFromEpubDoc(doc, chapterLabel = '') {
   if (!doc) return '';
@@ -69,16 +76,7 @@ export function useEbook() {
   // bookData: { type: 'epub'|'txt', data: string, name: string, path: string, siblings: Array<{name, path, type}>, currentIndex: number, toc: Array<{id, label, href, index}>, currentChapterIndex: number, currentChapterLabel: string }
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [recentFiles, setRecentFiles] = useState([]);
-
-  useEffect(() => {
-    const saved = localStorage.getItem('moyu_recent_files');
-    if (saved) {
-      try {
-        setRecentFiles(JSON.parse(saved));
-      } catch {}
-    }
-  }, []);
+  const [recentFiles, setRecentFiles] = useState(getInitialRecentFiles);
 
   const saveRecent = useCallback((item) => {
     setRecentFiles(prev => {
@@ -112,7 +110,10 @@ export function useEbook() {
     const effectiveFolderPath = folderPath || (isFolder ? (filePath.includes('\\') ? filePath.substring(0, filePath.lastIndexOf('\\')) : filePath.substring(0, filePath.lastIndexOf('/'))) : '');
 
     if (isEpub) {
-      const fileData = await readFile(filePath);
+      const [{ default: ePub }, fileData] = await Promise.all([
+        import('epubjs'),
+        readFile(filePath),
+      ]);
       const book = ePub(fileData.buffer);
       await book.ready;
 
@@ -354,7 +355,7 @@ export function useEbook() {
     setError(null);
   }, []);
 
-  const loadGeneratedContent = useCallback((modeOrConfig) => {
+  const loadGeneratedContent = useCallback(async (modeOrConfig) => {
     let mode = 'numbers';
     let config = null;
     let name = '随机数码报底';
@@ -380,7 +381,13 @@ export function useEbook() {
       }
     }
 
-    const text = (config && config.rawText) ? config.rawText : generatePracticeText(config || mode);
+    let text;
+    if (config && config.rawText) {
+      text = config.rawText;
+    } else {
+      const { generatePracticeText } = await import('../utils/morse/structuredRandom');
+      text = generatePracticeText(config || mode);
+    }
     setBookData({
       type: 'txt',
       data: text,

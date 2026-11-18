@@ -1,10 +1,11 @@
-import React, { useState } from 'react';
-import Reader from '../components/Reader';
+import React, { useState, Suspense, lazy } from 'react';
 import { FileText, Folder, Clock, PlusCircle } from 'lucide-react';
 import { useI18n } from '../i18n/index';
 import RecentFileItem from '../components/common/RecentFileItem';
 import GeneratorDropdown from '../components/common/GeneratorDropdown';
-import GeneratorModal from '../components/GeneratorModal';
+
+const Reader = lazy(() => import('../components/Reader'));
+const GeneratorModal = lazy(() => import('../components/GeneratorModal'));
 
 export default function LibraryView({ ebook }) {
   const { 
@@ -115,22 +116,28 @@ export default function LibraryView({ ebook }) {
       </div>
 
       {bookData && (
-        <Reader 
-          bookData={bookData} 
-          onClose={closeBook} 
-          jumpToSibling={jumpToSibling}
-          jumpToChapter={jumpToChapter}
-          onRegenerate={bookData.isGenerated ? () => loadGeneratedContent(bookData.generatorConfig || bookData.generatorMode) : undefined}
-          loadGeneratedContent={loadGeneratedContent}
-        />
+        <Suspense fallback={null}>
+          <Reader 
+            bookData={bookData} 
+            onClose={closeBook} 
+            jumpToSibling={jumpToSibling}
+            jumpToChapter={jumpToChapter}
+            onRegenerate={bookData.isGenerated ? () => loadGeneratedContent(bookData.generatorConfig || bookData.generatorMode) : undefined}
+            loadGeneratedContent={loadGeneratedContent}
+          />
+        </Suspense>
       )}
 
       {/* Custom Generator Configuration Modal */}
-      <GeneratorModal
-        isOpen={isGeneratorModalOpen}
-        onClose={() => setIsGeneratorModalOpen(false)}
-        onGenerate={loadGeneratedContent}
-      />
+      {isGeneratorModalOpen && (
+        <Suspense fallback={null}>
+          <GeneratorModal
+            isOpen={isGeneratorModalOpen}
+            onClose={() => setIsGeneratorModalOpen(false)}
+            onGenerate={loadGeneratedContent}
+          />
+        </Suspense>
+      )}
     </div>
   );
 }

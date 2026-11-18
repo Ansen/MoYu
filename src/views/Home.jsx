@@ -1,21 +1,21 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { Languages, Library } from 'lucide-react';
 import { useI18n } from '../i18n/index';
 import FeatureCard from '../components/common/FeatureCard';
 import RecentFileItem from '../components/common/RecentFileItem';
 
-export default function HomeView({ setView, recentFiles, openFileProgrammatically }) {
-  const { t, langSetting } = useI18n();
-  const [greeting, setGreeting] = useState('');
+function resolveGreetingKey() {
+  const hour = new Date().getHours();
+  if (hour < 6) return 'greeting.earlyMorning';
+  if (hour < 12) return 'greeting.morning';
+  if (hour < 14) return 'greeting.noon';
+  if (hour < 18) return 'greeting.afternoon';
+  return 'greeting.evening';
+}
 
-  useEffect(() => {
-    const hour = new Date().getHours();
-    if (hour < 6) setGreeting(t('greeting.earlyMorning'));
-    else if (hour < 12) setGreeting(t('greeting.morning'));
-    else if (hour < 14) setGreeting(t('greeting.noon'));
-    else if (hour < 18) setGreeting(t('greeting.afternoon'));
-    else setGreeting(t('greeting.evening'));
-  }, [t, langSetting]);
+export default function HomeView({ setView, recentFiles, openFileProgrammatically }) {
+  const { t } = useI18n();
+  const greeting = t(resolveGreetingKey());
 
   return (
     <div className="h-full overflow-y-auto bg-slate-50 dark:bg-[#1a1a1a] p-8 md:p-12 custom-scrollbar select-none text-slate-800 dark:text-slate-200">

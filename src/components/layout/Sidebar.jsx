@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { Languages, Library, PanelLeftClose, PanelLeft, Home } from 'lucide-react';
 import { useI18n } from '../../i18n/index';
 import { useResizable } from '../../hooks/useResizable';
-import { getVersion } from '@tauri-apps/api/app';
 
 export default function Sidebar({ currentView, setView, openAbout }) {
   const [isCollapsed, setIsCollapsed] = useState(false);
@@ -11,10 +10,13 @@ export default function Sidebar({ currentView, setView, openAbout }) {
   const { t } = useI18n();
 
   useEffect(() => {
-    try {
-      getVersion().then(v => setVersion('v' + v)).catch(() => {});
-    } catch {}
-  }, []);
+    // 构建期已注入 __APP_VERSION__，仅在缺失时延迟加载 Tauri API 回退查询，避免启动期多余 IPC
+    if (version) return;
+    import('@tauri-apps/api/app')
+      .then(({ getVersion }) => getVersion())
+      .then(v => setVersion('v' + v))
+      .catch(() => {});
+  }, [version]);
 
   const menuItems = [
     { id: 'home', icon: <Home size={20} strokeWidth={2} />, label: t('sidebar.home') },
