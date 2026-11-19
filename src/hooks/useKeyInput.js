@@ -303,6 +303,8 @@ export function useKeyInput({
   wpm = 20,
   frequency = 400,
   volume = 0.8,
+  emitKeyState = true,
+  onKeyStateChange = null,
   onKeyEvent = null,
   onHardwareActivity = null
 }) {
@@ -315,6 +317,11 @@ export function useKeyInput({
 
   const isKeyDownRef = useRef(false);
   const keyDownTimeRef = useRef(0);
+  const lastPressDurationRef = useRef(0);
+  const emitKeyStateRef = useRef(emitKeyState);
+  emitKeyStateRef.current = emitKeyState;
+  const onKeyStateChangeRef = useRef(onKeyStateChange);
+  onKeyStateChangeRef.current = onKeyStateChange;
   const audioCtxRef = useRef(null);
   const oscRef = useRef(null);
   const gainRef = useRef(null);
@@ -323,6 +330,24 @@ export function useKeyInput({
   onKeyEventRef.current = onKeyEvent;
   const onHardwareActivityRef = useRef(onHardwareActivity);
   onHardwareActivityRef.current = onHardwareActivity;
+
+  const notifyKeyState = useCallback((down, duration) => {
+    if (duration !== undefined) {
+      lastPressDurationRef.current = duration;
+    }
+    if (emitKeyStateRef.current) {
+      if (duration !== undefined) {
+        setPressDuration(duration);
+      }
+      setIsKeyDown(down);
+    }
+    if (onKeyStateChangeRef.current) {
+      onKeyStateChangeRef.current({
+        isKeyDown: down,
+        pressDuration: lastPressDurationRef.current
+      });
+    }
+  }, []);
 
   const keyTypeRef = useRef(keyType);
   keyTypeRef.current = keyType;
@@ -471,7 +496,7 @@ export function useKeyInput({
     isKeyDownRef.current = true;
     const now = performance.now();
     keyDownTimeRef.current = now;
-    setIsKeyDown(true);
+    notifyKeyState(true);
 
     initAudio();
     setTone(true);
@@ -480,15 +505,14 @@ export function useKeyInput({
     if (onKeyEventRef.current) {
       onKeyEventRef.current(ev);
     }
-  }, [initAudio, setTone]);
+  }, [initAudio, setTone, notifyKeyState]);
 
   const handleUp = useCallback((source = 'keyboard') => {
     if (!isKeyDownRef.current) return;
     isKeyDownRef.current = false;
     const now = performance.now();
     const duration = Math.max(10, Math.round(now - keyDownTimeRef.current));
-    setPressDuration(duration);
-    setIsKeyDown(false);
+    notifyKeyState(false, duration);
 
     setTone(false);
 
@@ -496,7 +520,7 @@ export function useKeyInput({
     if (onKeyEventRef.current) {
       onKeyEventRef.current(ev);
     }
-  }, [setTone]);
+  }, [setTone, notifyKeyState]);
 
   // 自动键模式：Iambic Mode B 电子键控发生器 (Electronic Keyer Engine)
   const triggerKeyer = useCallback(() => {
@@ -531,7 +555,7 @@ export function useKeyInput({
       const now = performance.now();
       keyDownTimeRef.current = now;
       isKeyDownRef.current = true;
-      setIsKeyDown(true);
+      notifyKeyState(true);
       initAudio();
       setTone(true);
       if (onKeyEventRef.current) {
@@ -543,8 +567,7 @@ export function useKeyInput({
         const upTime = performance.now();
         const duration = toneDuration;
         isKeyDownRef.current = false;
-        setPressDuration(duration);
-        setIsKeyDown(false);
+        notifyKeyState(false, duration);
         setTone(false);
         if (onKeyEventRef.current) {
           onKeyEventRef.current({ timestamp: upTime, state: 'UP', duration, source: 'paddle' });
@@ -559,7 +582,7 @@ export function useKeyInput({
     };
 
     playNext();
-  }, [initAudio, setTone]);
+  }, [initAudio, setTone, notifyKeyState]);
 
   // 双桨触点事件处理（点/划独立触发 + Mode B 锁存记忆）
   const onPaddleDit = useCallback((isDown) => {
@@ -602,8 +625,8 @@ export function useKeyInput({
     keyerRunningRef.current = false;
     isKeyDownRef.current = false;
     setTone(false);
-    setIsKeyDown(false);
-  }, [keyType, setTone]);
+    notifyKeyState(false);
+  }, [keyType, setTone, notifyKeyState]);
 
   // 2. 键盘监听：
   //    手键模式: Space 发报 (按下发声，松开切断)

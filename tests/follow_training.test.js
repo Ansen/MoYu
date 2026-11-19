@@ -281,7 +281,28 @@ function testSidetoneOffsetAndModeIntegrity() {
     'useKeyInput.js MUST call e.preventDefault() before !e.repeat check on straight-key Spacebar'
   );
 
-  console.log('✓ FollowTrainingModule sidetone offset default, chapter sync & key isolation validated.');
+  // 7. 性能与零抖动渲染契约验证 (S3 / M1 / M3-Canvas / L1)
+  assert.ok(
+    !readerCode.includes('activePlayToken') && readerCode.includes('totalCharCount'),
+    'Reader.jsx MUST remove dead activePlayToken state and memoize totalCharCount'
+  );
+  assert.ok(
+    engineCode.includes('React.memo(TxtEngine)'),
+    'TxtEngine.jsx MUST wrap default export with React.memo to prevent character-level tree diffs'
+  );
+  assert.ok(
+    moduleCode.includes('timelineVersion') &&
+      moduleCode.includes('emitKeyState: false') &&
+      moduleCode.includes('userEventsRef={userEventsRef}'),
+    'FollowTrainingModule.jsx MUST filter timeline rebuilds via timelineVersion and isolate key events/state via refs'
+  );
+  assert.ok(
+    canvasCode.includes('userPulseCacheRef') &&
+      !canvasCode.includes('[targetTimeline, userEvents, isPlaying'),
+    'MorseTimelineCanvas.jsx MUST use incremental userPulseCacheRef without restarting RAF on userEvents changes'
+  );
+
+  console.log('✓ FollowTrainingModule sidetone offset default, chapter sync, key isolation & zero-jank contracts validated.');
 }
 
 export function testFollowTrainingLogic() {

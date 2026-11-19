@@ -350,5 +350,62 @@ export function testStructuredRandom() {
   }
   console.log('✓ Non-blocking latency & slot invariants across 5/6/8-char end/multi slots validated (< 500ms).');
 
+  // 13. High-group-count MIXED x1000 & large-group-length LETTERS/CUSTOM O(n!) OOM regression (S1 & S2)
+  const mixed1000Start = performance.now();
+  const mixed1000 = generateStructuredRandomContent({
+    mode: GENERATOR_MODE.MIXED,
+    charsPerGroup: 5,
+    maxDigitsPerGroup: 1,
+    groupCount: 1000
+  });
+  const mixed1000Elapsed = performance.now() - mixed1000Start;
+  if (mixed1000Elapsed >= 500) {
+    throw new Error(`MIXED 5-char x1000 took too long: ${mixed1000Elapsed.toFixed(1)}ms (expected < 500ms)`);
+  }
+  if (!mixed1000 || mixed1000.groups.length !== 1000) {
+    throw new Error('MIXED x1000 failed to generate 1000 groups');
+  }
+  for (let i = 0; i < mixed1000.groups.length; i++) {
+    const g = mixed1000.groups[i];
+    const digitCount = g.filter(ch => /[0-9]/.test(ch)).length;
+    if (g.length !== 5 || digitCount !== 1 || /[0-9]/.test(g[0]) || /[0-9]/.test(g[4])) {
+      throw new Error(`MIXED x1000 group ${i} ('${g.join('')}') violated length/interior digit invariants`);
+    }
+  }
+
+  for (const len of [10, 12]) {
+    const startLetters = performance.now();
+    const lettersLarge = generateStructuredRandomContent({
+      mode: GENERATOR_MODE.LETTERS,
+      charsPerGroup: len,
+      groupCount: 50
+    });
+    const elapsedLetters = performance.now() - startLetters;
+    if (elapsedLetters >= 500) {
+      throw new Error(`LETTERS len=${len} x50 took too long: ${elapsedLetters.toFixed(1)}ms (expected < 500ms)`);
+    }
+    if (!lettersLarge || lettersLarge.groups.length !== 50 || lettersLarge.groups.some(g => g.length !== len)) {
+      throw new Error(`LETTERS len=${len} x50 returned invalid group lengths`);
+    }
+
+    const startCustom = performance.now();
+    const customLarge = generateStructuredRandomContent({
+      mode: 'custom',
+      customProfile: true,
+      pool: 'abcdefghijklmnopqrstuvwxyz'.split(''),
+      charsPerGroup: len,
+      groupCount: 50,
+      allowAdjacentDuplicate: true
+    });
+    const elapsedCustom = performance.now() - startCustom;
+    if (elapsedCustom >= 500) {
+      throw new Error(`CUSTOM(allowAdj=true) len=${len} x50 took too long: ${elapsedCustom.toFixed(1)}ms (expected < 500ms)`);
+    }
+    if (!customLarge || customLarge.groups.length !== 50 || customLarge.groups.some(g => g.length !== len)) {
+      throw new Error(`CUSTOM len=${len} x50 returned invalid group lengths`);
+    }
+  }
+  console.log('✓ MIXED x1000 & len=10/12 LETTERS/CUSTOM anti-OOM permutation bounds validated (< 500ms).');
+
   console.log('All Upgraded Random Generator tests passed successfully!\n');
 }

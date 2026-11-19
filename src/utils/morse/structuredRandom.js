@@ -403,35 +403,114 @@ function canCompleteGroup(prefix, counts, remainingSlots, profile, maxDigitsPerG
 }
 
 function filterFeasibleCandidates(candidates, counts, groupChars, profile, charsPerGroup, maxDigitsPerGroup = null, minDigitsPerGroup = 0, targetDigitSlots = null) {
-    if (profile.allowAdjacentDuplicate) {
+    if (profile.allowAdjacentDuplicate || candidates.length === 0) {
         return candidates
     }
 
+    const previousChar = groupChars[groupChars.length - 1] || ''
+    const hasDigits = profile.pool.some(c => /[0-9]/.test(c))
+    const hasLetters = profile.pool.some(c => /[a-z]/i.test(c))
+    const isMixed = hasDigits && hasLetters
+    const currentDigitCount = groupChars.filter(ch => /[0-9]/.test(ch)).length
+    const hasTargetDigitSlots = Boolean(targetDigitSlots && targetDigitSlots.size > 0)
     const remainingSlots = charsPerGroup - groupChars.length - 1
+
+    const canSkipBacktracking = !hasAdjacentDuplicate(groupChars)
+    if (canSkipBacktracking) {
+        const nonAdjacent = previousChar
+            ? candidates.filter(c => c !== previousChar && (counts.get(c) || 0) > 0)
+            : candidates.filter(c => (counts.get(c) || 0) > 0)
+
+        if (remainingSlots <= 0) {
+            const validFinal = (isMixed && minDigitsPerGroup > 0)
+                ? nonAdjacent.filter(c => currentDigitCount + (/[0-9]/.test(c) ? 1 : 0) >= minDigitsPerGroup)
+                : nonAdjacent
+            if (validFinal.length > 0) {
+                return validFinal
+            }
+        } else if (nonAdjacent.length > 0) {
+            let availableDigits = 0
+            let distinctDigits = 0
+            let maxDigitCount = 0
+            let availableNonDigits = 0
+            let distinctNonDigits = 0
+            let maxNonDigitCount = 0
+
+            for (const [char, count] of counts.entries()) {
+                if (count <= 0) continue
+                if (/[0-9]/.test(char)) {
+                    availableDigits += count
+                    distinctDigits++
+                    if (count > maxDigitCount) maxDigitCount = count
+                } else {
+                    availableNonDigits += count
+                    distinctNonDigits++
+                    if (count > maxNonDigitCount) maxNonDigitCount = count
+                }
+            }
+
+            if (isMixed && hasTargetDigitSlots) {
+                const position = groupChars.length
+                const isTargetSlot = targetDigitSlots.has(position)
+                let remainingTargetDigits = 0
+                for (let s = position + 1; s < charsPerGroup; s++) {
+                    if (targetDigitSlots.has(s)) {
+                        remainingTargetDigits++
+                    }
+                }
+                const remainingTargetNonDigits = remainingSlots - remainingTargetDigits
+                const digitsAfterPick = currentDigitCount + (isTargetSlot ? 1 : 0)
+                const minOk = minDigitsPerGroup <= 0 || (digitsAfterPick + remainingTargetDigits >= minDigitsPerGroup)
+                const maxOk = maxDigitsPerGroup === null || maxDigitsPerGroup === undefined || (digitsAfterPick + remainingTargetDigits <= maxDigitsPerGroup)
+                const remDigitsAvail = availableDigits - (isTargetSlot ? 1 : 0)
+                const remNonDigitsAvail = availableNonDigits - (isTargetSlot ? 0 : 1)
+                const digitsOk = remainingTargetDigits === 0 || (
+                    distinctDigits >= 3 &&
+                    remDigitsAvail >= remainingTargetDigits &&
+                    (remDigitsAvail - maxDigitCount) >= Math.floor(remainingTargetDigits / 2) + 1
+                )
+                const nonDigitsOk = remainingTargetNonDigits === 0 || (
+                    distinctNonDigits >= 3 &&
+                    remNonDigitsAvail >= remainingTargetNonDigits &&
+                    (remNonDigitsAvail - maxNonDigitCount) >= Math.floor(remainingTargetNonDigits / 2) + 1
+                )
+                if (minOk && maxOk && digitsOk && nonDigitsOk) {
+                    return nonAdjacent
+                }
+            } else if (!isMixed) {
+                const totalAvailable = availableDigits + availableNonDigits
+                const totalDistinct = distinctDigits + distinctNonDigits
+                const totalMaxSingle = Math.max(maxDigitCount, maxNonDigitCount)
+                if (
+                    totalDistinct >= 3 &&
+                    (totalAvailable - 1) >= remainingSlots &&
+                    ((totalAvailable - 1) - totalMaxSingle) >= Math.floor(remainingSlots / 2) + 1
+                ) {
+                    return nonAdjacent
+                }
+            }
+        }
+    }
+
     const feasible = candidates.filter(candidate => {
         const currentCount = counts.get(candidate) || 0
         if (currentCount <= 0) return false
 
-        const nextCounts = new Map(counts)
-        nextCounts.set(candidate, currentCount - 1)
-        return canCompleteGroup([...groupChars, candidate], nextCounts, remainingSlots, profile, maxDigitsPerGroup, charsPerGroup, minDigitsPerGroup, targetDigitSlots)
+        counts.set(candidate, currentCount - 1)
+        const ok = canCompleteGroup([...groupChars, candidate], counts, remainingSlots, profile, maxDigitsPerGroup, charsPerGroup, minDigitsPerGroup, targetDigitSlots)
+        counts.set(candidate, currentCount)
+        return ok
     })
 
     if (feasible.length > 0) {
         return feasible
     }
 
-    const hasDigits = profile.pool.some(c => /[0-9]/.test(c))
-    const hasLetters = profile.pool.some(c => /[a-z]/i.test(c))
-    const isMixed = hasDigits && hasLetters
     const position = groupChars.length
     const isBoundary = isMixed && charsPerGroup >= 3 && (position === 0 || position === charsPerGroup - 1)
-    const hasTargetDigitSlots = Boolean(targetDigitSlots && targetDigitSlots.size > 0)
     const isTargetDigitSlot = Boolean(hasTargetDigitSlots && targetDigitSlots.has(position))
     const isForbiddenDigitSlot = Boolean(hasTargetDigitSlots && !targetDigitSlots.has(position))
 
-    const previousChar = groupChars[groupChars.length - 1] || ''
-    const currentDigitCount = groupChars.filter(ch => /[0-9]/.test(ch)).length
     const reserveCounts = new Map(profile.pool.map(char => [char, charsPerGroup]))
     const emergencyCandidates = profile.pool
         .filter(candidate => profile.allowAdjacentDuplicate || candidate !== previousChar)
@@ -448,9 +527,11 @@ function filterFeasibleCandidates(candidates, counts, groupChars, profile, chars
             if (maxDigitsPerGroup !== null && maxDigitsPerGroup !== undefined && /[0-9]/.test(candidate) && currentDigitCount >= maxDigitsPerGroup) {
                 return false
             }
-            const nextCounts = new Map(reserveCounts)
-            nextCounts.set(candidate, Math.max(0, (nextCounts.get(candidate) || 0) - 1))
-            return canCompleteGroup([...groupChars, candidate], nextCounts, remainingSlots, profile, maxDigitsPerGroup, charsPerGroup, minDigitsPerGroup, targetDigitSlots)
+            const prevReserve = reserveCounts.get(candidate) || 0
+            reserveCounts.set(candidate, Math.max(0, prevReserve - 1))
+            const ok = canCompleteGroup([...groupChars, candidate], reserveCounts, remainingSlots, profile, maxDigitsPerGroup, charsPerGroup, minDigitsPerGroup, targetDigitSlots)
+            reserveCounts.set(candidate, prevReserve)
+            return ok
         })
 
     return emergencyCandidates.length > 0 ? emergencyCandidates : candidates
@@ -512,25 +593,73 @@ function hasAdjacentDuplicate(chars) {
     return false
 }
 
-function uniquePermutations(chars) {
+function sampleValidPermutations(chars, {
+    isMixed = false,
+    previousGroup = '',
+    allowAdjacentDuplicate = false,
+    random = Math.random,
+    maxResults = 32,
+    maxAttempts = 64,
+} = {}) {
+    const results = []
+    const seen = new Set()
+
+    const isAcceptable = (candidate) => {
+        if (!allowAdjacentDuplicate && hasAdjacentDuplicate(candidate)) return false
+        if (isMixed && (/[0-9]/.test(candidate[0]) || /[0-9]/.test(candidate[candidate.length - 1]))) return false
+        if (previousGroup && candidate.join('') === previousGroup) return false
+        return true
+    }
+
+    for (let attempt = 0; attempt < maxAttempts && results.length < maxResults; attempt++) {
+        const candidate = shuffle(chars, random)
+        if (!isAcceptable(candidate)) continue
+        const key = candidate.join('')
+        if (!seen.has(key)) {
+            seen.add(key)
+            results.push(candidate)
+        }
+    }
+
+    if (results.length > 0) {
+        return results
+    }
+
+    // 采样全未命中时运行严格有界回溯（常数上限，杜绝任何组长的 O(n!) OOM）
     const counts = new Map()
     for (const char of chars) {
         counts.set(char, (counts.get(char) || 0) + 1)
     }
 
-    const results = []
+    const boundedResults = []
     const path = []
     const pool = [...counts.keys()].sort()
+    const maxBoundedResults = 16
+    const maxVisits = 256
+    let visits = 0
 
     function backtrack() {
-        if (path.length === chars.length) {
-            results.push([...path])
+        if (boundedResults.length >= maxBoundedResults || visits >= maxVisits) return
+        visits++
+
+        const pos = path.length
+        if (pos === chars.length) {
+            if (!previousGroup || path.join('') !== previousGroup) {
+                boundedResults.push([...path])
+            }
             return
         }
 
+        const prevChar = pos > 0 ? path[pos - 1] : ''
+        const isEdge = isMixed && (pos === 0 || pos === chars.length - 1)
+
         for (const char of pool) {
+            if (boundedResults.length >= maxBoundedResults || visits >= maxVisits) return
             const remaining = counts.get(char) || 0
             if (remaining <= 0) continue
+            if (!allowAdjacentDuplicate && prevChar && char === prevChar) continue
+            if (isEdge && /[0-9]/.test(char)) continue
+
             counts.set(char, remaining - 1)
             path.push(char)
             backtrack()
@@ -540,7 +669,7 @@ function uniquePermutations(chars) {
     }
 
     backtrack()
-    return results
+    return boundedResults
 }
 
 function scoreGroupPermutation(chars, previousGroup, profile) {
@@ -604,14 +733,21 @@ function normalizeGroupOrder(group, previousGroup, profile, random = Math.random
         (minDigitsPerGroup > 0 && digitCount < minDigitsPerGroup)
     )
 
-    if (!hasAdjacentDuplicate(group) && (!previousGroup || group.join('') !== previousGroup) && !hasBadDigitPlacement) {
+    const needsAdjacentRepair = !profile.allowAdjacentDuplicate && hasAdjacentDuplicate(group)
+    const isRepeatedGroup = Boolean(previousGroup && group.join('') === previousGroup)
+
+    if (!needsAdjacentRepair && !isRepeatedGroup && !hasBadDigitPlacement) {
         return group
     }
 
-    const permutations = uniquePermutations(group)
-        .filter(candidate => !hasAdjacentDuplicate(candidate))
-        .filter(candidate => !isMixed || (!/[0-9]/.test(candidate[0]) && !/[0-9]/.test(candidate[candidate.length - 1])))
-        .filter(candidate => !previousGroup || candidate.join('') !== previousGroup)
+    const permutations = sampleValidPermutations(group, {
+        isMixed,
+        previousGroup,
+        allowAdjacentDuplicate: Boolean(profile.allowAdjacentDuplicate),
+        random,
+        maxResults: 32,
+        maxAttempts: 64,
+    })
 
     if (permutations.length === 0) {
         return group

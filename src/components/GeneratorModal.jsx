@@ -51,7 +51,10 @@ export default function GeneratorModal({ isOpen, onClose, onGenerate }) {
   const [exportType, setExportType] = useState('pdf'); // 'pdf' | 'epub'
   const [exportProgress, setExportProgress] = useState(null); // { current, total, percent, text }
 
-  const effectiveGroupCount = isCustomCount ? Math.max(1, parseInt(customCountInput) || 100) : groupCount;
+  const MAX_CUSTOM_GROUP_COUNT = 2000;
+  const effectiveGroupCount = isCustomCount
+    ? Math.min(MAX_CUSTOM_GROUP_COUNT, Math.max(1, parseInt(customCountInput, 10) || 100))
+    : groupCount;
 
   // Recommended length: Letters & Mixed -> 5 chars, Numbers -> 4 chars
   const recommendedLength = useMemo(() => {

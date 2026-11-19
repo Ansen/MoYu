@@ -44,6 +44,9 @@ class DesktopAudioPlayer {
     this.isReady = false;
     this._readyPromise = null;
     this._scheduleEpoch = 0; // 调度代数版本号，用于精准作废过期的未发声高亮回调
+    this._timelineVersion = 0; // 时间轴结构版本号，仅队列构建或重算偏移时递增
+    this._scheduledStartIdx = 0; // 当前音频调度起点索引，用于 getPlaybackProgress 游标边界
+    this._progressCursor = 0; // 进度查询游标，避免高频 60FPS 从 queue[0] 线性全扫
 
     this.state = AUDIO_STATE.IDLE;
 
@@ -156,6 +159,7 @@ class DesktopAudioPlayer {
       isPlaying: this.playbackState.isPlaying,
       isPaused: this.playbackState.isPaused,
       activeMarker: this.playbackState.activeMarker,
+      timelineVersion: this._timelineVersion,
       volume: this.volume,
       config: { ...this.playbackConfig },
       session: { ...this.session }
@@ -380,7 +384,12 @@ class DesktopAudioPlayer {
         nextOffsetMs = gap.timelineEndMs;
       }
     }
-    if (nextIndex >= this.queue.length) return;
+    if (nextIndex >= this.queue.length) {
+      if (previousIndex >= 0) {
+        this._timelineVersion = (this._timelineVersion || 0) + 1;
+      }
+      return;
+    }
 
     this._scheduleEpoch = (this._scheduleEpoch || 0) + 1;
     if (this.oscGain) {
@@ -398,6 +407,10 @@ class DesktopAudioPlayer {
       delete this.queue[i].toneEndTime;
     }
     this.queueIndex = nextIndex;
+    this._progressCursor = Math.min(
+      this._progressCursor || 0,
+      Math.max(this._scheduledStartIdx || 0, previousIndex >= 0 ? previousIndex : nextIndex)
+    );
     this.nextNoteTime = nextStart;
     this._refreshQueueNumberMode(nextIndex, this.playbackConfig.numberMode);
     this._recomputeTimelineOffsets(nextIndex, nextOffsetMs);
@@ -495,6 +508,8 @@ class DesktopAudioPlayer {
       this.queue = [];
       this.queueIndex = 0;
     }
+    this._scheduledStartIdx = 0;
+    this._progressCursor = 0;
     if (stopRequested) {
       this._transitionTo(AUDIO_STATE.STOPPED, { activeMarker: null });
       this._lastPlaybackTimeMs = 0;
@@ -556,6 +571,8 @@ class DesktopAudioPlayer {
       delete this.queue[i].toneEndTime;
     }
     this._recomputeTimelineOffsets(this.queueIndex);
+    this._scheduledStartIdx = this.queueIndex;
+    this._progressCursor = this.queueIndex;
     this.nextNoteTime = now + leadIn;
 
     // 启动 25ms Lookahead 调度心跳
@@ -609,6 +626,8 @@ class DesktopAudioPlayer {
 
     this.queue = normalizeMorseTokenGaps(queue);
     this.queueIndex = 0;
+    this._scheduledStartIdx = 0;
+    this._progressCursor = 0;
     this._recomputeTimelineOffsets();
     return this.queue;
   }
@@ -648,6 +667,8 @@ class DesktopAudioPlayer {
       }
       item.timelineEndMs = offsetMs;
     }
+
+    this._timelineVersion = (this._timelineVersion || 0) + 1;
   }
 
   /**
@@ -999,20 +1020,33 @@ class DesktopAudioPlayer {
     let currentItem = null;
 
     if (this.queue && this.queue.length > 0) {
-      for (let i = 0; i < this.queue.length; i++) {
+      const len = this.queue.length;
+      let startIdx = Math.max(0, Math.min(this._progressCursor || 0, len - 1));
+      const hintItem = this.queue[startIdx];
+      if (!hintItem || hintItem.startTime === undefined || now < hintItem.startTime) {
+        startIdx = Math.max(0, Math.min(this._scheduledStartIdx || 0, len - 1));
+        const baseItem = this.queue[startIdx];
+        if (!baseItem || baseItem.startTime === undefined || now < baseItem.startTime) {
+          startIdx = 0;
+        }
+      }
+
+      for (let i = startIdx; i < len; i++) {
         const it = this.queue[i];
         if (it.startTime !== undefined && it.endTime !== undefined) {
-          if (now >= it.startTime && now < it.endTime) {
+          if (now < it.endTime) {
             currentItem = it;
-            break;
-          } else if (now < it.startTime) {
-            currentItem = it;
+            this._progressCursor = i;
             break;
           }
+        } else if (i >= this.queueIndex && i >= (this._scheduledStartIdx || 0)) {
+          break;
         }
       }
       if (!currentItem && this.queueIndex > 0) {
-        currentItem = this.queue[Math.min(this.queue.length - 1, this.queueIndex - 1)];
+        const lastScheduledIdx = Math.min(len - 1, this.queueIndex - 1);
+        currentItem = this.queue[lastScheduledIdx];
+        this._progressCursor = lastScheduledIdx;
       }
     }
 

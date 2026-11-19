@@ -205,6 +205,82 @@ export async function testAudioPlayerLogic() {
   );
   console.log('✓ Inaudible wake stream error handling validated.');
 
+  // 15. timelineVersion monotonicity & cursor-accelerated getPlaybackProgress parity (M1 & M2)
+  const longText = 'ABCDE 12345 '.repeat(45).trim();
+  const baseVersion = audioPlayer.getSnapshot().timelineVersion;
+  await audioPlayer.play(longText, { wpm: 20 });
+  const afterPlayVersion = audioPlayer.getSnapshot().timelineVersion;
+  assert.ok(afterPlayVersion > baseVersion, 'timelineVersion must increment when building playback queue');
+
+  audioPlayer.setOutputVolume(65);
+  assert.strictEqual(
+    audioPlayer.getSnapshot().timelineVersion,
+    afterPlayVersion,
+    'timelineVersion must remain unchanged on volume-only changes'
+  );
+
+  // Mock 500+ item timeline progression and verify forward, pause/resume gap, and backward seek parity
+  const linearFindItem = (queue, now) => {
+    let found = null;
+    for (let i = 0; i < queue.length; i++) {
+      const it = queue[i];
+      if (it.startTime !== undefined && it.endTime !== undefined) {
+        if ((now >= it.startTime && now < it.endTime) || now < it.startTime) {
+          found = it;
+          break;
+        }
+      }
+    }
+    if (!found && audioPlayer.queueIndex > 0) {
+      found = queue[Math.min(queue.length - 1, audioPlayer.queueIndex - 1)];
+    }
+    return found;
+  };
+
+  const savedCtx = audioPlayer.audioContext;
+  try {
+    let mockNow = 10;
+    audioPlayer.audioContext = { currentTime: mockNow };
+    let tCursor = 10;
+    const midStart = Math.floor(audioPlayer.queue.length / 2);
+    for (let i = 0; i < audioPlayer.queue.length; i++) {
+      const durSec = (audioPlayer.queue[i].timelineDurationMs || 100) / 1000;
+      if (i < midStart) {
+        delete audioPlayer.queue[i].startTime;
+        delete audioPlayer.queue[i].endTime;
+      } else {
+        audioPlayer.queue[i].startTime = tCursor;
+        audioPlayer.queue[i].endTime = tCursor + durSec;
+        tCursor += durSec;
+      }
+    }
+    audioPlayer._scheduledStartIdx = midStart;
+    audioPlayer._progressCursor = midStart;
+    audioPlayer.queueIndex = audioPlayer.queue.length;
+
+    const sampleIndices = [midStart, midStart + 25, midStart + 120, audioPlayer.queue.length - 1, midStart + 10];
+    for (const idx of sampleIndices) {
+      const targetItem = audioPlayer.queue[idx];
+      mockNow = (targetItem.startTime + targetItem.endTime) / 2;
+      audioPlayer.audioContext.currentTime = mockNow;
+      const got = audioPlayer.getPlaybackProgress();
+      const expected = linearFindItem(audioPlayer.queue, mockNow);
+      const expectedMs = expected.timelineStartMs + Math.max(0, (mockNow - expected.startTime) * 1000);
+      assert.ok(Math.abs(got.timeMs - expectedMs) < 1e-6, `Progress cursor timeMs mismatch at idx ${idx}`);
+      assert.strictEqual(got.activeToken, expected.type === 'body' ? expected.rawToken : null);
+    }
+
+    audioPlayer.updateConfig({ wpm: 25 });
+    assert.ok(
+      audioPlayer.getSnapshot().timelineVersion > afterPlayVersion,
+      'timelineVersion must increment after runtime speed change'
+    );
+  } finally {
+    audioPlayer.audioContext = savedCtx;
+    audioPlayer.stop();
+  }
+  console.log('✓ timelineVersion precision filtering & O(1) cursor progress parity validated.');
+
   console.log('All Audio Player tests passed successfully!\n');
 }
 

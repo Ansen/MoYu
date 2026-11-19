@@ -14,6 +14,8 @@ import { useI18n } from '../../i18n';
 export default function MorseTimelineCanvas({
   targetTimeline,
   userEvents = [],
+  userEventsRef = null,
+  eventsResetVersion = 0,
   currentTime = 0,
   isPlaying = false,
   isPaused = false,
@@ -27,6 +29,20 @@ export default function MorseTimelineCanvas({
   const containerRef = useRef(null);
   const canvasRef = useRef(null);
   const canvasDimensionsRef = useRef({ width: 0, height: 0, dpr: 1 });
+  const userEventsPropRef = useRef(userEvents);
+  userEventsPropRef.current = userEvents;
+  const userEventsRefPropRef = useRef(userEventsRef);
+  userEventsRefPropRef.current = userEventsRef;
+  const eventsResetVersionRef = useRef(eventsResetVersion);
+  eventsResetVersionRef.current = eventsResetVersion;
+  const userPulseCacheRef = useRef({
+    source: null,
+    resetVersion: -1,
+    processedCount: 0,
+    pulses: [],
+    curDown: null,
+    curDownTimestamp: 0
+  });
 
   // 监听主题变化
   const [isDark, setIsDark] = useState(() => {
@@ -42,9 +58,10 @@ export default function MorseTimelineCanvas({
     return () => observer.disconnect();
   }, []);
 
-  // 检查当前是否有未抬起的按键（按下状态）
-  const lastEvent = userEvents.length > 0 ? userEvents[userEvents.length - 1] : null;
-  const isPressing = lastEvent && (lastEvent.state || '').toUpperCase() === 'DOWN';
+  // 检查当前是否有未抬起的按键（向下兼容直接传数组 prop 场景）
+  const activeEventsSnapshot = userEventsRef ? (userEventsRef.current || []) : userEvents;
+  const lastEvent = activeEventsSnapshot.length > 0 ? activeEventsSnapshot[activeEventsSnapshot.length - 1] : null;
+  const isPressing = !userEventsRef && lastEvent && (lastEvent.state || '').toUpperCase() === 'DOWN';
 
   // 监听容器尺寸调整 Canvas 物理像素（仅在实际缩放/窗口拉伸时执行，杜绝 60FPS 显存重建）
   useEffect(() => {
@@ -207,50 +224,66 @@ export default function MorseTimelineCanvas({
       ctx.fillText(blindText, width / 2, halfH / 2 + 4);
     }
 
-    // 6. 绘制下轨：用户打键脉冲 (User Transmit Track)
+    // 6. 绘制下轨：用户打键脉冲 (User Transmit Track) — 增量解析缓存 + 二分可视剔除
     const bottomTrackY = Math.round(halfH + halfH / 2 - pulseH / 2);
+    const activeEvents = userEventsRefPropRef.current?.current ?? userEventsPropRef.current ?? [];
+    const cache = userPulseCacheRef.current;
 
-    let curDown = null;
-    let curDownTimestamp = 0;
-    const userPulses = [];
+    if (
+      cache.source !== activeEvents ||
+      cache.resetVersion !== eventsResetVersionRef.current ||
+      activeEvents.length < cache.processedCount
+    ) {
+      cache.source = activeEvents;
+      cache.resetVersion = eventsResetVersionRef.current;
+      cache.processedCount = 0;
+      cache.pulses = [];
+      cache.curDown = null;
+      cache.curDownTimestamp = 0;
+    }
 
-    for (let i = 0; i < userEvents.length; i++) {
-      const ev = userEvents[i];
+    for (let i = cache.processedCount; i < activeEvents.length; i++) {
+      const ev = activeEvents[i];
       const t = Number(ev.time !== undefined ? ev.time : (ev.timestamp || 0));
       const state = (ev.state || '').toUpperCase();
       if (state === 'DOWN') {
-        curDown = t;
-        curDownTimestamp = Number(ev.timestamp || 0);
-      } else if (state === 'UP' && curDown !== null) {
+        cache.curDown = t;
+        cache.curDownTimestamp = Number(ev.timestamp || 0);
+      } else if (state === 'UP' && cache.curDown !== null) {
         const pulseDur = (ev.duration !== undefined && ev.duration > 0)
           ? Number(ev.duration)
-          : Math.max(10, t - curDown);
-        userPulses.push({
-          start: curDown,
-          end: curDown + pulseDur,
+          : Math.max(10, t - cache.curDown);
+        cache.pulses.push({
+          start: cache.curDown,
+          end: cache.curDown + pulseDur,
           duration: pulseDur
         });
-        curDown = null;
-        curDownTimestamp = 0;
+        cache.curDown = null;
+        cache.curDownTimestamp = 0;
       }
     }
+    cache.processedCount = activeEvents.length;
 
-    // 当前未抬起的实时生长按键
-    if (curDown !== null) {
-      const now = performance.now();
-      const realDur = curDownTimestamp > 0 
-        ? Math.max(8, Math.round(now - curDownTimestamp))
-        : Math.max(8, curTime - curDown);
-      userPulses.push({
-        start: curDown,
-        end: curDown + realDur,
-        duration: realDur,
-        isActive: true
-      });
+    const cachedPulses = cache.pulses;
+    let userStartIdx = 0;
+    let uLow = 0;
+    let uHigh = cachedPulses.length - 1;
+    while (uLow <= uHigh) {
+      const mid = (uLow + uHigh) >> 1;
+      if (cachedPulses[mid].end >= windowStartMs) {
+        userStartIdx = mid;
+        uHigh = mid - 1;
+      } else {
+        uLow = mid + 1;
+      }
+    }
+    while (userStartIdx > 0 && cachedPulses[userStartIdx - 1].end >= windowStartMs) {
+      userStartIdx--;
     }
 
-    for (let i = 0; i < userPulses.length; i++) {
-      const p = userPulses[i];
+    ctx.fillStyle = colors.userPulseGood;
+    for (let i = userStartIdx; i < cachedPulses.length; i++) {
+      const p = cachedPulses[i];
       if (p.end < windowStartMs) continue;
       if (p.start > windowEndMs) break;
 
@@ -258,7 +291,6 @@ export default function MorseTimelineCanvas({
       const pWidth = Math.max(3, p.duration * pxPerMs);
 
       if (xStart + pWidth >= 0 && xStart <= width) {
-        ctx.fillStyle = p.isActive ? colors.userPulseActive : colors.userPulseGood;
         ctx.beginPath();
         if (ctx.roundRect) {
           ctx.roundRect(xStart, bottomTrackY, pWidth, pulseH, pulseRadius);
@@ -266,6 +298,29 @@ export default function MorseTimelineCanvas({
           ctx.rect(xStart, bottomTrackY, pWidth, pulseH);
         }
         ctx.fill();
+      }
+    }
+
+    // 当前未抬起的实时生长按键
+    if (cache.curDown !== null) {
+      const now = performance.now();
+      const realDur = cache.curDownTimestamp > 0
+        ? Math.max(8, Math.round(now - cache.curDownTimestamp))
+        : Math.max(8, curTime - cache.curDown);
+      const activeEnd = cache.curDown + realDur;
+      if (activeEnd >= windowStartMs && cache.curDown <= windowEndMs) {
+        const xStart = playheadX + (cache.curDown - curTime) * pxPerMs;
+        const pWidth = Math.max(3, realDur * pxPerMs);
+        if (xStart + pWidth >= 0 && xStart <= width) {
+          ctx.fillStyle = colors.userPulseActive;
+          ctx.beginPath();
+          if (ctx.roundRect) {
+            ctx.roundRect(xStart, bottomTrackY, pWidth, pulseH, pulseRadius);
+          } else {
+            ctx.rect(xStart, bottomTrackY, pWidth, pulseH);
+          }
+          ctx.fill();
+        }
       }
     }
 
@@ -290,7 +345,7 @@ export default function MorseTimelineCanvas({
     ctx.fill();
 
     ctx.restore();
-  }, [targetTimeline, userEvents, isPlaying, isFinished, mode, playheadPosition, windowDurationMs, isDark, t]);
+  }, [targetTimeline, isPlaying, isFinished, mode, playheadPosition, windowDurationMs, isDark, t]);
 
   // 自驱 60FPS 动画引擎：在播放中或按压中直接由 Canvas RAF 循环驱动，彻底解耦 React 父树重渲染！
   useEffect(() => {
@@ -316,7 +371,7 @@ export default function MorseTimelineCanvas({
     return () => {
       if (animId) cancelAnimationFrame(animId);
     };
-  }, [isPlaying, isPaused, isPressing, currentTime, drawAtTime]);
+  }, [isPlaying, isPaused, isPressing, currentTime, eventsResetVersion, drawAtTime]);
 
   return (
     <div ref={containerRef} className="w-full relative overflow-hidden rounded-lg border border-slate-200 dark:border-[#2b2b2b] shadow-2xs bg-slate-50 dark:bg-[#121212]">

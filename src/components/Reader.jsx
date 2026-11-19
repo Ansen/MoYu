@@ -211,7 +211,11 @@ export default function Reader({ bookData, onClose, jumpToSibling, jumpToChapter
     });
   }, [baseFontSize, morseSpeed, morseFreq, numberMode, useHarmonics, viewMode, fontFamily, enableMarkers, prefixMarker, suffixMarker, updateAudioConfig]);
 
-  const [activePlayToken, setActivePlayToken] = useState(null);
+  const totalCharCount = useMemo(() => {
+    return parsedTelegram.cleanText
+      ? parsedTelegram.cleanText.replace(/\s+/g, '').length
+      : (bookData.data?.length || 0);
+  }, [parsedTelegram.cleanText, bookData.data]);
 
   // 统一播放/暂停控制：直接委托给中枢的自适应 toggle，杜绝业务层推演状态
   const togglePlay = useCallback(async () => {
@@ -237,11 +241,9 @@ export default function Reader({ bookData, onClose, jumpToSibling, jumpToChapter
       prefixMarker: effectivePrefix,
       suffixMarker: effectiveSuffix,
       onCharPlay: (token) => {
-        setActivePlayToken(token);
         if (engineRef.current) engineRef.current.highlightToken(token);
       },
       onComplete: () => {
-        setActivePlayToken(null);
         if (engineRef.current) engineRef.current.clearHighlight();
       }
     });
@@ -249,7 +251,6 @@ export default function Reader({ bookData, onClose, jumpToSibling, jumpToChapter
 
   const stopPlay = useCallback(() => {
     stopAudio();
-    setActivePlayToken(null);
     if (engineRef.current) {
       engineRef.current.clearHighlight();
       engineRef.current.saveProgress();
@@ -417,8 +418,6 @@ export default function Reader({ bookData, onClose, jumpToSibling, jumpToChapter
               enableMarkers={enableMarkers}
               prefixMarker={enableMarkers ? (prefixMarker || parsedTelegram.startMarker || '') : ''}
               suffixMarker={enableMarkers ? (suffixMarker || parsedTelegram.endMarker || '') : ''}
-              activeToken={activePlayToken}
-              activeMarker={activeMarker}
               onStopRequest={stopPlay}
               onStartWeakPractice={handleStartWeakPractice}
             />
@@ -513,7 +512,7 @@ export default function Reader({ bookData, onClose, jumpToSibling, jumpToChapter
               </div>
             ) : (
               <div className="font-mono text-slate-600 dark:text-slate-400 text-[13px] font-medium shrink-0">
-                {t('reader.stats.totalChars', { count: (parsedTelegram.cleanText ? parsedTelegram.cleanText.replace(/\s+/g, '').length : (bookData.data?.length || 0)).toLocaleString() }, `共 ${(parsedTelegram.cleanText ? parsedTelegram.cleanText.replace(/\s+/g, '').length : (bookData.data?.length || 0)).toLocaleString()} 字符`)}
+                {t('reader.stats.totalChars', { count: totalCharCount.toLocaleString() }, `共 ${totalCharCount.toLocaleString()} 字符`)}
               </div>
             )}
 

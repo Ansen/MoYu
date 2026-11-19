@@ -46,7 +46,7 @@ export default function GroupCountSelector({
           <input
             type="number"
             min="1"
-            max="10000"
+            max="2000"
             value={customCountInput}
             onFocus={() => setIsCustomCount(true)}
             onChange={(e) => {

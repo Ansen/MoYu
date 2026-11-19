@@ -407,4 +407,6 @@ const TxtEngine = forwardRef(({ bookData, fontSize = 20, fontFamily = 'Cascadia 
   );
 });
 
-export default TxtEngine;
+TxtEngine.displayName = 'TxtEngine';
+
+export default React.memo(TxtEngine);

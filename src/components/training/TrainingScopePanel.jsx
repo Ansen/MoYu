@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Eye, 
   EyeOff, 
@@ -18,7 +18,70 @@ import {
 import MorseTimelineCanvas from './MorseTimelineCanvas';
 import { useI18n } from '../../i18n';
 
-export default function TrainingScopePanel({
+const KeyIndicatorButton = React.memo(function KeyIndicatorButton({
+  subscribeKeyState = null,
+  fallbackIsKeyDown = false,
+  fallbackPressDuration = 0,
+  onManualDown,
+  onManualUp,
+  t
+}) {
+  const [keyState, setKeyState] = useState({
+    isKeyDown: fallbackIsKeyDown,
+    pressDuration: fallbackPressDuration
+  });
+
+  useEffect(() => {
+    if (!subscribeKeyState) return undefined;
+    return subscribeKeyState((next) => {
+      setKeyState((prev) => (
+        prev.isKeyDown === next.isKeyDown && prev.pressDuration === next.pressDuration
+          ? prev
+          : next
+      ));
+    });
+  }, [subscribeKeyState]);
+
+  const activeIsKeyDown = subscribeKeyState ? keyState.isKeyDown : fallbackIsKeyDown;
+  const activePressDuration = subscribeKeyState ? keyState.pressDuration : fallbackPressDuration;
+
+  return (
+    <div 
+      onMouseDown={(e) => {
+        e.preventDefault();
+        onManualDown?.();
+      }}
+      onMouseUp={(e) => {
+        e.preventDefault();
+        onManualUp?.();
+      }}
+      onMouseLeave={() => {
+        if (activeIsKeyDown) onManualUp?.();
+      }}
+      onTouchStart={(e) => {
+        e.preventDefault();
+        onManualDown?.();
+      }}
+      onTouchEnd={(e) => {
+        e.preventDefault();
+        onManualUp?.();
+      }}
+      className={`h-7 w-[64px] px-2 rounded-md font-mono text-[12px] font-semibold flex items-center justify-center gap-1.5 transition-colors shadow-2xs whitespace-nowrap shrink-0 cursor-pointer select-none active:scale-95 ${
+        activeIsKeyDown 
+          ? 'bg-emerald-500 text-white shadow-emerald-500/30' 
+          : 'bg-slate-200/80 dark:bg-[#252525] text-slate-600 dark:text-slate-300 hover:bg-slate-300 dark:hover:bg-[#303030]'
+      }`}
+      title={activeIsKeyDown ? t('training.scope.keyDown', '电键按下 (支持长按发报)') : t('training.scope.keyUp', '电键待命 (点击或长按可虚拟发报)')}
+    >
+      <span className={`w-2 h-2 rounded-full shrink-0 ${activeIsKeyDown ? 'bg-white animate-ping' : 'bg-slate-400 dark:bg-slate-500'}`} />
+      <span className="font-mono text-[12px] tabular-nums">
+        {activePressDuration > 0 ? `${activePressDuration}ms` : '--'}
+      </span>
+    </div>
+  );
+});
+
+function TrainingScopePanel({
   isCollapsed = false,
   onToggleCollapse,
   trainingMode = 'live',
@@ -38,10 +101,13 @@ export default function TrainingScopePanel({
   serialPortName = null,
   modeNotice = null,
   onDismissNotice,
+  subscribeKeyState = null,
   isKeyDown = false,
   pressDuration = 0,
   targetTimeline = [],
   userEvents = [],
+  userEventsRef = null,
+  eventsResetVersion = 0,
   currentTime = 0,
   isPlaying = false,
   isFinished = false,
@@ -101,39 +167,15 @@ export default function TrainingScopePanel({
         
         {/* 左侧：电键指示灯(支持触控打键)、硬件/键盘模式徽章、手键/自动键切换、模式胶囊、侧音频率微调 */}
         <div className="flex items-center gap-2 shrink-0">
-          {/* 电键状态指示灯 (支持鼠标点击/屏幕长按触摸发报) */}
-          <div 
-            onMouseDown={(e) => {
-              e.preventDefault();
-              onManualDown?.();
-            }}
-            onMouseUp={(e) => {
-              e.preventDefault();
-              onManualUp?.();
-            }}
-            onMouseLeave={() => {
-              if (isKeyDown) onManualUp?.();
-            }}
-            onTouchStart={(e) => {
-              e.preventDefault();
-              onManualDown?.();
-            }}
-            onTouchEnd={(e) => {
-              e.preventDefault();
-              onManualUp?.();
-            }}
-            className={`h-7 w-[64px] px-2 rounded-md font-mono text-[12px] font-semibold flex items-center justify-center gap-1.5 transition-colors shadow-2xs whitespace-nowrap shrink-0 cursor-pointer select-none active:scale-95 ${
-              isKeyDown 
-                ? 'bg-emerald-500 text-white shadow-emerald-500/30' 
-                : 'bg-slate-200/80 dark:bg-[#252525] text-slate-600 dark:text-slate-300 hover:bg-slate-300 dark:hover:bg-[#303030]'
-            }`}
-            title={isKeyDown ? t('training.scope.keyDown', '电键按下 (支持长按发报)') : t('training.scope.keyUp', '电键待命 (点击或长按可虚拟发报)')}
-          >
-            <span className={`w-2 h-2 rounded-full shrink-0 ${isKeyDown ? 'bg-white animate-ping' : 'bg-slate-400 dark:bg-slate-500'}`} />
-            <span className="font-mono text-[12px] tabular-nums">
-              {pressDuration > 0 ? `${pressDuration}ms` : '--'}
-            </span>
-          </div>
+          {/* 电键状态指示灯 (独立轻量子组件订阅，隔离高频打键对整面板的重渲染) */}
+          <KeyIndicatorButton
+            subscribeKeyState={subscribeKeyState}
+            fallbackIsKeyDown={isKeyDown}
+            fallbackPressDuration={pressDuration}
+            onManualDown={onManualDown}
+            onManualUp={onManualUp}
+            t={t}
+          />
 
           {/* 输入源模式切换按钮: 直观展示当前处于【键盘模式】还是【CH552G 硬件模式】 */}
           <button
@@ -417,6 +459,8 @@ export default function TrainingScopePanel({
           <MorseTimelineCanvas
             targetTimeline={targetTimeline}
             userEvents={userEvents}
+            userEventsRef={userEventsRef}
+            eventsResetVersion={eventsResetVersion}
             currentTime={currentTime}
             isPlaying={isPlaying}
             mode={trainingMode}
@@ -431,3 +475,7 @@ export default function TrainingScopePanel({
     </div>
   );
 }
+
+TrainingScopePanel.displayName = 'TrainingScopePanel';
+
+export default React.memo(TrainingScopePanel);

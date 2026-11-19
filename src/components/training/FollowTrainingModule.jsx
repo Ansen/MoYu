@@ -27,7 +27,6 @@ export default function FollowTrainingModule({
   enableMarkers = false,
   prefixMarker = '',
   suffixMarker = '',
-  activeToken: _activeToken = null,
   onStopRequest: _onStopRequest,
   onStartWeakPractice = null
 }) {
@@ -210,8 +209,8 @@ export default function FollowTrainingModule({
     });
   }, [activeChapterContent, morseSpeed, numberMode, enableMarkers, prefixMarker, suffixMarker]);
 
-  // 时序与事件数据
-  const [userEvents, setUserEvents] = useState([]);
+  // 时序与事件数据（高频打键完全驻留 ref，彻底隔离整树 React 重渲染与 RAF 销毁重建）
+  const [eventsResetVersion, setEventsResetVersion] = useState(0);
   const [currentTime, setCurrentTime] = useState(0);
   const [targetTimeline, setTargetTimeline] = useState(() => buildTimeline());
   const [analysisResult, setAnalysisResult] = useState(null);
@@ -221,25 +220,47 @@ export default function FollowTrainingModule({
   const userEventsRef = useRef([]);
   const lastAnalyzedRef = useRef(false);
   const wasPlayingRef = useRef(false);
+  const lastTimelineVersionRef = useRef(-1);
+
+  const keyStateListenersRef = useRef(new Set());
+  const latestKeyStateRef = useRef({ isKeyDown: false, pressDuration: 0 });
+  const handleKeyStateChange = useCallback((nextState) => {
+    latestKeyStateRef.current = nextState;
+    for (const listener of keyStateListenersRef.current) {
+      listener(nextState);
+    }
+  }, []);
+  const subscribeKeyState = useCallback((listener) => {
+    if (typeof listener !== 'function') return () => {};
+    keyStateListenersRef.current.add(listener);
+    listener(latestKeyStateRef.current);
+    return () => {
+      keyStateListenersRef.current.delete(listener);
+    };
+  }, []);
 
   // 监听正文与配置变化更新时间轴
   useEffect(() => {
     try {
       const tl = buildTimeline();
+      lastTimelineVersionRef.current = audioPlayer._timelineVersion;
       if (tl) setTargetTimeline(tl);
     } catch (e) {
       console.warn('[FollowTrainingModule] Failed to generate target timeline:', e);
     }
   }, [buildTimeline]);
 
-  // 监听底层音频中枢热重调度与队列跃迁，毫秒级同步目标波形
+  // 仅当音频队列构造/动态调速/重对齐导致 timelineVersion 递增时重建时间轴，屏蔽 marker 切换等无关广播
   useEffect(() => {
-    const unsubscribe = audioPlayer.subscribe(() => {
-      if (audioPlayer.playbackState.isPlaying && Array.isArray(audioPlayer.queue) && audioPlayer.queue.length > 0) {
-        try {
-          const tl = buildTimeline();
-          if (tl) setTargetTimeline(tl);
-        } catch {}
+    const unsubscribe = audioPlayer.subscribe((snapshot) => {
+      if (snapshot?.isPlaying && Array.isArray(audioPlayer.queue) && audioPlayer.queue.length > 0) {
+        if (snapshot.timelineVersion !== lastTimelineVersionRef.current) {
+          lastTimelineVersionRef.current = snapshot.timelineVersion;
+          try {
+            const tl = buildTimeline();
+            if (tl) setTargetTimeline(tl);
+          } catch {}
+        }
       }
     });
     return () => unsubscribe();
@@ -253,18 +274,14 @@ export default function FollowTrainingModule({
     isPausedRef.current = isPaused;
   }, [isPlaying, isPaused]);
 
-  // 2. 按键事件回调：精确锚定声卡当前物理硬件时间
+  // 2. 按键事件回调：直接追加到 ref 并锚定声卡当前物理硬件时间，避免逐键触发父子重渲染
   const handleRawKeyEvent = useCallback((ev) => {
     if (!isPlayingRef.current || isPausedRef.current) {
       return;
     }
     const prog = audioPlayer.getPlaybackProgress();
     const timeOffset = prog.timeMs || 0;
-    setUserEvents((prev) => {
-      const next = [...prev, { ...ev, time: timeOffset }];
-      userEventsRef.current = next;
-      return next;
-    });
+    userEventsRef.current.push({ ...ev, time: timeOffset });
   }, []);
 
   // 当用户在键盘模式下直接按下已连接的 CH552G 实体电键时，自动切换回 CH552G 硬件模式并提示
@@ -286,10 +303,8 @@ export default function FollowTrainingModule({
     }
   }, [isEn, showModeNotice]);
 
-  // 3. 规范调用即时侧音与按键采集 Hook
+  // 3. 规范调用即时侧音与按键采集 Hook（关闭 Hook 内部高层 state 广播，由轻量子指示灯局部订阅）
   const {
-    isKeyDown,
-    pressDuration,
     connectSerial,
     serialConnected,
     serialPortName,
@@ -303,6 +318,8 @@ export default function FollowTrainingModule({
     wpm: morseSpeed,
     frequency: effectiveSidetoneFreq,
     volume: 0.8,
+    emitKeyState: false,
+    onKeyStateChange: handleKeyStateChange,
     onKeyEvent: handleRawKeyEvent,
     onHardwareActivity: handleHardwareActivity
   });
@@ -429,12 +446,15 @@ export default function FollowTrainingModule({
   useEffect(() => {
     if (isPlaying && !isPaused) {
       if (!wasPlayingRef.current) {
-        setUserEvents([]);
         userEventsRef.current = [];
+        setEventsResetVersion((v) => v + 1);
         wasPlayingRef.current = true;
         lastAnalyzedRef.current = false;
-        const tl = buildTimeline();
-        if (tl) setTargetTimeline(tl);
+        if (lastTimelineVersionRef.current !== audioPlayer._timelineVersion) {
+          lastTimelineVersionRef.current = audioPlayer._timelineVersion;
+          const tl = buildTimeline();
+          if (tl) setTargetTimeline(tl);
+        }
       }
     } else if (isPlaying && isPaused) {
       const prog = audioPlayer.getPlaybackProgress();
@@ -493,10 +513,10 @@ export default function FollowTrainingModule({
         serialPortName={serialPortName}
         modeNotice={modeNotice}
         onDismissNotice={() => setModeNotice(null)}
-        isKeyDown={isKeyDown}
-        pressDuration={pressDuration}
+        subscribeKeyState={subscribeKeyState}
         targetTimeline={targetTimeline}
-        userEvents={userEvents}
+        userEventsRef={userEventsRef}
+        eventsResetVersion={eventsResetVersion}
         currentTime={currentTime}
         isPlaying={isPlaying}
         isPaused={isPaused}
@@ -521,8 +541,8 @@ export default function FollowTrainingModule({
         onClose={() => setIsResultOpen(false)}
         onRetry={() => {
           setIsResultOpen(false);
-          setUserEvents([]);
           userEventsRef.current = [];
+          setEventsResetVersion((v) => v + 1);
         }}
         onOpenHistory={() => setIsHistoryOpen(true)}
         onStartWeakPractice={onStartWeakPractice}
