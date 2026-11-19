@@ -2,7 +2,7 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import './index.css'
 import App from './App.jsx'
-import { I18nProvider } from './i18n/index.jsx'
+import { I18nProvider } from './i18n'
 
 // 全局劫持 WebView 默认行为，打造纯原生体验
 if (typeof window !== 'undefined') {

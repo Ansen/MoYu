@@ -304,12 +304,16 @@ export default function Reader({ bookData, onClose, jumpToSibling, jumpToChapter
         }
       }
 
-      if (e.key === 'ArrowLeft') {
+      // 训练模式下方向键由跟发模块作为自动键点/划独占，禁止同时触发翻页并打断播放
+      if (!isTraining && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) {
         e.preventDefault();
-        handlePrev();
-      } else if (e.key === 'ArrowRight') {
-        e.preventDefault();
-        handleNext();
+        if (!e.repeat) {
+          if (e.key === 'ArrowLeft') {
+            handlePrev();
+          } else {
+            handleNext();
+          }
+        }
       }
     };
 

@@ -617,23 +617,27 @@ export function useKeyInput({
       }
       if (keyTypeRef.current === 'paddle') {
         if (e.code === 'BracketLeft' || e.code === 'KeyZ' || e.code === 'ArrowLeft') {
+          e.preventDefault();
           if (!e.repeat) {
-            e.preventDefault();
             onPaddleDit(true);
           }
         } else if (e.code === 'BracketRight' || e.code === 'KeyX' || e.code === 'ArrowRight') {
+          e.preventDefault();
           if (!e.repeat) {
-            e.preventDefault();
             onPaddleDah(true);
           }
-        } else if (e.code === 'Space' && !e.repeat) {
+        } else if (e.code === 'Space') {
           e.preventDefault();
-          onPaddleDit(true);
+          if (!e.repeat) {
+            onPaddleDit(true);
+          }
         }
       } else {
-        if (e.code === 'Space' && !e.repeat) {
+        if (e.code === 'Space') {
           e.preventDefault();
-          handleDown('keyboard');
+          if (!e.repeat) {
+            handleDown('keyboard');
+          }
         }
       }
     };

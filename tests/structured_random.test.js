@@ -211,5 +211,144 @@ export function testStructuredRandom() {
   }
   console.log('✓ Specified multi digit slots [1, 3] validated (100% match).');
 
+  // 10. Test Specified End-Boundary Digit Slot [4] in MIXED mode (last char, must never truncate group length)
+  const fixedLastSlotMixed = generateStructuredRandomContent({
+    mode: GENERATOR_MODE.MIXED,
+    charsPerGroup: 5,
+    maxDigitsPerGroup: 1,
+    digitSlots: [4],
+    groupCount: 50
+  });
+
+  for (let i = 0; i < fixedLastSlotMixed.groups.length; i++) {
+    const g = fixedLastSlotMixed.groups[i];
+    if (g.length !== 5) {
+      throw new Error(`Group ${i} ('${g.join('')}') expected length 5, got ${g.length}`);
+    }
+    if (!/[0-9]/.test(g[4])) {
+      throw new Error(`Group ${i} ('${g.join('')}') expected digit at last slot 4, got '${g[4]}'`);
+    }
+    const otherDigits = g.filter((ch, idx) => idx !== 4 && /[0-9]/.test(ch));
+    if (otherDigits.length > 0) {
+      throw new Error(`Group ${i} ('${g.join('')}') has unexpected digit outside fixed last slot 4`);
+    }
+  }
+  console.log('✓ Specified last-slot [4] in MIXED mode validated (100% full 5-char groups).');
+
+  // 11. Test Both Boundaries Digit Slots [0, 4] and deduplicated duplicate slot [4, 4] in MIXED mode
+  const fixedBothEnds = generateStructuredRandomContent({
+    mode: GENERATOR_MODE.MIXED,
+    charsPerGroup: 5,
+    maxDigitsPerGroup: 2,
+    digitSlots: [0, 4],
+    groupCount: 30
+  });
+  for (let i = 0; i < fixedBothEnds.groups.length; i++) {
+    const g = fixedBothEnds.groups[i];
+    if (g.length !== 5 || !/[0-9]/.test(g[0]) || !/[0-9]/.test(g[4])) {
+      throw new Error(`Group ${i} ('${g.join('')}') expected 5 chars with digits at [0, 4]`);
+    }
+  }
+
+  const dedupedLastSlot = generateStructuredRandomContent({
+    mode: GENERATOR_MODE.MIXED,
+    charsPerGroup: 5,
+    maxDigitsPerGroup: 1,
+    digitSlots: [4, 4],
+    groupCount: 20
+  });
+  for (let i = 0; i < dedupedLastSlot.groups.length; i++) {
+    const g = dedupedLastSlot.groups[i];
+    if (g.length !== 5 || !/[0-9]/.test(g[4])) {
+      throw new Error(`Group ${i} ('${g.join('')}') expected 5 chars with digit at deduplicated slot 4`);
+    }
+  }
+  console.log('✓ Boundary slots [0, 4] & duplicate slot [4, 4] in MIXED mode validated.');
+
+  // 12. Performance & completion guard against exponential backtracking (S1 deep fix)
+  const perfCases = [
+    {
+      label: 'MIXED 5-char end slot [4] x100 (noAdjDup)',
+      cfg: { mode: GENERATOR_MODE.MIXED, charsPerGroup: 5, maxDigitsPerGroup: 1, digitSlots: [4], groupCount: 100 },
+      len: 5,
+      slots: [4]
+    },
+    {
+      label: 'CUSTOM(UI) 5-char end slot [4] x100 (allowAdjDup=true)',
+      cfg: {
+        mode: 'custom',
+        customProfile: true,
+        pool: '0123456789abcdefghijklmnopqrstuvwxyz'.split(''),
+        charsPerGroup: 5,
+        maxDigitsPerGroup: 1,
+        digitSlots: [4],
+        groupCount: 100,
+        allowAdjacentDuplicate: true
+      },
+      len: 5,
+      slots: [4]
+    },
+    {
+      label: 'CUSTOM(UI) 6-char end slot [5] x50 (noAdjDup)',
+      cfg: {
+        mode: 'custom',
+        customProfile: true,
+        pool: '0123456789abcdefghijklmnopqrstuvwxyz'.split(''),
+        charsPerGroup: 6,
+        maxDigitsPerGroup: 1,
+        digitSlots: [5],
+        groupCount: 50,
+        allowAdjacentDuplicate: false
+      },
+      len: 6,
+      slots: [5]
+    },
+    {
+      label: 'CUSTOM(UI) 8-char end slot [7] x50 (noAdjDup)',
+      cfg: {
+        mode: 'custom',
+        customProfile: true,
+        pool: '0123456789abcdefghijklmnopqrstuvwxyz'.split(''),
+        charsPerGroup: 8,
+        maxDigitsPerGroup: 1,
+        digitSlots: [7],
+        groupCount: 50,
+        allowAdjacentDuplicate: false
+      },
+      len: 8,
+      slots: [7]
+    },
+    {
+      label: 'MIXED 5-char both ends [0, 4] maxDigits=2 x100',
+      cfg: { mode: GENERATOR_MODE.MIXED, charsPerGroup: 5, maxDigitsPerGroup: 2, digitSlots: [0, 4], groupCount: 100 },
+      len: 5,
+      slots: [0, 4]
+    }
+  ];
+
+  for (const item of perfCases) {
+    const startMs = performance.now();
+    const out = generateStructuredRandomContent(item.cfg);
+    const elapsedMs = performance.now() - startMs;
+    if (elapsedMs >= 500) {
+      throw new Error(`${item.label} took too long: ${elapsedMs.toFixed(1)}ms (expected < 500ms)`);
+    }
+    if (!out || out.groups.length !== item.cfg.groupCount) {
+      throw new Error(`${item.label} generated unexpected group count`);
+    }
+    for (let i = 0; i < out.groups.length; i++) {
+      const g = out.groups[i];
+      if (g.length !== item.len) {
+        throw new Error(`${item.label} group ${i} expected length ${item.len}, got ${g.length}`);
+      }
+      for (const s of item.slots) {
+        if (!/[0-9]/.test(g[s])) {
+          throw new Error(`${item.label} group ${i} ('${g.join('')}') expected digit at slot ${s}`);
+        }
+      }
+    }
+  }
+  console.log('✓ Non-blocking latency & slot invariants across 5/6/8-char end/multi slots validated (< 500ms).');
+
   console.log('All Upgraded Random Generator tests passed successfully!\n');
 }

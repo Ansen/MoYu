@@ -384,13 +384,15 @@ export function analyzeSession(arg1, arg2 = [], arg3 = 0) {
   const _targetGaps = Array.isArray(safeTimeline.gaps) ? safeTimeline.gaps : [];
   const { pulses: userPulses, gaps: userGaps } = extractUserPulsesAndGaps(userEvents, sessionStartTime);
 
-  // 如果用户完全没有按键或目标为空
+  // 如果用户完全没有按键或目标为空，保证返回结构与正常路径字段完全对齐
   if (userPulses.length === 0 || targetPulses.length === 0) {
     return {
       totalTargetPulses: targetPulses.length,
       totalUserPulses: userPulses.length,
+      matchedCount: 0,
+      accuracyRate: 0,
       completionRate: 0,
-      unitMs,
+      unitMs: Math.round(unitMs),
       avgDot: 0,
       avgDash: 0,
       avgElementGap: null,
@@ -403,7 +405,8 @@ export function analyzeSession(arg1, arg2 = [], arg3 = 0) {
       timingConsistency: 0,
       overallScore: 0,
       grade: 'D',
-      matchedPulses: [],
+      userPulses,
+      userGaps,
       charStats: {},
       weakestChars: []
     };

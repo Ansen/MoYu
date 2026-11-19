@@ -1,5 +1,6 @@
 import assert from 'assert';
 import audioPlayer, { AUDIO_STATE } from '../src/utils/audioPlayer.js';
+import { NUMBER_MODES } from '../src/utils/morseCode.js';
 
 export async function testAudioPlayerLogic() {
   console.log('--- Running Audio Player Lifecycle & Fallback Unit Tests ---');
@@ -141,6 +142,68 @@ export async function testAudioPlayerLogic() {
   assert.ok(audioPlayer._scheduleEpoch > initialEpoch, 'Schedule epoch should bump on runtime WPM change to invalidate stale ahead timers');
   audioPlayer.stop();
   console.log('✓ Runtime WPM hot-reload & schedule epoch invalidation validated.');
+
+  // 12. Subscriber error boundary resilience (catch block must not throw ReferenceError)
+  const originalConsoleError = console.error;
+  let loggedErrorArgs = null;
+  console.error = (...args) => {
+    loggedErrorArgs = args;
+  };
+  let throwingUnsub = null;
+  try {
+    throwingUnsub = audioPlayer.subscribe(() => {
+      throw new Error('Intentional subscriber init failure');
+    });
+  } finally {
+    console.error = originalConsoleError;
+  }
+  assert.strictEqual(typeof throwingUnsub, 'function', 'subscribe() must return unsubscribe function even if initial listener throws');
+  assert.ok(Array.isArray(loggedErrorArgs) && loggedErrorArgs[1] instanceof Error, 'subscribe() catch block must log the caught Error instance');
+  throwingUnsub();
+  console.log('✓ Subscriber initial notification error handling validated.');
+
+  // 13. Number modes table integrity (long vs short5 vs short10)
+  const digits = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
+  for (const d of digits) {
+    assert.strictEqual(NUMBER_MODES.long[d].length, 5, `long['${d}'] must be 5 symbols`);
+  }
+  const short5Changed = digits.filter((d) => NUMBER_MODES.short5[d] !== NUMBER_MODES.long[d]);
+  assert.deepStrictEqual(short5Changed.sort(), ['0', '1', '2', '8', '9'], 'short5 must shorten exactly 5 digits (0,1,2,8,9)');
+  assert.strictEqual(NUMBER_MODES.short5['7'], '--...', 'short5[7] remains standard 5-symbol --...');
+  const short10Changed = digits.filter((d) => NUMBER_MODES.short10[d] !== NUMBER_MODES.long[d]);
+  assert.strictEqual(short10Changed.length, 10, 'short10 must shorten all 10 digits');
+  assert.strictEqual(new Set(digits.map((d) => NUMBER_MODES.short10[d])).size, 10, 'short10 digit codes must be unique');
+  console.log('✓ NUMBER_MODES (long/short5/short10) integrity validated.');
+
+  // 14. Inaudible wake stream catch block resilience (must bind caught error without ReferenceError)
+  const originalAudioCtx = audioPlayer.audioContext;
+  const originalConsoleWarn = console.warn;
+  let loggedWarnArgs = null;
+  console.warn = (...args) => {
+    loggedWarnArgs = args;
+  };
+  audioPlayer.audioContext = {
+    state: 'running',
+    currentTime: 0,
+    sampleRate: 44100,
+    createBuffer() {
+      throw new Error('Simulated wake stream failure');
+    }
+  };
+  try {
+    await audioPlayer._startPlaybackEngine({ leadTimeSec: 0.05 });
+  } finally {
+    audioPlayer.stop();
+    audioPlayer.audioContext = originalAudioCtx;
+    console.warn = originalConsoleWarn;
+  }
+  assert.ok(
+    Array.isArray(loggedWarnArgs) &&
+      loggedWarnArgs[0] === 'Inaudible wake stream error:' &&
+      loggedWarnArgs[1] instanceof Error,
+    '_startPlaybackEngine wake stream catch block must log the caught Error instance'
+  );
+  console.log('✓ Inaudible wake stream error handling validated.');
 
   console.log('All Audio Player tests passed successfully!\n');
 }

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { X, Save } from 'lucide-react';
-import { useI18n } from '../i18n/index';
+import { useI18n } from '../i18n';
 import { loadRememberWindowState, saveRememberWindowState } from '../utils/windowStatePrefs';
 
 export default function SettingsModal({ isOpen, onClose }) {

@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { useI18n } from '../../i18n/index';
+import { useI18n } from '../../i18n';
 import DropdownMenu from '../common/DropdownMenu';
 import { Sun, Moon, Monitor, Languages, Type, Settings, Info, Check, BookOpen, Minus, Square, Copy, X as CloseIcon, ChevronDown, Sparkles, Folder, FileText } from 'lucide-react';
 import { getCurrentWindow } from '@tauri-apps/api/window';

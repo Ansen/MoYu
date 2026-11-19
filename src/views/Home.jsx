@@ -1,6 +1,6 @@
 import React from 'react';
 import { Languages, Library } from 'lucide-react';
-import { useI18n } from '../i18n/index';
+import { useI18n } from '../i18n';
 import FeatureCard from '../components/common/FeatureCard';
 import RecentFileItem from '../components/common/RecentFileItem';
 

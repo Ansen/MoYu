@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, Suspense, lazy } from 'react';
 import { chineseToCodes, morseToCodes, codesToChinese, isMainlyMorse, isMainlyCodes } from '../utils/translator';
-import { useI18n } from '../i18n/index';
+import { useI18n } from '../i18n';
 import { Edit3, MessageSquare, Hash, Wand2, Upload, Trash2, ChevronDown, Mic, Keyboard } from 'lucide-react';
 import OutputCard from '../components/common/OutputCard';
 import FontSizeAdjuster from '../components/common/FontSizeAdjuster';
@@ -108,12 +108,15 @@ export default function TranslatorView() {
   }, []);
 
   useEffect(() => {
+    let cancelled = false;
+    const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+
     const loadDictionary = () => {
       if (prefDictionaryId.startsWith('custom_')) {
         try {
           const dictData = JSON.parse(localStorage.getItem(`moyu_dict_${prefDictionaryId}`));
           if (dictData) {
-            setDictionary(dictData);
+            if (!cancelled) setDictionary(dictData);
             return;
           }
         } catch (e) {
@@ -123,14 +126,25 @@ export default function TranslatorView() {
       
       // Fallback to builtin
       const file = '/dict/mapping.json';
-      fetch(file)
+      fetch(file, controller ? { signal: controller.signal } : undefined)
         .then(res => res.json())
-        .then(data => setDictionary(data))
-        .catch(err => console.error(`Failed to load ${file}`, err));
+        .then(data => {
+          if (!cancelled) setDictionary(data);
+        })
+        .catch(err => {
+          if (!cancelled && err?.name !== 'AbortError') {
+            console.error(`Failed to load ${file}`, err);
+          }
+        });
     };
     
     loadDictionary();
     localStorage.setItem('pref_dictionary', prefDictionaryId);
+
+    return () => {
+      cancelled = true;
+      if (controller) controller.abort();
+    };
   }, [prefDictionaryId]);
 
   useEffect(() => {

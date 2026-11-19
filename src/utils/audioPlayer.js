@@ -142,7 +142,7 @@ class DesktopAudioPlayer {
     this.listeners.add(listener);
     try {
       listener(this.getSnapshot());
-    } catch {
+    } catch (e) {
       console.error('[MorseAudioCore] Initial subscriber notification error:', e);
     }
     return () => {
@@ -535,7 +535,7 @@ class DesktopAudioPlayer {
         wakeSource.buffer = wakeBuffer;
         wakeSource.connect(this.masterGain || this.audioContext.destination);
         wakeSource.start(now);
-      } catch {
+      } catch (e) {
         console.warn('Inaudible wake stream error:', e);
       }
     }

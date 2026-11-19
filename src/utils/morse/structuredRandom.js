@@ -286,12 +286,14 @@ function listCandidates(counts, previousChar, allowAdjacentDuplicate, currentDig
     const isBoundary = isMixed && charsPerGroup >= 3 && (position === 0 || position === charsPerGroup - 1)
     
     // 如果指定了目标数字槽位
-    const isTargetDigitSlot = Boolean(targetDigitSlots && targetDigitSlots.has(position))
-    const isForbiddenDigitSlot = Boolean(targetDigitSlots && !targetDigitSlots.has(position))
+    const hasTargetDigitSlots = Boolean(targetDigitSlots && targetDigitSlots.size > 0)
+    const isTargetDigitSlot = Boolean(hasTargetDigitSlots && targetDigitSlots.has(position))
+    const isForbiddenDigitSlot = Boolean(hasTargetDigitSlots && !targetDigitSlots.has(position))
 
-    // 如果到了最后一个内部有效槽位，且仍无数字，则必须选数字以满足至少1个数字的下限
+    // 当未指定目标数字槽位时，若到了最后几个内部有效槽位且数字未达下限，则必须选数字
+    // 若已指定目标数字槽位，则严格以 targetDigitSlots 为准，避免倒数第二位与末位目标槽位冲突导致空候选与指数回溯
     const isInterior = position > 0 && position < charsPerGroup - 1
-    const mustBeDigit = isTargetDigitSlot || (isMixed && charsPerGroup >= 3 && minDigitsPerGroup > 0 && isInterior &&
+    const mustBeDigit = isTargetDigitSlot || (!hasTargetDigitSlots && isMixed && charsPerGroup >= 3 && minDigitsPerGroup > 0 && isInterior &&
         currentDigitCount < minDigitsPerGroup && 
         ((charsPerGroup - 1 - position) <= (minDigitsPerGroup - currentDigitCount)))
 
@@ -341,10 +343,44 @@ function canCompleteGroup(prefix, counts, remainingSlots, profile, maxDigitsPerG
     const currentPosition = prefix.length
     const effectiveCharsPerGroup = charsPerGroup || (prefix.length + remainingSlots)
 
-    if (minDigitsPerGroup > 0 && isMixed && effectiveCharsPerGroup >= 3) {
+    // 提前校验剩余字符配额，避免在配额耗尽时发生指数级 DFS 回溯
+    let availableDigits = 0
+    let availableNonDigits = 0
+    for (const [char, count] of counts.entries()) {
+        if (count <= 0) continue
+        if (/[0-9]/.test(char)) {
+            availableDigits += count
+        } else {
+            availableNonDigits += count
+        }
+    }
+
+    if (availableDigits + availableNonDigits < remainingSlots) {
+        return false
+    }
+
+    const hasTargetDigitSlots = Boolean(targetDigitSlots && targetDigitSlots.size > 0)
+    if (isMixed && hasTargetDigitSlots) {
+        let remainingTargetDigits = 0
+        for (let s = currentPosition; s < effectiveCharsPerGroup; s++) {
+            if (targetDigitSlots.has(s)) {
+                remainingTargetDigits++
+            }
+        }
+        const remainingTargetNonDigits = remainingSlots - remainingTargetDigits
+        if (availableDigits < remainingTargetDigits || availableNonDigits < remainingTargetNonDigits) {
+            return false
+        }
+        if (maxDigitsPerGroup !== null && maxDigitsPerGroup !== undefined && currentDigitCount + remainingTargetDigits > maxDigitsPerGroup) {
+            return false
+        }
+        if (minDigitsPerGroup > 0 && currentDigitCount + remainingTargetDigits < minDigitsPerGroup) {
+            return false
+        }
+    } else if (minDigitsPerGroup > 0 && isMixed && effectiveCharsPerGroup >= 3) {
         const remainingInteriorSlots = Math.max(0, (effectiveCharsPerGroup - 1) - Math.max(1, currentPosition))
         const digitsNeeded = minDigitsPerGroup - currentDigitCount
-        if (digitsNeeded > remainingInteriorSlots) {
+        if (digitsNeeded > remainingInteriorSlots || availableDigits < digitsNeeded) {
             return false
         }
     }
@@ -390,8 +426,9 @@ function filterFeasibleCandidates(candidates, counts, groupChars, profile, chars
     const isMixed = hasDigits && hasLetters
     const position = groupChars.length
     const isBoundary = isMixed && charsPerGroup >= 3 && (position === 0 || position === charsPerGroup - 1)
-    const isTargetDigitSlot = Boolean(targetDigitSlots && targetDigitSlots.has(position))
-    const isForbiddenDigitSlot = Boolean(targetDigitSlots && !targetDigitSlots.has(position))
+    const hasTargetDigitSlots = Boolean(targetDigitSlots && targetDigitSlots.size > 0)
+    const isTargetDigitSlot = Boolean(hasTargetDigitSlots && targetDigitSlots.has(position))
+    const isForbiddenDigitSlot = Boolean(hasTargetDigitSlots && !targetDigitSlots.has(position))
 
     const previousChar = groupChars[groupChars.length - 1] || ''
     const currentDigitCount = groupChars.filter(ch => /[0-9]/.test(ch)).length
@@ -902,12 +939,14 @@ function buildGroup({
     let targetDigitSlots = null
     if (isMixed && charsPerGroup >= 2 && minDigitsPerGroup > 0) {
         if (specifiedDigitSlots && Array.isArray(specifiedDigitSlots) && specifiedDigitSlots.length > 0) {
-            // 用户明确指定了槽位 (0-based)
-            const validSlots = specifiedDigitSlots.filter(s => typeof s === 'number' && s >= 0 && s < charsPerGroup)
+            // 用户明确指定了槽位 (0-based)，先去重再裁剪数量
+            const validSlots = Array.from(
+                new Set(specifiedDigitSlots.filter(s => typeof s === 'number' && s >= 0 && s < charsPerGroup))
+            )
             if (validSlots.length > 0) {
                 if (maxDigitsPerGroup === 1 && validSlots.length === 1) {
                     targetDigitSlots = new Set(validSlots)
-                } else if (validSlots.length <= maxDigitsPerGroup) {
+                } else if (maxDigitsPerGroup === null || maxDigitsPerGroup === undefined || validSlots.length <= maxDigitsPerGroup) {
                     targetDigitSlots = new Set(validSlots)
                 } else {
                     const shuffledSlots = shuffle([...validSlots], random)
@@ -974,7 +1013,27 @@ function buildGroup({
         counts.set(picked, Math.max(0, (counts.get(picked) || 0) - 1))
     }
 
-    if (specifiedDigitSlots && specifiedDigitSlots.length > 0) {
+    // 极端配额耗尽兜底：确保无论任何槽位组合都绝不返回缺位残组
+    while (groupChars.length < charsPerGroup && profile.pool.length > 0) {
+        const position = groupChars.length
+        const previousChar = groupChars[groupChars.length - 1] || ''
+        const preferDigit = Boolean(targetDigitSlots && targetDigitSlots.has(position))
+        const preferredPool = profile.pool.filter(ch => {
+            if (!profile.allowAdjacentDuplicate && ch === previousChar) return false
+            if (preferDigit) return /[0-9]/.test(ch)
+            if (targetDigitSlots && !targetDigitSlots.has(position)) return !/[0-9]/.test(ch)
+            return true
+        })
+        const fallbackPool = preferredPool.length > 0
+            ? preferredPool
+            : profile.pool.filter(ch => profile.allowAdjacentDuplicate || ch !== previousChar)
+        const activePool = fallbackPool.length > 0 ? fallbackPool : profile.pool
+        const fallbackChar = activePool[Math.floor(random() * activePool.length)]
+        groupChars.push(fallbackChar)
+        counts.set(fallbackChar, Math.max(0, (counts.get(fallbackChar) || 0) - 1))
+    }
+
+    if (targetDigitSlots && targetDigitSlots.size > 0) {
         return groupChars
     }
 
@@ -990,9 +1049,22 @@ function repairRepeatedGroup(group, previousGroup, counts, profile, random = Mat
     const hasLetters = profile.pool.some(c => /[a-z]/i.test(c))
     const isMixed = hasDigits && hasLetters
 
-    const targetDigitSlots = (specifiedDigitSlots && specifiedDigitSlots.length > 0)
-        ? new Set(specifiedDigitSlots.filter(s => typeof s === 'number' && s >= 0 && s < group.length))
-        : null
+    let targetDigitSlots = null
+    if (specifiedDigitSlots && Array.isArray(specifiedDigitSlots) && specifiedDigitSlots.length > 0) {
+        const validSlots = Array.from(
+            new Set(specifiedDigitSlots.filter(s => typeof s === 'number' && s >= 0 && s < group.length))
+        )
+        if (validSlots.length > 0) {
+            if (maxDigitsPerGroup !== null && maxDigitsPerGroup !== undefined && validSlots.length > maxDigitsPerGroup) {
+                const actualSlots = validSlots.filter(s => /[0-9]/.test(group[s]))
+                targetDigitSlots = new Set(
+                    (actualSlots.length > 0 ? actualSlots : validSlots).slice(0, maxDigitsPerGroup)
+                )
+            } else {
+                targetDigitSlots = new Set(validSlots)
+            }
+        }
+    }
 
     const repaired = [...group]
     for (let index = repaired.length - 1; index >= 0; index--) {
@@ -1360,9 +1432,25 @@ export function generateStructuredRandomContent(config, options = {}) {
         minDigitsPerGroup = charsPerGroup >= 3 ? 1 : 0
     }
 
+    const specifiedDigitSlots = Array.isArray(config.digitSlots) ? config.digitSlots : null
+    const validSpecifiedSlots = specifiedDigitSlots
+        ? Array.from(new Set(specifiedDigitSlots.filter(s => typeof s === 'number' && s >= 0 && s < charsPerGroup)))
+        : []
+
+    let plannedDigitsPerGroup = minDigitsPerGroup
+    if (isMixed && charsPerGroup >= 2 && minDigitsPerGroup > 0) {
+        if (validSpecifiedSlots.length > 0) {
+            plannedDigitsPerGroup = (maxDigitsPerGroup !== null && maxDigitsPerGroup !== undefined)
+                ? Math.min(validSpecifiedSlots.length, maxDigitsPerGroup)
+                : validSpecifiedSlots.length
+        } else if (charsPerGroup >= 3 && maxDigitsPerGroup > 1) {
+            plannedDigitsPerGroup = Math.min(maxDigitsPerGroup, Math.max(1, charsPerGroup - 2))
+        }
+    }
+
     const totalChars = Math.max(0, groupCount) * charsPerGroup
     const maxAllowedDigits = (maxDigitsPerGroup !== null) ? groupCount * maxDigitsPerGroup : Infinity
-    const minRequiredDigits = (minDigitsPerGroup > 0) ? groupCount * minDigitsPerGroup : 0
+    const minRequiredDigits = (minDigitsPerGroup > 0) ? groupCount * Math.max(minDigitsPerGroup, plannedDigitsPerGroup) : 0
     const counts = buildQuotaCounts(profile.pool, totalChars, buildWeights(profile, config), random, maxAllowedDigits, minRequiredDigits)
     const groups = []
     const allChars = []
@@ -1372,8 +1460,6 @@ export function generateStructuredRandomContent(config, options = {}) {
     const recentStartLetters = []
     const recentEndLetters = []
     const recentDigitPositions = []
-
-    const specifiedDigitSlots = Array.isArray(config.digitSlots) ? config.digitSlots : null
 
     for (let i = 0; i < groupCount; i++) {
         const group = buildGroup({

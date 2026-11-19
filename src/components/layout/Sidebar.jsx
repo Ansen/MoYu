@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Languages, Library, PanelLeftClose, PanelLeft, Home } from 'lucide-react';
-import { useI18n } from '../../i18n/index';
+import { useI18n } from '../../i18n';
 import { useResizable } from '../../hooks/useResizable';
 
 export default function Sidebar({ currentView, setView, openAbout }) {

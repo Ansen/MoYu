@@ -251,7 +251,37 @@ function testSidetoneOffsetAndModeIntegrity() {
   const engineCode = fs.readFileSync(enginePath, 'utf8');
   assert.ok(engineCode.includes('getCurrentText:'), 'TxtEngine MUST expose getCurrentText method');
 
-  console.log('✓ FollowTrainingModule sidetone offset default, chapter sync & player mute isolation validated.');
+  // 6. 验证训练模式下方向键不与全局翻页快捷键冲突，且方向键/空格长按不触发滚动 (S2 & L3)
+  assert.ok(
+    readerCode.includes("if (!isTraining && (e.key === 'ArrowLeft' || e.key === 'ArrowRight'))") &&
+      readerCode.includes('if (!e.repeat)'),
+    'Reader.jsx MUST guard ArrowLeft/ArrowRight pagination with !isTraining and !e.repeat while preventing repeat scroll'
+  );
+
+  const keyInputPath = path.resolve('src/hooks/useKeyInput.js');
+  const keyInputCode = fs.readFileSync(keyInputPath, 'utf8');
+  const arrowLeftBranchIdx = keyInputCode.indexOf("e.code === 'ArrowLeft')");
+  const arrowLeftRepeatIdx = keyInputCode.indexOf('if (!e.repeat)', arrowLeftBranchIdx);
+  const arrowLeftPreventIdx = keyInputCode.indexOf('e.preventDefault()', arrowLeftBranchIdx);
+  assert.ok(
+    arrowLeftBranchIdx !== -1 &&
+      arrowLeftPreventIdx > arrowLeftBranchIdx &&
+      arrowLeftPreventIdx < arrowLeftRepeatIdx,
+    'useKeyInput.js MUST call e.preventDefault() before !e.repeat check on ArrowLeft/ArrowRight'
+  );
+  const straightSpaceBranchIdx = keyInputCode.indexOf("} else {\n        if (e.code === 'Space')") !== -1
+    ? keyInputCode.indexOf("} else {\n        if (e.code === 'Space')")
+    : keyInputCode.indexOf("} else {\r\n        if (e.code === 'Space')");
+  const straightSpaceRepeatIdx = keyInputCode.indexOf('if (!e.repeat)', straightSpaceBranchIdx);
+  const straightSpacePreventIdx = keyInputCode.indexOf('e.preventDefault()', straightSpaceBranchIdx);
+  assert.ok(
+    straightSpaceBranchIdx !== -1 &&
+      straightSpacePreventIdx > straightSpaceBranchIdx &&
+      straightSpacePreventIdx < straightSpaceRepeatIdx,
+    'useKeyInput.js MUST call e.preventDefault() before !e.repeat check on straight-key Spacebar'
+  );
+
+  console.log('✓ FollowTrainingModule sidetone offset default, chapter sync & key isolation validated.');
 }
 
 export function testFollowTrainingLogic() {
@@ -369,7 +399,18 @@ export function testFollowTrainingLogic() {
     sessionStartTime: 1000
   });
   assert.strictEqual(emptyAnalysis.completionRate, 0, 'Empty events should have 0% completion');
+  assert.strictEqual(emptyAnalysis.accuracyRate, 0, 'Empty events should include numeric accuracyRate 0');
+  assert.strictEqual(emptyAnalysis.matchedCount, 0, 'Empty events should include matchedCount 0');
+  assert.strictEqual(emptyAnalysis.overallScore, 0, 'Empty events should include overallScore 0');
+  assert.ok(Array.isArray(emptyAnalysis.userPulses) && Array.isArray(emptyAnalysis.userGaps), 'Empty events should include userPulses and userGaps arrays');
   assert.strictEqual(emptyAnalysis.grade, 'D', 'Empty events should yield lowest D grade');
+
+  const fractionalEmptyAnalysis = analyzeSession({
+    targetTimeline: generateTargetTimeline('A', 18),
+    userEvents: [],
+    sessionStartTime: 0
+  });
+  assert.ok(Number.isInteger(fractionalEmptyAnalysis.unitMs), 'Empty events unitMs should be rounded integer like normal path');
   console.log('✓ Empty events edge case safety validated.');
 
   // 8. 验证 analyzeSession 双重传参签名兼容性 (对象 vs 扁平三参数)

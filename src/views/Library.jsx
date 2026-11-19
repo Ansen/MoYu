@@ -1,6 +1,6 @@
 import React, { useState, Suspense, lazy } from 'react';
 import { FileText, Folder, Clock, PlusCircle } from 'lucide-react';
-import { useI18n } from '../i18n/index';
+import { useI18n } from '../i18n';
 import RecentFileItem from '../components/common/RecentFileItem';
 import GeneratorDropdown from '../components/common/GeneratorDropdown';
 

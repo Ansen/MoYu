@@ -1,6 +1,6 @@
 import React from 'react';
 import { ArrowRight } from 'lucide-react';
-import { useI18n } from '../../i18n/index';
+import { useI18n } from '../../i18n';
 
 export default function FeatureCard({ icon: Icon, title, desc, onClick, colorClass }) {
   const { t } = useI18n();
