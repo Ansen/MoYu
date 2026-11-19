@@ -247,47 +247,80 @@ export async function exportMorseAudio({
 
   if (!filePath) return false;
 
+  if (!/\.wav$/i.test(String(filePath))) {
+    filePath = `${filePath}.wav`;
+  }
+
   if (onProgress) {
     onProgress({ percent: 15, text: '正在初始化离线音频合成引擎...' });
   }
 
-  // 4. 创建 Web Audio OfflineAudioContext 进行多核高速并发离线渲染
-  const sampleRate = 44100;
-  const totalDurationSec = (offsetMs / 1000) + 0.5; // 预留 0.5 秒尾部余音
-  const totalSamples = Math.ceil(totalDurationSec * sampleRate);
-
-  const AudioContextClass = typeof window !== 'undefined'
-    ? (window.OfflineAudioContext || window.webkitOfflineAudioContext)
-    : null;
-
-  if (!AudioContextClass) {
-    throw new Error('OfflineAudioContext is not supported on this platform');
-  }
-
-  const offlineCtx = new AudioContextClass(1, totalSamples, sampleRate);
-  const osc = offlineCtx.createOscillator();
-  const gain = offlineCtx.createGain();
-
   const safeFreq = Math.max(100, Math.min(1500, Number(freq) || 400));
-  osc.type = 'sine';
-  osc.frequency.setValueAtTime(safeFreq, 0);
+  const totalDurationSec = (offsetMs / 1000) + 0.5; // 预留 0.5 秒尾部余音
+  const sampleRate = totalDurationSec > 300 ? 22050 : 44100;
 
-  // 初始静音
-  gain.gain.setValueAtTime(0, 0);
-
-  // 5. 按照时间轴预排期各个点划声音包络 (包含 5ms 梯形平滑防破音边缘)
-  const rampTimeSec = 0.005; // 5ms 上升沿与下降沿
-
+  // 提取规范化的脉冲起止数组（供桌面端流式原生渲染与 Web Audio 共享）
+  const pulses = [];
   for (let i = 0; i < normalizedQueue.length; i++) {
     const item = normalizedQueue[i];
     if (!item.code) continue;
 
-    let symTimeSec = item.timelineStartMs / 1000;
+    let symTimeMs = item.timelineStartMs;
     const symbols = item.code.split('');
-
     for (let s = 0; s < symbols.length; s++) {
       const isDah = symbols[s] === '-';
-      const pulseDurationSec = (isDah ? 3 * dotMs : 1 * dotMs) / 1000;
+      const pulseDurationMs = isDah ? 3 * dotMs : 1 * dotMs;
+      pulses.push({
+        start_ms: symTimeMs,
+        duration_ms: pulseDurationMs
+      });
+      symTimeMs += pulseDurationMs + dotMs;
+    }
+  }
+
+  const isTauriRuntime = typeof window !== 'undefined' && Boolean(window.__TAURI_INTERNALS__ || window.__TAURI__);
+
+  if (isTauriRuntime) {
+    if (onProgress) {
+      onProgress({ percent: 40, text: '正在原生流式合成 16-bit PCM WAV 音频...' });
+    }
+    // 桌面端使用 Rust 流式写盘，恒定内存且支持伴随文件写入（不受单文件 dialog scope 限制）
+    await invoke('export_morse_wav', {
+      path: filePath,
+      pulses,
+      freq: safeFreq,
+      sampleRate,
+      totalDurationMs: totalDurationSec * 1000
+    });
+  } else {
+    // 4. 非 Tauri 网页环境回退到 Web Audio OfflineAudioContext + PCM 编码下载
+    const totalSamples = Math.ceil(totalDurationSec * sampleRate);
+
+    const AudioContextClass = typeof window !== 'undefined'
+      ? (window.OfflineAudioContext || window.webkitOfflineAudioContext)
+      : null;
+
+    if (!AudioContextClass) {
+      throw new Error('OfflineAudioContext is not supported on this platform');
+    }
+
+    const offlineCtx = new AudioContextClass(1, totalSamples, sampleRate);
+    const osc = offlineCtx.createOscillator();
+    const gain = offlineCtx.createGain();
+
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(safeFreq, 0);
+
+    // 初始静音
+    gain.gain.setValueAtTime(0, 0);
+
+    // 5. 按照时间轴预排期各个点划声音包络 (包含 5ms 梯形平滑防破音边缘)
+    const rampTimeSec = 0.005; // 5ms 上升沿与下降沿
+
+    for (let i = 0; i < pulses.length; i++) {
+      const p = pulses[i];
+      const symTimeSec = p.start_ms / 1000;
+      const pulseDurationSec = p.duration_ms / 1000;
       const pulseEndSec = symTimeSec + pulseDurationSec;
 
       // 梯形增益包络 (自适应平滑斜率，杜绝非严格单调时间戳异常)
@@ -301,45 +334,39 @@ export async function exportMorseAudio({
         gain.gain.setValueAtTime(0.85, rampDownStart);
       }
       gain.gain.linearRampToValueAtTime(0, pulseEndSec);
-
-      symTimeSec += pulseDurationSec + (dotMs / 1000); // 下一个点划起始
     }
-  }
 
-  osc.connect(gain);
-  gain.connect(offlineCtx.destination);
-  osc.start(0);
-  osc.stop(totalDurationSec);
+    osc.connect(gain);
+    gain.connect(offlineCtx.destination);
+    osc.start(0);
+    osc.stop(totalDurationSec);
 
-  if (onProgress) {
-    onProgress({ percent: 40, text: '正在离线高速混音渲染 (Web Audio SIMD)...' });
-  }
+    if (onProgress) {
+      onProgress({ percent: 40, text: '正在离线高速混音渲染 (Web Audio SIMD)...' });
+    }
 
-  // 开始离线高速渲染 (C++ 底层高并发)
-  const renderedBuffer = await offlineCtx.startRendering();
+    const renderedBuffer = await offlineCtx.startRendering();
 
-  if (onProgress) {
-    onProgress({ percent: 75, text: '正在编码 16-bit PCM WAV 二进制文件...' });
-  }
+    if (onProgress) {
+      onProgress({ percent: 75, text: '正在编码 16-bit PCM WAV 二进制文件...' });
+    }
 
-  // 6. 将生成的音频数据编码为标准 PCM WAV
-  const wavBytes = encodeAudioBufferToWav(renderedBuffer);
+    const wavBytes = encodeAudioBufferToWav(renderedBuffer);
 
-  // 7. 写入本地磁盘文件 (基于 Tauri plugin-fs 或浏览器下载回退)
-  try {
-    await writeFile(filePath, wavBytes);
-  } catch (fsErr) {
-    // 桌面环境若 writeFile 失败，尝试 Blob 下载备用方案
-    if (typeof document !== 'undefined') {
-      const blob = new Blob([wavBytes], { type: 'audio/wav' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = String(filePath).split(/[/\\]/).pop() || 'telegram.wav';
-      a.click();
-      URL.revokeObjectURL(url);
-    } else {
-      throw fsErr;
+    try {
+      await writeFile(filePath, wavBytes);
+    } catch (fsErr) {
+      if (typeof document !== 'undefined') {
+        const blob = new Blob([wavBytes], { type: 'audio/wav' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = String(filePath).split(/[/\\]/).pop() || 'telegram.wav';
+        a.click();
+        URL.revokeObjectURL(url);
+      } else {
+        throw fsErr;
+      }
     }
   }
 

@@ -1,11 +1,14 @@
 use serde::{Deserialize, Serialize};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{mpsc, Arc, Mutex};
+#[cfg(not(test))]
 use std::time::Duration;
+#[cfg(not(test))]
 use tauri::{
     window::Color, AppHandle, Manager, Monitor, PhysicalPosition, PhysicalSize, Position, Size,
     State, Theme, WebviewWindow, WindowEvent,
 };
+#[cfg(not(test))]
 use tauri_plugin_store::StoreExt;
 
 /// 持久化配置文件名（与前端 store.js 共用同一 Store 文件）
@@ -64,6 +67,7 @@ pub struct MonitorWorkArea {
     pub height: u32,
 }
 
+#[cfg(not(test))]
 impl MonitorWorkArea {
     fn from_monitor(monitor: &Monitor) -> Self {
         let area = monitor.work_area();
@@ -179,6 +183,7 @@ impl WindowStateManager {
     }
 
     /// 启动唯一后台防抖写盘线程
+    #[cfg(not(test))]
     fn ensure_debounce_worker(&self, app_handle: AppHandle) {
         let Ok(mut tx_guard) = self.save_tx.lock() else {
             return;
@@ -363,6 +368,7 @@ pub fn resolve_restored_geometry(
 }
 
 /// 从 Store 读取设置开关与历史窗口状态（读取失败时返回安全默认值）
+#[cfg(not(test))]
 fn load_persisted_config(app: &AppHandle) -> (bool, Option<PersistedWindowState>) {
     let Ok(store) = app.store(SETTINGS_STORE_FILE) else {
         return (true, None);
@@ -382,6 +388,7 @@ fn load_persisted_config(app: &AppHandle) -> (bool, Option<PersistedWindowState>
 }
 
 /// 将内存快照持久化至磁盘 Store（需受 persist_lock 保护）
+#[cfg(not(test))]
 fn flush_snapshot_internal(
     app: &AppHandle,
     enabled: &AtomicBool,
@@ -417,6 +424,7 @@ fn flush_snapshot_internal(
 }
 
 /// 采样当前原生窗口的实时几何与状态
+#[cfg(not(test))]
 fn sample_live_window(window: &WebviewWindow) -> Option<LiveWindowSample> {
     let maximized = window.is_maximized().unwrap_or(false);
     let minimized = window.is_minimized().unwrap_or(false);
@@ -436,7 +444,7 @@ fn sample_live_window(window: &WebviewWindow) -> Option<LiveWindowSample> {
 }
 
 /// Windows DWM 窗口遮罩（Cloak）辅助：允许窗口先以 WS_VISIBLE 唤醒 WebView2 GPU 合成首帧，再瞬时揭开呈现
-#[cfg(target_os = "windows")]
+#[cfg(all(not(test), target_os = "windows"))]
 mod win_cloak {
     use std::ffi::{c_char, c_void};
     use std::sync::OnceLock;
@@ -494,7 +502,7 @@ mod win_cloak {
     }
 }
 
-#[cfg(not(target_os = "windows"))]
+#[cfg(all(not(test), not(target_os = "windows")))]
 mod win_cloak {
     use tauri::WebviewWindow;
 
@@ -503,16 +511,24 @@ mod win_cloak {
     }
 }
 
-/// 获取与当前主题对应的原生窗口底色（对齐前端 App.jsx 背景色）
-fn theme_background_color(is_dark: bool) -> Color {
+/// 获取与当前主题对应的原生窗口底色 RGBA（对齐前端 App.jsx 背景色）
+fn theme_background_rgba(is_dark: bool) -> (u8, u8, u8, u8) {
     if is_dark {
-        Color(0x1e, 0x1e, 0x1e, 255)
+        (0x1e, 0x1e, 0x1e, 255)
     } else {
-        Color(0xff, 0xff, 0xff, 255)
+        (0xff, 0xff, 0xff, 255)
     }
 }
 
+/// 获取与当前主题对应的原生窗口底色（对齐前端 App.jsx 背景色）
+#[cfg(not(test))]
+fn theme_background_color(is_dark: bool) -> Color {
+    let (r, g, b, a) = theme_background_rgba(is_dark);
+    Color(r, g, b, a)
+}
+
 /// 幂等地解除 Windows DWM 窗口遮罩，确保首帧合成后再完整呈现给用户
+#[cfg(not(test))]
 fn uncloak_window_once(window: &WebviewWindow, state: &WindowStateManager) {
     if !state.mark_uncloaked_once() {
         return;
@@ -522,6 +538,7 @@ fn uncloak_window_once(window: &WebviewWindow, state: &WindowStateManager) {
 }
 
 /// 幂等地显示主窗口，并在首次启动尚无基线时记录默认几何快照
+#[cfg(not(test))]
 fn reveal_main_window(
     window: &WebviewWindow,
     state: &WindowStateManager,
@@ -573,6 +590,7 @@ fn reveal_main_window(
 }
 
 /// 启动阶段：恢复主窗口尺寸/位置/最大化状态（保持隐藏等待首帧就绪后显示），并挂载事件监听
+#[cfg(not(test))]
 pub fn setup_main_window(app: &tauri::App) {
     let Some(window) = app.get_webview_window("main") else {
         return;
@@ -727,6 +745,7 @@ pub fn setup_main_window(app: &tauri::App) {
 }
 
 /// 前端首帧渲染就绪后调用：同步主题底色并显示主窗口（幂等，仅首次生效）
+#[cfg(not(test))]
 #[tauri::command]
 pub fn show_main_window(
     window: WebviewWindow,
@@ -737,12 +756,14 @@ pub fn show_main_window(
 }
 
 /// 前端确认 GPU 合成器完成首帧绘制后调用：解除 DWM 遮罩以零白屏呈现窗口
+#[cfg(not(test))]
 #[tauri::command]
 pub fn uncloak_main_window(window: WebviewWindow, state: State<'_, WindowStateManager>) {
     uncloak_window_once(&window, &state);
 }
 
 /// 读取“记住窗口大小与位置”开关状态
+#[cfg(not(test))]
 #[tauri::command]
 pub fn get_remember_window_state(
     app: AppHandle,
@@ -778,6 +799,7 @@ fn centered_geometry_in_area(
 }
 
 /// 计算当前显示器居中的默认普通窗口矩形（当在最大化状态下重新开启记忆且无历史普通尺寸时作为还原基线）
+#[cfg(not(test))]
 fn default_centered_bounds(window: &WebviewWindow, maximized: bool) -> PersistedWindowState {
     let monitor = window
         .current_monitor()
@@ -812,6 +834,7 @@ fn default_centered_bounds(window: &WebviewWindow, maximized: bool) -> Persisted
 }
 
 /// 结合实时采样更新快照；当首次即以最大化状态捕获且尚无普通尺寸基线时，补充居中默认尺寸作为还原基线
+#[cfg(not(test))]
 fn compute_next_snapshot(
     window: &WebviewWindow,
     prev: Option<&PersistedWindowState>,
@@ -830,6 +853,7 @@ fn compute_next_snapshot(
 }
 
 /// 更新“记住窗口大小与位置”开关状态并立即同步持久化存储
+#[cfg(not(test))]
 #[tauri::command]
 pub fn set_remember_window_state(
     app: AppHandle,
@@ -1065,8 +1089,8 @@ mod tests {
 
     #[test]
     fn test_theme_background_color_matches_dark_and_light() {
-        assert_eq!(theme_background_color(true), Color(0x1e, 0x1e, 0x1e, 255));
-        assert_eq!(theme_background_color(false), Color(0xff, 0xff, 0xff, 255));
+        assert_eq!(theme_background_rgba(true), (0x1e, 0x1e, 0x1e, 255));
+        assert_eq!(theme_background_rgba(false), (0xff, 0xff, 0xff, 255));
     }
 
     #[test]

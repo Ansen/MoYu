@@ -40,12 +40,14 @@ export default function GeneratorModal({ isOpen, onClose, onGenerate }) {
   const [isGenerating, setIsGenerating] = useState(false);
   const [generatedDataset, setGeneratedDataset] = useState(null);
 
-  // Multi-format export checkboxes (default both checked) & statuses
-  const [selectedFormats, setSelectedFormats] = useState({ pdf: true, epub: true });
+  // Multi-format export checkboxes (default PDF & EPUB checked, WAV optional) & statuses
+  const [selectedFormats, setSelectedFormats] = useState({ pdf: true, epub: true, wav: false });
   const [isExportingPdf, setIsExportingPdf] = useState(false);
   const [isExportingEpub, setIsExportingEpub] = useState(false);
+  const [isExportingWav, setIsExportingWav] = useState(false);
   const [pdfExported, setPdfExported] = useState(false);
   const [epubExported, setEpubExported] = useState(false);
+  const [wavExported, setWavExported] = useState(false);
 
 
   const [exportType, setExportType] = useState('pdf'); // 'pdf' | 'epub'
@@ -122,6 +124,7 @@ export default function GeneratorModal({ isOpen, onClose, onGenerate }) {
     setExportProgress(null);
     setPdfExported(false);
     setEpubExported(false);
+    setWavExported(false);
 
     onClose();
   };
@@ -234,6 +237,7 @@ export default function GeneratorModal({ isOpen, onClose, onGenerate }) {
 
     setPdfExported(false);
     setEpubExported(false);
+    setWavExported(false);
   };
 
   const handleToggleFormat = (fmt) => {
@@ -318,8 +322,18 @@ export default function GeneratorModal({ isOpen, onClose, onGenerate }) {
       const targetWavPath = wav ? (String(chosenPath).endsWith('.wav') ? String(chosenPath) : `${basePath}.wav`) : `${basePath}.wav`;
 
       // Step 2: Now generate the full multi-page dataset (or reuse if already generated for this batch)
-      setExportType(pdf ? 'pdf' : 'epub');
-      const pages = await ensureFullPagesGenerated(pdf && epub ? 0.55 : 0.75);
+      const selectedFormatsList = [pdf && 'pdf', epub && 'epub', wav && 'wav'].filter(Boolean);
+      const selectedCount = selectedFormatsList.length;
+      const prepShare = selectedCount > 1 ? 0.45 : 0.7;
+      setExportType(selectedFormatsList[0]);
+      const pages = await ensureFullPagesGenerated(prepShare);
+      const prepBasePercent = Math.round(prepShare * 100);
+      const perFormatSpan = (99 - prepBasePercent) / Math.max(1, selectedCount);
+      const getFormatProgressPercent = (formatKey, rawPercent) => {
+        const formatIndex = selectedFormatsList.indexOf(formatKey);
+        const start = prepBasePercent + formatIndex * perFormatSpan;
+        return Math.min(99, Math.round(start + ((Number(rawPercent) || 0) / 100) * perFormatSpan));
+      };
 
       // Step 3: Export PDF if selected
       if (pdf) {
@@ -340,7 +354,7 @@ export default function GeneratorModal({ isOpen, onClose, onGenerate }) {
           onProgress: (prog) => {
             setExportProgress({
               ...prog,
-              percent: epub ? 55 + Math.round((prog.percent || 90) * 0.2) : prog.percent
+              percent: getFormatProgressPercent('pdf', prog?.percent ?? 90)
             });
           },
           generatedPages: pages,
@@ -369,7 +383,7 @@ export default function GeneratorModal({ isOpen, onClose, onGenerate }) {
           onProgress: (prog) => {
             setExportProgress({
               ...prog,
-              percent: pdf ? 75 + Math.round((prog.percent || 90) * 0.22) : prog.percent
+              percent: getFormatProgressPercent('epub', prog?.percent ?? 90)
             });
           },
           generatedPages: pages,
@@ -386,17 +400,19 @@ export default function GeneratorModal({ isOpen, onClose, onGenerate }) {
         const fullPracticeText = pages.map(p => p.map(g => Array.isArray(g) ? g.join('') : String(g)).join(' ')).join('\n\n');
         const prefSpeed = Number(localStorage.getItem('pref_morse_speed')) || 20;
         const prefFreq = Number(localStorage.getItem('pref_morse_freq')) || 400;
+        const prefNumberMode = localStorage.getItem('pref_number_mode') || 'long';
         const { exportMorseAudio } = await import('../services/audioExportService');
         await exportMorseAudio({
           text: fullPracticeText,
           wpm: prefSpeed,
           freq: prefFreq,
+          numberMode: prefNumberMode,
           title: generatedDataset.title,
           includeLrc: true,
           onProgress: (prog) => {
             setExportProgress({
               ...prog,
-              percent: Math.min(99, prog.percent || 70)
+              percent: getFormatProgressPercent('wav', prog?.percent ?? 70)
             });
           },
           targetFilePath: targetWavPath
@@ -485,8 +501,10 @@ export default function GeneratorModal({ isOpen, onClose, onGenerate }) {
             onToggleFormat={handleToggleFormat}
             isExportingPdf={isExportingPdf}
             isExportingEpub={isExportingEpub}
+            isExportingWav={isExportingWav}
             pdfExported={pdfExported}
             epubExported={epubExported}
+            wavExported={wavExported}
             onExportSelected={handleExportSelected}
             onRegenerate={handlePrepareExportView}
             onBackToConfig={handleBackToConfig}

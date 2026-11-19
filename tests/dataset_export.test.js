@@ -64,6 +64,22 @@ export function testDatasetExportConsistency() {
   const epubServiceCode = fs.readFileSync(path.resolve('src/services/epubExportService.js'), 'utf8');
   assert.ok(epubServiceCode.includes('targetFilePath = null'), 'epubExportService must support targetFilePath for companion dual-file export');
 
+  // 5. 验证 GeneratorModal 对 WAV 导出状态完整声明并透传至 TelegramReadyView，以及原生流式音频导出契约
+  const generatorModalCode = fs.readFileSync(path.resolve('src/components/GeneratorModal.jsx'), 'utf8');
+  for (const sym of ['isExportingWav', 'setIsExportingWav', 'wavExported', 'setWavExported']) {
+    assert.ok(generatorModalCode.includes(sym), `GeneratorModal must declare and use ${sym}`);
+  }
+  assert.ok(
+    generatorModalCode.includes('isExportingWav={isExportingWav}') && generatorModalCode.includes('wavExported={wavExported}'),
+    'GeneratorModal must pass isExportingWav and wavExported props to TelegramReadyView'
+  );
+
+  const audioExportServiceCode = fs.readFileSync(path.resolve('src/services/audioExportService.js'), 'utf8');
+  assert.ok(
+    audioExportServiceCode.includes("invoke('export_morse_wav'") && audioExportServiceCode.includes("invoke('save_companion_text'"),
+    'audioExportService must invoke Rust export_morse_wav and save_companion_text for companion multi-format exports'
+  );
+
   console.log('✓ Shared dataset successfully exported to EPUB chapters with exact token match.');
   console.log(`✓ Shared dataset successfully rendered to PDF (${pdfBytes.length} bytes).`);
   console.log('✓ Dual-format checkbox cards (PDF + EPUB checked by default) & single-dialog companion export validated.');

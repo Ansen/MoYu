@@ -8,6 +8,7 @@ export default function ExportProgressBanner({ exportProgress, exportType }) {
   if (!exportProgress) return null;
 
   const isPdf = exportType === 'pdf';
+  const isWav = exportType === 'wav';
 
   return (
     <div className="shrink-0 px-5 py-2.5 bg-indigo-50/90 dark:bg-indigo-950/50 border-t border-indigo-200/80 dark:border-indigo-800/80 space-y-1.5 animate-in fade-in duration-150 select-none">
@@ -23,6 +24,8 @@ export default function ExportProgressBanner({ exportProgress, exportType }) {
           className={`h-full rounded-full transition-all duration-150 ease-out shadow-xs ${
             isPdf 
               ? 'bg-gradient-to-r from-emerald-500 via-teal-600 to-emerald-600'
+              : isWav
+              ? 'bg-gradient-to-r from-sky-500 via-cyan-600 to-sky-600'
               : 'bg-gradient-to-r from-indigo-500 via-indigo-600 to-purple-600'
           }`}
           style={{ width: `${exportProgress.percent}%` }}

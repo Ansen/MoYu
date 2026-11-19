@@ -1,17 +1,28 @@
+#[cfg(not(test))]
 use epub_builder::{EpubBuilder, EpubContent, ReferenceType, ZipLibrary};
+#[cfg(not(test))]
 use tauri::Manager;
 
+#[cfg_attr(test, allow(dead_code))]
+mod audio_export;
+#[cfg(not(test))]
 mod serial;
+#[cfg_attr(test, allow(dead_code))]
 mod window_state;
+#[cfg(not(test))]
+use audio_export::{write_morse_wav_file, MorsePulse};
+#[cfg(not(test))]
 use serial::{
     connect_serial_port, disconnect_serial_port, get_serial_status, spawn_serial_monitor,
     SerialManagerState,
 };
+#[cfg(not(test))]
 use window_state::{
     get_remember_window_state, set_remember_window_state, setup_main_window, show_main_window,
     uncloak_main_window, WindowStateManager,
 };
 
+#[cfg(not(test))]
 #[tauri::command]
 fn generate_epub(
     title: String,
@@ -74,6 +85,7 @@ fn generate_epub(
     Ok(out)
 }
 
+#[cfg(not(test))]
 #[tauri::command]
 fn save_companion_text(path: String, content: String) -> Result<(), String> {
     let lower = path.to_ascii_lowercase();
@@ -83,6 +95,24 @@ fn save_companion_text(path: String, content: String) -> Result<(), String> {
     std::fs::write(&path, content.as_bytes()).map_err(|e| e.to_string())
 }
 
+/// 异步后台流式导出莫尔斯 16-bit PCM WAV 音频文件
+#[cfg(not(test))]
+#[tauri::command]
+async fn export_morse_wav(
+    path: String,
+    pulses: Vec<MorsePulse>,
+    freq: f64,
+    sample_rate: u32,
+    total_duration_ms: f64,
+) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        write_morse_wav_file(&path, &pulses, freq, sample_rate, total_duration_ms)
+    })
+    .await
+    .map_err(|e| format!("WAV export worker panicked: {e}"))?
+}
+
+#[cfg(not(test))]
 #[tauri::command]
 fn toggle_devtools(window: tauri::WebviewWindow) {
     if window.is_devtools_open() {
@@ -92,6 +122,7 @@ fn toggle_devtools(window: tauri::WebviewWindow) {
     }
 }
 
+#[cfg(not(test))]
 pub fn run() {
     let serial_state = SerialManagerState::default();
     let window_state = WindowStateManager::default();
@@ -108,6 +139,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             generate_epub,
             save_companion_text,
+            export_morse_wav,
             toggle_devtools,
             get_serial_status,
             connect_serial_port,
