@@ -11,6 +11,7 @@
     "beforeBuildCommand": "node scripts/update-copyright.js && pnpm run build"
   },
   "app": {
+    "macOSPrivateApi": true,
     "windows": [
       {
         "title": "摩语 MoYu",

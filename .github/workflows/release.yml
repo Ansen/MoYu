@@ -204,6 +204,8 @@ jobs:
                   latest.platforms['darwin-x86_64'] = { signature, url };
                 } else if (lower.includes('windows') || lower.includes('setup') || lower.endsWith('.exe') || lower.endsWith('.zip')) {
                   latest.platforms['windows-x86_64'] = { signature, url };
+                } else if (lower.includes('linux') || lower.includes('appimage')) {
+                  latest.platforms['linux-x86_64'] = { signature, url };
                 }
               } else if (lower.includes('universal')) {
                 latest.platforms['darwin-x86_64'] = { signature, url };

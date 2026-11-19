@@ -60,10 +60,12 @@ function App() {
   // 开发者调试工具快捷键 (仅在开发环境中允许 F12 / Ctrl+Shift+I 唤出；正式版本全局拦截并禁用 F12 避免调出控制台)
   useEffect(() => {
     const handleKeyDown = (e) => {
+      const key = e.key.toLowerCase();
       if (
         e.key === 'F12' || 
-        (e.ctrlKey && e.shiftKey && (e.key === 'I' || e.key === 'i')) ||
-        (e.ctrlKey && e.shiftKey && e.altKey && (e.key === 'D' || e.key === 'd'))
+        (e.ctrlKey && e.shiftKey && key === 'i') ||
+        (e.metaKey && e.altKey && (key === 'i' || e.code === 'KeyI')) ||
+        (e.ctrlKey && e.shiftKey && e.altKey && key === 'd')
       ) {
         e.preventDefault();
         if (import.meta.env.DEV) {
@@ -103,6 +105,7 @@ function App() {
     localStorage.setItem('moyu_last_view', currentView);
   }, [currentView]);
 
+  const mainRef = useRef(null);
   const themeRef = useRef(theme);
   themeRef.current = theme;
 
@@ -132,6 +135,8 @@ function App() {
     let rafId = null;
     let raceTimer = null;
     let prefetchTimer = null;
+    let mainWaitTimer = null;
+    let mainObserver = null;
 
     const waitPaintFrames = (frameCount) =>
       new Promise((resolve) => {
@@ -151,17 +156,51 @@ function App() {
         rafId = requestAnimationFrame(step);
       });
 
+    const waitForMainContent = () =>
+      new Promise((resolve) => {
+        const container = mainRef.current;
+        if (
+          !container ||
+          container.childElementCount > 0 ||
+          typeof MutationObserver === 'undefined'
+        ) {
+          resolve();
+          return;
+        }
+        let settled = false;
+        const done = () => {
+          if (settled) return;
+          settled = true;
+          if (mainObserver) {
+            mainObserver.disconnect();
+            mainObserver = null;
+          }
+          if (mainWaitTimer !== null) {
+            clearTimeout(mainWaitTimer);
+            mainWaitTimer = null;
+          }
+          resolve();
+        };
+        mainObserver = new MutationObserver(() => {
+          if (container.childElementCount > 0) {
+            done();
+          }
+        });
+        mainObserver.observe(container, { childList: true });
+        mainWaitTimer = setTimeout(done, 150);
+      });
+
     const revealWithCompositorWarmup = async () => {
-      // 若启动恢复到非首页视图，等待目标懒加载视图就绪并完成 React 提交后再统计布局
+      // 若启动恢复到非首页视图，等待目标懒加载视图真实挂载提交 DOM 后再显窗，确保主内容区零空帧
       const initialView = getInitialView();
       if (initialView === 'translator') {
         await loadTranslatorView();
         if (cancelled) return;
-        await new Promise((resolve) => setTimeout(resolve, 0));
+        await waitForMainContent();
       } else if (initialView === 'library') {
         await loadLibraryView();
         if (cancelled) return;
-        await new Promise((resolve) => setTimeout(resolve, 0));
+        await waitForMainContent();
       }
       if (cancelled) return;
 
@@ -205,6 +244,11 @@ function App() {
       if (rafId !== null) cancelAnimationFrame(rafId);
       if (raceTimer !== null) clearTimeout(raceTimer);
       if (prefetchTimer !== null) clearTimeout(prefetchTimer);
+      if (mainWaitTimer !== null) clearTimeout(mainWaitTimer);
+      if (mainObserver) {
+        mainObserver.disconnect();
+        mainObserver = null;
+      }
     };
   }, []);
 
@@ -260,7 +304,7 @@ function App() {
       <div className="flex flex-1 min-h-0">
         <Sidebar currentView={currentView} setView={setView} openAbout={() => setIsAboutOpen(true)} />
         
-        <main className="flex-1 relative overflow-hidden bg-white dark:bg-[#1e1e1e]">
+        <main ref={mainRef} className="flex-1 relative overflow-hidden bg-white dark:bg-[#1e1e1e]">
           {currentView === 'home' && (
             <HomeView 
               setView={setView} 

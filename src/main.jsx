@@ -14,25 +14,27 @@ if (typeof window !== 'undefined') {
     }
   });
 
-  // 2. 禁用浏览器快捷键 (缩放、刷新等)
+  // 2. 禁用浏览器快捷键 (缩放、刷新等，同时兼容 macOS Cmd 与 Windows/Linux Ctrl)
   document.addEventListener('keydown', e => {
-    // 禁用 F5 / Ctrl+R 刷新 (如果在开发模式下可以保留，但这里为了原生感全干掉)
-    if (e.key === 'F5' || (e.ctrlKey && e.key.toLowerCase() === 'r')) {
+    const hasMod = e.ctrlKey || e.metaKey;
+    const keyLower = e.key.toLowerCase();
+    // 禁用 F5 / Ctrl+R / Cmd+R 刷新
+    if (e.key === 'F5' || (hasMod && keyLower === 'r')) {
       e.preventDefault();
     }
-    // 禁用 Ctrl+F 默认页面搜索
-    if (e.ctrlKey && e.key.toLowerCase() === 'f') {
+    // 禁用 Ctrl+F / Cmd+F 默认页面搜索
+    if (hasMod && keyLower === 'f') {
       e.preventDefault();
     }
-    // 禁用缩放 Ctrl + '+' / '-'
-    if (e.ctrlKey && (e.key === '=' || e.key === '-' || e.key === '+')) {
+    // 禁用缩放 Ctrl/Cmd + '+' / '-'
+    if (hasMod && (e.key === '=' || e.key === '-' || e.key === '+')) {
       e.preventDefault();
     }
   });
 
   // 3. 禁用触控板/鼠标滚轮缩放
   document.addEventListener('wheel', e => {
-    if (e.ctrlKey) {
+    if (e.ctrlKey || e.metaKey) {
       e.preventDefault();
     }
   }, { passive: false });

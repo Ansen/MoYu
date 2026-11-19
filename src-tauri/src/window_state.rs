@@ -629,19 +629,31 @@ pub fn setup_main_window(app: &tauri::App) {
                         height,
                         maximized,
                     } => {
-                        let _ = window.set_size(Size::Physical(PhysicalSize::new(width, height)));
-                        let _ = window.center();
-                        // 在 maximize() 之前采样居中后的普通位置，避免记录成最大化边界坐标
-                        let centered_pos = window.outer_position().ok();
+                        // 直接基于目标显示器工作区计算居中坐标并先定位再设尺寸，兼容跨 DPI 显示器且避免 macOS/Linux 异步 center() 采样失准
+                        let target_monitor = primary.or_else(|| monitors.first().copied());
+                        let centered_coords = if let Some(area) = target_monitor {
+                            let (cx, cy, cw, ch) = centered_geometry_in_area(&area, width, height);
+                            let _ = window
+                                .set_position(Position::Physical(PhysicalPosition::new(cx, cy)));
+                            let _ = window.set_size(Size::Physical(PhysicalSize::new(cw, ch)));
+                            Some((cx, cy, cw, ch))
+                        } else {
+                            let _ = window.set_size(Size::Physical(PhysicalSize::new(width, height)));
+                            let _ = window.center();
+                            window
+                                .outer_position()
+                                .ok()
+                                .map(|pos| (pos.x, pos.y, width, height))
+                        };
                         if maximized {
                             let _ = window.maximize();
                         }
-                        if let Some(pos) = centered_pos {
+                        if let Some((cx, cy, cw, ch)) = centered_coords {
                             manager.set_snapshot(Some(PersistedWindowState {
-                                x: pos.x,
-                                y: pos.y,
-                                width,
-                                height,
+                                x: cx,
+                                y: cy,
+                                width: cw,
+                                height: ch,
                                 maximized,
                             }));
                         } else {
@@ -748,6 +760,23 @@ pub fn get_remember_window_state(
     Ok(state.is_enabled())
 }
 
+/// 计算窗口在目标显示器工作区矩形内居中放置的安全物理几何坐标与宽高
+fn centered_geometry_in_area(
+    area: &MonitorWorkArea,
+    desired_width: u32,
+    desired_height: u32,
+) -> (i32, i32, u32, u32) {
+    let width = desired_width
+        .min(area.width)
+        .max(MIN_VALID_WIDTH.min(area.width));
+    let height = desired_height
+        .min(area.height)
+        .max(MIN_VALID_HEIGHT.min(area.height));
+    let x = area.x + ((area.width as i32 - width as i32) / 2);
+    let y = area.y + ((area.height as i32 - height as i32) / 2);
+    (x, y, width, height)
+}
+
 /// 计算当前显示器居中的默认普通窗口矩形（当在最大化状态下重新开启记忆且无历史普通尺寸时作为还原基线）
 fn default_centered_bounds(window: &WebviewWindow, maximized: bool) -> PersistedWindowState {
     let monitor = window
@@ -759,14 +788,11 @@ fn default_centered_bounds(window: &WebviewWindow, maximized: bool) -> Persisted
     if let Some(mon) = monitor {
         let scale = mon.scale_factor();
         let area = MonitorWorkArea::from_monitor(&mon);
-        let width = ((DEFAULT_LOGICAL_WIDTH * scale).round() as u32)
-            .min(area.width)
-            .max(MIN_VALID_WIDTH.min(area.width));
-        let height = ((DEFAULT_LOGICAL_HEIGHT * scale).round() as u32)
-            .min(area.height)
-            .max(MIN_VALID_HEIGHT.min(area.height));
-        let x = area.x + ((area.width as i32 - width as i32) / 2);
-        let y = area.y + ((area.height as i32 - height as i32) / 2);
+        let (x, y, width, height) = centered_geometry_in_area(
+            &area,
+            (DEFAULT_LOGICAL_WIDTH * scale).round() as u32,
+            (DEFAULT_LOGICAL_HEIGHT * scale).round() as u32,
+        );
         return PersistedWindowState {
             x,
             y,
@@ -1041,5 +1067,12 @@ mod tests {
     fn test_theme_background_color_matches_dark_and_light() {
         assert_eq!(theme_background_color(true), Color(0x1e, 0x1e, 0x1e, 255));
         assert_eq!(theme_background_color(false), Color(0xff, 0xff, 0xff, 255));
+    }
+
+    #[test]
+    fn test_centered_geometry_in_area_clamps_and_centers() {
+        let area = sample_monitor(100, 40, 1440, 900);
+        assert_eq!(centered_geometry_in_area(&area, 1010, 680), (315, 150, 1010, 680));
+        assert_eq!(centered_geometry_in_area(&area, 2000, 1200), (100, 40, 1440, 900));
     }
 }
