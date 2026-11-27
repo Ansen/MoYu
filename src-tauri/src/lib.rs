@@ -18,8 +18,9 @@ use serial::{
 };
 #[cfg(not(test))]
 use window_state::{
-    get_remember_window_state, set_remember_window_state, setup_main_window, show_main_window,
-    uncloak_main_window, WindowStateManager,
+    get_remember_window_state, is_main_window_maximized, set_remember_window_state,
+    setup_main_window, show_main_window, toggle_main_window_maximize, uncloak_main_window,
+    WindowStateManager,
 };
 
 #[cfg(not(test))]
@@ -146,6 +147,8 @@ pub fn run() {
             disconnect_serial_port,
             get_remember_window_state,
             set_remember_window_state,
+            is_main_window_maximized,
+            toggle_main_window_maximize,
             show_main_window,
             uncloak_main_window
         ]);

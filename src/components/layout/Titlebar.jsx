@@ -3,12 +3,15 @@ import { useI18n } from '../../i18n';
 import DropdownMenu from '../common/DropdownMenu';
 import { Sun, Moon, Monitor, Languages, Type, Settings, Info, Check, BookOpen, Minus, Square, Copy, X as CloseIcon, ChevronDown, Sparkles, Folder, FileText } from 'lucide-react';
 import { getCurrentWindow } from '@tauri-apps/api/window';
+import { createWindowMaximizedMonitor, toggleMainWindowMaximize } from '../../utils/windowStatePrefs';
 
 export default function Titlebar({ theme, setTheme, openSettings, openHelp, openAbout, activeDoc }) {
   const [activeMenu, setActiveMenu] = useState(null);
   const [isMaximized, setIsMaximized] = useState(false);
   const menubarRef = useRef(null);
   const menuTimeoutRef = useRef(null);
+  const toggleBusyRef = useRef(false);
+  const monitorRef = useRef(null);
   const { t, langSetting, setLangSetting } = useI18n();
 
   const handleMenuMouseEnter = () => {
@@ -32,26 +35,55 @@ export default function Titlebar({ theme, setTheme, openSettings, openHelp, open
     };
   }, []);
 
-  // 监听窗口最大化状态
+  // 监听窗口最大化状态（使用权威判定 + StrictMode 竞态防护 + 请求序号防乱序）
   useEffect(() => {
-    let unlisten;
+    let win = null;
     try {
-      const win = getCurrentWindow();
-      if (win?.isMaximized) {
-        win.isMaximized().then(setIsMaximized).catch(() => {});
-        
-        win.onResized(() => {
-          win.isMaximized().then(setIsMaximized).catch(() => {});
-        }).then(u => unlisten = u).catch(() => {});
-      }
+      win = getCurrentWindow();
     } catch {
       // 容错: 非原生 Tauri 窗口运行环境
     }
 
+    const monitor = createWindowMaximizedMonitor({
+      win,
+      onMaximizedChange: setIsMaximized,
+      debounceMs: 50,
+    });
+    monitorRef.current = monitor;
+    monitor.start();
+
     return () => {
-      if (unlisten) unlisten();
+      monitor.stop();
+      if (monitorRef.current === monitor) {
+        monitorRef.current = null;
+      }
     };
   }, []);
+
+  const handleToggleMaximize = async () => {
+    if (toggleBusyRef.current) return;
+    toggleBusyRef.current = true;
+    try {
+      let win = null;
+      try {
+        win = getCurrentWindow();
+      } catch {
+        win = null;
+      }
+      const next = await toggleMainWindowMaximize({ win });
+      if (typeof next === 'boolean') {
+        if (monitorRef.current) {
+          monitorRef.current.applyAuthoritativeState(next);
+        } else {
+          setIsMaximized(next);
+        }
+      }
+    } catch {
+      // 忽略窗口控制异常
+    } finally {
+      toggleBusyRef.current = false;
+    }
+  };
 
   // 点击外部关闭菜单
   useEffect(() => {
@@ -143,17 +175,19 @@ export default function Titlebar({ theme, setTheme, openSettings, openHelp, open
         <div 
           className="flex-1 h-full flex items-center justify-center min-w-0 px-2 sm:px-4 overflow-hidden" 
           data-tauri-drag-region
-        >
-          {activeDoc && (
-            <div 
-              className="flex items-center gap-1.5 text-[12px] text-slate-500 dark:text-slate-400 font-medium min-w-0 max-w-full select-none pointer-events-none animate-in fade-in duration-150"
-              title={
-                [
+          title={
+            activeDoc
+              ? [
                   activeDoc.folderName ? `${activeDoc.folderName} /` : '',
                   activeDoc.name,
                   activeDoc.currentChapterLabel ? `· ${activeDoc.currentChapterLabel}` : ''
                 ].filter(Boolean).join(' ')
-              }
+              : undefined
+          }
+        >
+          {activeDoc && (
+            <div 
+              className="flex items-center gap-1.5 text-[12px] text-slate-500 dark:text-slate-400 font-medium min-w-0 max-w-full select-none pointer-events-none animate-in fade-in duration-150"
             >
               {activeDoc.isGenerated ? (
                 <Sparkles size={13} className="text-orange-500 shrink-0" />
@@ -193,20 +227,28 @@ export default function Titlebar({ theme, setTheme, openSettings, openHelp, open
         {/* Window Controls (Custom Native Titlebar): Protected with shrink-0 */}
         <div className="flex h-full items-center shrink-0">
           <button 
-            onClick={() => { try { getCurrentWindow().minimize(); } catch {} }}
+            onClick={() => {
+              try {
+                Promise.resolve(getCurrentWindow().minimize()).catch(() => {});
+              } catch {}
+            }}
             className="h-full px-3.5 hover:bg-slate-200 dark:hover:bg-[#333] transition-colors flex items-center justify-center text-slate-600 dark:text-slate-400"
           >
             <Minus size={14} />
           </button>
           <button 
-            onClick={() => { try { getCurrentWindow().toggleMaximize(); } catch {} }}
+            onClick={handleToggleMaximize}
             className="h-full px-3.5 hover:bg-slate-200 dark:hover:bg-[#333] transition-colors flex items-center justify-center text-slate-600 dark:text-slate-400"
             title={isMaximized ? t('titlebar.restore') : t('titlebar.maximize')}
           >
             {isMaximized ? <Copy size={13} strokeWidth={2.5} /> : <Square size={13} strokeWidth={2.5} />}
           </button>
           <button 
-            onClick={() => { try { getCurrentWindow().close(); } catch {} }}
+            onClick={() => {
+              try {
+                Promise.resolve(getCurrentWindow().close()).catch(() => {});
+              } catch {}
+            }}
             className="h-full px-4 hover:bg-red-500 hover:text-white transition-colors flex items-center justify-center text-slate-600 dark:text-slate-400"
           >
             <CloseIcon size={14} />

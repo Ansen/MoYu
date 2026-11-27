@@ -1,10 +1,20 @@
-import React, { useRef } from 'react';
+import React, { useRef, useEffect } from 'react';
 import { X, FileText, FileJson, Upload } from 'lucide-react';
 import { useI18n } from '../i18n';
 
 export default function ImportDictModal({ isOpen, onClose, onImport }) {
   const { t } = useI18n();
   const fileInputRef = useRef(null);
+
+  // ESC 键关闭弹窗
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
 
   if (!isOpen) return null;
 
@@ -24,7 +34,7 @@ export default function ImportDictModal({ isOpen, onClose, onImport }) {
   };
 
   return (
-    <div className="fixed inset-0 bg-black/40 dark:bg-black/60 z-[110] flex items-center justify-center backdrop-blur-sm select-none">
+    <div className="fixed top-8 inset-x-0 bottom-0 bg-black/40 dark:bg-black/60 z-[110] flex items-center justify-center backdrop-blur-sm select-none">
       <div className="bg-white dark:bg-[#1e1e1e] border border-slate-300 dark:border-[#333333] rounded-lg shadow-2xl w-[400px] max-w-[90vw] overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-200">
         
         {/* Header */}

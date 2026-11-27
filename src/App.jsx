@@ -294,7 +294,6 @@ function App() {
       <Titlebar 
         theme={theme} 
         setTheme={setTheme} 
-        setView={setView} 
         openSettings={() => setSettingsOpen(true)}
         openHelp={() => setIsHelpModalOpen(true)}
         openAbout={() => setIsAboutOpen(true)}

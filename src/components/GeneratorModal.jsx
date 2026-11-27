@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { save } from '@tauri-apps/plugin-dialog';
 import { X, Sparkles, CheckCircle2 } from 'lucide-react';
 import { useI18n } from '../i18n';
@@ -119,7 +119,7 @@ export default function GeneratorModal({ isOpen, onClose, onGenerate }) {
   }, [presetMode, selectedDigitSlots, effectiveLength, effectiveMaxDigits]);
 
   // Reset dataset and close
-  const handleClose = () => {
+  const handleClose = useCallback(() => {
     setGeneratedDataset(null);
     setExportProgress(null);
     setPdfExported(false);
@@ -127,7 +127,21 @@ export default function GeneratorModal({ isOpen, onClose, onGenerate }) {
     setWavExported(false);
 
     onClose();
-  };
+  }, [onClose]);
+
+  const isBusyExporting = isGenerating || isExportingPdf || isExportingEpub || isExportingWav;
+
+  // ESC 键关闭弹窗（生成或导出期间避免误中断）
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape' && !isBusyExporting) {
+        handleClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, isBusyExporting, handleClose]);
 
   if (!isOpen) return null;
 
@@ -467,8 +481,8 @@ export default function GeneratorModal({ isOpen, onClose, onGenerate }) {
   };
 
   return (
-    <div className="fixed inset-0 bg-black/40 dark:bg-black/70 z-[100] flex items-center justify-center p-4 sm:p-6 backdrop-blur-xs select-none animate-in fade-in duration-200">
-      <div className="bg-white dark:bg-[#1e1e1e] border border-slate-300 dark:border-[#333333] rounded-2xl shadow-2xl w-[600px] max-w-[94vw] h-[640px] max-h-[calc(100vh-2rem)] overflow-hidden flex flex-col animate-in zoom-in-95 duration-200">
+    <div className="fixed top-8 inset-x-0 bottom-0 bg-black/40 dark:bg-black/70 z-[100] flex items-center justify-center p-4 sm:p-6 backdrop-blur-xs select-none animate-in fade-in duration-200">
+      <div className="bg-white dark:bg-[#1e1e1e] border border-slate-300 dark:border-[#333333] rounded-2xl shadow-2xl w-[600px] max-w-[94vw] h-[640px] max-h-full overflow-hidden flex flex-col animate-in zoom-in-95 duration-200">
         
         {/* Modal Header */}
         <div className="shrink-0 h-12 flex items-center justify-between px-5 bg-slate-50 dark:bg-[#252526] border-b border-slate-200 dark:border-[#333333]">

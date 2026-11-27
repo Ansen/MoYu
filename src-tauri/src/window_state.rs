@@ -1,8 +1,10 @@
 use serde::{Deserialize, Serialize};
+use std::path::Path;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{mpsc, Arc, Mutex};
 #[cfg(not(test))]
 use std::time::Duration;
+use std::time::{SystemTime, UNIX_EPOCH};
 #[cfg(not(test))]
 use tauri::{
     window::Color, AppHandle, Manager, Monitor, PhysicalPosition, PhysicalSize, Position, Size,
@@ -22,9 +24,18 @@ pub const KEY_WINDOW_STATE: &str = "window_state";
 const DEFAULT_LOGICAL_WIDTH: f64 = 1010.0;
 const DEFAULT_LOGICAL_HEIGHT: f64 = 680.0;
 
-/// 合法窗口尺寸下限（避免异常或损坏数据导致窗口过小无法操作）
+/// 合法窗口尺寸上下限（避免异常或损坏数据导致窗口过小或无限巨大）
 const MIN_VALID_WIDTH: u32 = 400;
 const MIN_VALID_HEIGHT: u32 = 300;
+const MAX_VALID_WIDTH: u32 = 16_384;
+const MAX_VALID_HEIGHT: u32 = 16_384;
+
+/// 合法显示器缩放比例区间
+const MIN_VALID_SCALE_FACTOR: f64 = 0.25;
+const MAX_VALID_SCALE_FACTOR: f64 = 8.0;
+
+/// 判断窗口尺寸是否已几乎占满显示器工作区的物理像素容差
+const WORK_AREA_FULL_TOLERANCE: u32 = 24;
 
 /// 判断窗口是否仍在显示器工作区内的最小有效重叠区域（物理像素）
 const MIN_VISIBLE_OVERLAP_WIDTH: i64 = 120;
@@ -41,41 +52,58 @@ const REVEAL_FALLBACK_TIMEOUT_MS: u64 = 6_000;
 #[cfg(target_os = "windows")]
 const UNCLOAK_FALLBACK_TIMEOUT_MS: u64 = 250;
 
+/// 校验缩放因子是否处于合理有限区间
+fn is_valid_scale_factor(scale: f64) -> bool {
+    scale.is_finite() && (MIN_VALID_SCALE_FACTOR..=MAX_VALID_SCALE_FACTOR).contains(&scale)
+}
+
 /// 持久化存储的窗口几何与最大化状态（均使用物理像素）
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct PersistedWindowState {
     pub x: i32,
     pub y: i32,
     pub width: u32,
     pub height: u32,
     pub maximized: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub scale_factor: Option<f64>,
 }
 
 impl PersistedWindowState {
-    /// 校验宽高是否达到最低可用阈值
+    /// 校验宽高及缩放比例是否达到合法可用范围
     pub fn is_valid_dimensions(&self) -> bool {
-        self.width >= MIN_VALID_WIDTH && self.height >= MIN_VALID_HEIGHT
+        let valid_dims = (MIN_VALID_WIDTH..=MAX_VALID_WIDTH).contains(&self.width)
+            && (MIN_VALID_HEIGHT..=MAX_VALID_HEIGHT).contains(&self.height);
+        let valid_scale = self.scale_factor.map_or(true, is_valid_scale_factor);
+        valid_dims && valid_scale
     }
 }
 
 /// 显示器工作区矩形（物理像素）
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub struct MonitorWorkArea {
     pub x: i32,
     pub y: i32,
     pub width: u32,
     pub height: u32,
+    pub scale_factor: f64,
 }
 
 #[cfg(not(test))]
 impl MonitorWorkArea {
     fn from_monitor(monitor: &Monitor) -> Self {
         let area = monitor.work_area();
+        let scale = monitor.scale_factor();
         Self {
             x: area.position.x,
             y: area.position.y,
             width: area.size.width,
             height: area.size.height,
+            scale_factor: if is_valid_scale_factor(scale) {
+                scale
+            } else {
+                1.0
+            },
         }
     }
 }
@@ -100,7 +128,7 @@ pub enum RestoredPlacement {
 }
 
 /// 运行期窗口状态采样输入（用于纯函数状态机合并，方便单元测试）
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct LiveWindowSample {
     pub x: i32,
     pub y: i32,
@@ -109,19 +137,27 @@ pub struct LiveWindowSample {
     pub maximized: bool,
     pub minimized: bool,
     pub fullscreen: bool,
+    pub scale_factor: Option<f64>,
+    pub monitor_work_area: Option<MonitorWorkArea>,
 }
 
 /// 全局窗口状态管理器（由 Tauri State 托管）
 pub struct WindowStateManager {
     /// 是否启用窗口状态记忆（默认 true）
     enabled: Arc<AtomicBool>,
-    /// 主窗口是否已完成首帧显窗（确保只触发一次且忽略显窗前的瞬态尺寸事件）
+    /// 主窗口是否已完成首帧显窗（确保只触发一次）
     shown: Arc<AtomicBool>,
+    /// 主窗口显窗后的运行期事件监听是否已就绪（在 window.show() 之后置位）
+    events_ready: Arc<AtomicBool>,
     /// 主窗口是否已完成 DWM 解封显示（仅触发一次）
     uncloaked: Arc<AtomicBool>,
+    /// 正在主动执行几何自愈/还原时的防重入守卫
+    restoring_geometry: Arc<AtomicBool>,
+    /// 关闭流程是否已完成同步落盘（防止 CloseRequested 与 Destroyed 重复写入）
+    closed_flushed: Arc<AtomicBool>,
     /// 内存中保存的最近一次有效窗口快照（最大化和还原时保护普通尺寸不被覆盖）
     snapshot: Arc<Mutex<Option<PersistedWindowState>>>,
-    /// 串口化磁盘写入锁，避免后台防抖线程与同步关闭/开关变更产生写入竞态
+    /// 串行化磁盘写入锁，避免后台防抖线程与同步关闭/开关变更产生写入竞态
     persist_lock: Arc<Mutex<()>>,
     /// 防抖保存通道发送端（容量为 1，O(1) 非阻塞合并事件）
     save_tx: Mutex<Option<mpsc::SyncSender<()>>>,
@@ -132,11 +168,38 @@ impl Default for WindowStateManager {
         Self {
             enabled: Arc::new(AtomicBool::new(true)),
             shown: Arc::new(AtomicBool::new(false)),
+            events_ready: Arc::new(AtomicBool::new(false)),
             uncloaked: Arc::new(AtomicBool::new(false)),
+            restoring_geometry: Arc::new(AtomicBool::new(false)),
+            closed_flushed: Arc::new(AtomicBool::new(false)),
             snapshot: Arc::new(Mutex::new(None)),
             persist_lock: Arc::new(Mutex::new(())),
             save_tx: Mutex::new(None),
         }
+    }
+}
+
+/// 几何自愈防重入守卫（离开作用域自动复位）
+#[cfg(not(test))]
+struct RestoringGeometryGuard {
+    flag: Arc<AtomicBool>,
+}
+
+#[cfg(not(test))]
+impl RestoringGeometryGuard {
+    fn try_acquire(flag: &Arc<AtomicBool>) -> Option<Self> {
+        flag.compare_exchange(false, true, Ordering::AcqRel, Ordering::Acquire)
+            .ok()
+            .map(|_| Self {
+                flag: Arc::clone(flag),
+            })
+    }
+}
+
+#[cfg(not(test))]
+impl Drop for RestoringGeometryGuard {
+    fn drop(&mut self) {
+        self.flag.store(false, Ordering::Release);
     }
 }
 
@@ -151,11 +214,40 @@ impl WindowStateManager {
         self.shown.load(Ordering::Acquire)
     }
 
+    /// 读取运行期窗口事件采样是否已就绪
+    pub fn is_events_ready(&self) -> bool {
+        self.events_ready.load(Ordering::Acquire)
+    }
+
     /// 原子标记窗口已显示，仅首次返回 true
     fn mark_shown_once(&self) -> bool {
         self.shown
             .compare_exchange(false, true, Ordering::AcqRel, Ordering::Acquire)
             .is_ok()
+    }
+
+    /// 标记运行期窗口事件采样已就绪
+    #[cfg(not(test))]
+    fn mark_events_ready(&self) {
+        self.events_ready.store(true, Ordering::Release);
+    }
+
+    /// 判断是否正在执行几何还原
+    #[cfg(not(test))]
+    fn is_restoring_geometry(&self) -> bool {
+        self.restoring_geometry.load(Ordering::Acquire)
+    }
+
+    /// 判断关闭流程是否已完成刷盘
+    #[cfg(not(test))]
+    fn is_closed_flushed(&self) -> bool {
+        self.closed_flushed.load(Ordering::Acquire)
+    }
+
+    /// 标记关闭流程已完成刷盘
+    #[cfg(not(test))]
+    fn mark_closed_flushed(&self) {
+        self.closed_flushed.store(true, Ordering::Release);
     }
 
     /// 原子标记窗口已完成解封，仅首次返回 true
@@ -230,10 +322,20 @@ impl WindowStateManager {
     }
 }
 
+/// 纯函数：判断窗口宽高是否已几乎占满目标显示器工作区（物理像素）
+pub fn is_covering_work_area(width: u32, height: u32, area: &MonitorWorkArea) -> bool {
+    if area.width == 0 || area.height == 0 {
+        return false;
+    }
+    width >= area.width.saturating_sub(WORK_AREA_FULL_TOLERANCE)
+        && height >= area.height.saturating_sub(WORK_AREA_FULL_TOLERANCE)
+}
+
 /// 纯函数：合并实时窗口采样与已有快照
 /// - 最小化或全屏状态下直接忽略，保留原快照
-/// - 最大化状态下仅翻转 `maximized = true`，保留原有普通 `x/y/width/height`
-/// - 普通状态下（非最大化、非最小化、非全屏）更新完整坐标与尺寸
+/// - 最大化状态下仅翻转 `maximized = true`，保留原有普通 `x/y/width/height/scale_factor`
+/// - 若原快照为最大化且当前 `sample.maximized == false` 但尺寸仍占满工作区，则保护原普通几何不被全屏尺寸覆盖
+/// - 普通状态下（非最大化、非最小化、非全屏）更新完整坐标、尺寸与缩放因子
 pub fn merge_window_snapshot(
     prev: Option<&PersistedWindowState>,
     sample: &LiveWindowSample,
@@ -252,9 +354,28 @@ pub fn merge_window_snapshot(
         };
     }
 
-    if sample.width < MIN_VALID_WIDTH || sample.height < MIN_VALID_HEIGHT {
+    if sample.width < MIN_VALID_WIDTH
+        || sample.height < MIN_VALID_HEIGHT
+        || sample.width > MAX_VALID_WIDTH
+        || sample.height > MAX_VALID_HEIGHT
+    {
         return prev.cloned();
     }
+
+    // 最大化退出瞬态或 WM_DPICHANGED 丢标志后尺寸仍占满工作区时，保护原有普通小窗口几何不被覆盖
+    if let (Some(existing), Some(area)) = (prev, sample.monitor_work_area.as_ref()) {
+        if existing.maximized
+            && existing.is_valid_dimensions()
+            && is_covering_work_area(sample.width, sample.height, area)
+        {
+            return Some(PersistedWindowState {
+                maximized: false,
+                ..existing.clone()
+            });
+        }
+    }
+
+    let valid_scale = sample.scale_factor.filter(|&s| is_valid_scale_factor(s));
 
     Some(PersistedWindowState {
         x: sample.x,
@@ -262,6 +383,7 @@ pub fn merge_window_snapshot(
         width: sample.width,
         height: sample.height,
         maximized: false,
+        scale_factor: valid_scale,
     })
 }
 
@@ -286,6 +408,19 @@ fn compute_intersection(
     let overlap_w = (a_right.min(b_right) - a_left.max(b_left)).max(0);
     let overlap_h = (a_bottom.min(b_bottom) - a_top.max(b_top)).max(0);
     (overlap_w, overlap_h, overlap_w * overlap_h)
+}
+
+/// 根据目标显示器缩放因子计算默认物理宽高
+fn default_physical_size_for_scale(scale_factor: f64) -> (u32, u32) {
+    let scale = if is_valid_scale_factor(scale_factor) {
+        scale_factor
+    } else {
+        1.0
+    };
+    (
+        (DEFAULT_LOGICAL_WIDTH * scale).round() as u32,
+        (DEFAULT_LOGICAL_HEIGHT * scale).round() as u32,
+    )
 }
 
 /// 纯函数：根据当前显示器列表校验并计算恢复后的安全窗口位置
@@ -317,6 +452,19 @@ pub fn resolve_restored_geometry(
         .map(|(_, monitor)| monitor);
 
     if let Some(monitor) = best_monitor {
+        // 旧污染配置自愈：若历史快照为最大化且普通尺寸已占满目标工作区，则重置为居中默认尺寸
+        if saved.maximized && is_covering_work_area(saved.width, saved.height, &monitor) {
+            let (def_w, def_h) = default_physical_size_for_scale(monitor.scale_factor);
+            let (cx, cy, cw, ch) = centered_geometry_in_area(&monitor, def_w, def_h);
+            return Some(RestoredPlacement::Positioned {
+                x: cx,
+                y: cy,
+                width: cw,
+                height: ch,
+                maximized: true,
+            });
+        }
+
         let clamped_width = saved
             .width
             .min(monitor.width)
@@ -347,16 +495,37 @@ pub fn resolve_restored_geometry(
 
     // 所有已保存位置均不在当前显示器工作区内（例如断开外接副屏）
     let (fallback_w, fallback_h) = match primary.or_else(|| monitors.first().copied()) {
-        Some(target) => (
-            saved
-                .width
-                .min(target.width)
-                .max(MIN_VALID_WIDTH.min(target.width)),
-            saved
-                .height
-                .min(target.height)
-                .max(MIN_VALID_HEIGHT.min(target.height)),
-        ),
+        Some(target) => {
+            let (mut desired_w, mut desired_h) = (saved.width, saved.height);
+
+            // 若记录了原显示器 DPI，且与回退目标显示器不同，按比例换算物理宽高以维持逻辑视觉尺寸
+            if let Some(saved_scale) = saved.scale_factor {
+                if is_valid_scale_factor(saved_scale)
+                    && is_valid_scale_factor(target.scale_factor)
+                    && (target.scale_factor - saved_scale).abs() > f64::EPSILON
+                {
+                    let ratio = target.scale_factor / saved_scale;
+                    desired_w = (f64::from(saved.width) * ratio).round().max(1.0) as u32;
+                    desired_h = (f64::from(saved.height) * ratio).round().max(1.0) as u32;
+                }
+            }
+
+            // 旧污染配置自愈：若换算后在目标工作区仍占满屏幕，替换为目标显示器默认逻辑尺寸
+            if saved.maximized && is_covering_work_area(desired_w, desired_h, &target) {
+                let (def_w, def_h) = default_physical_size_for_scale(target.scale_factor);
+                desired_w = def_w;
+                desired_h = def_h;
+            }
+
+            (
+                desired_w
+                    .min(target.width)
+                    .max(MIN_VALID_WIDTH.min(target.width)),
+                desired_h
+                    .min(target.height)
+                    .max(MIN_VALID_HEIGHT.min(target.height)),
+            )
+        }
         None => (saved.width, saved.height),
     };
 
@@ -367,9 +536,61 @@ pub fn resolve_restored_geometry(
     })
 }
 
+/// 检查并在设置文件损坏（非合法 JSON Object）时先备份原文件，防止空 Store 静默覆盖历史进度
+pub fn backup_corrupt_settings_file(path: &Path) -> bool {
+    if !path.exists() {
+        return false;
+    }
+
+    let Ok(bytes) = std::fs::read(path) else {
+        return false;
+    };
+
+    if let Ok(serde_json::Value::Object(_)) = serde_json::from_slice::<serde_json::Value>(&bytes) {
+        return false;
+    }
+
+    let ts = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0);
+    let file_name = path
+        .file_name()
+        .and_then(|n| n.to_str())
+        .unwrap_or(SETTINGS_STORE_FILE);
+
+    let mut backup_path = path.with_file_name(format!("{}.corrupt.{}.bak", file_name, ts));
+    if backup_path.exists() {
+        for idx in 1..=100 {
+            let candidate =
+                path.with_file_name(format!("{}.corrupt.{}.{}.bak", file_name, ts, idx));
+            if !candidate.exists() {
+                backup_path = candidate;
+                break;
+            }
+        }
+    }
+
+    match std::fs::rename(path, &backup_path) {
+        Ok(()) => {
+            log::warn!("检测到损坏的设置文件，已备份至 {:?}", backup_path);
+            true
+        }
+        Err(err) => {
+            log::warn!("备份损坏的设置文件失败 ({:?}): {}", path, err);
+            false
+        }
+    }
+}
+
 /// 从 Store 读取设置开关与历史窗口状态（读取失败时返回安全默认值）
 #[cfg(not(test))]
 fn load_persisted_config(app: &AppHandle) -> (bool, Option<PersistedWindowState>) {
+    if let Ok(app_data_dir) = app.path().app_data_dir() {
+        let settings_path = app_data_dir.join(SETTINGS_STORE_FILE);
+        backup_corrupt_settings_file(&settings_path);
+    }
+
     let Ok(store) = app.store(SETTINGS_STORE_FILE) else {
         return (true, None);
     };
@@ -423,14 +644,157 @@ fn flush_snapshot_internal(
     }
 }
 
+/// Windows 原生窗口状态查询（通过 user32.dll 动态解析，避免受 tao 内存缓存标志滞后影响）
+#[cfg(all(not(test), target_os = "windows"))]
+mod win_native {
+    use std::ffi::{c_char, c_void};
+    use std::sync::OnceLock;
+    use tauri::WebviewWindow;
+
+    const SW_SHOWMINIMIZED: u32 = 2;
+    const SW_SHOWMAXIMIZED: u32 = 3;
+
+    #[repr(C)]
+    #[derive(Default)]
+    struct Point {
+        x: i32,
+        y: i32,
+    }
+
+    #[repr(C)]
+    #[derive(Default)]
+    struct Rect {
+        left: i32,
+        top: i32,
+        right: i32,
+        bottom: i32,
+    }
+
+    #[repr(C)]
+    #[derive(Default)]
+    struct WindowPlacement {
+        length: u32,
+        flags: u32,
+        show_cmd: u32,
+        pt_min_position: Point,
+        pt_max_position: Point,
+        rc_normal_position: Rect,
+    }
+
+    type IsZoomedFn = unsafe extern "system" fn(hwnd: *mut c_void) -> i32;
+    type IsIconicFn = unsafe extern "system" fn(hwnd: *mut c_void) -> i32;
+    type GetWindowPlacementFn =
+        unsafe extern "system" fn(hwnd: *mut c_void, lpwndpl: *mut WindowPlacement) -> i32;
+
+    struct User32Procs {
+        is_zoomed: IsZoomedFn,
+        is_iconic: IsIconicFn,
+        get_window_placement: GetWindowPlacementFn,
+    }
+
+    extern "system" {
+        fn LoadLibraryA(lp_lib_file_name: *const c_char) -> *mut c_void;
+        fn GetProcAddress(h_module: *mut c_void, lp_proc_name: *const c_char) -> *mut c_void;
+    }
+
+    fn resolve_user32_procs() -> Option<&'static User32Procs> {
+        static CACHE: OnceLock<Option<User32Procs>> = OnceLock::new();
+        CACHE
+            .get_or_init(|| unsafe {
+                let module = LoadLibraryA(c"user32.dll".as_ptr());
+                if module.is_null() {
+                    return None;
+                }
+                let p_zoomed = GetProcAddress(module, c"IsZoomed".as_ptr());
+                let p_iconic = GetProcAddress(module, c"IsIconic".as_ptr());
+                let p_placement = GetProcAddress(module, c"GetWindowPlacement".as_ptr());
+                if p_zoomed.is_null() || p_iconic.is_null() || p_placement.is_null() {
+                    return None;
+                }
+                Some(User32Procs {
+                    is_zoomed: std::mem::transmute::<*mut c_void, IsZoomedFn>(p_zoomed),
+                    is_iconic: std::mem::transmute::<*mut c_void, IsIconicFn>(p_iconic),
+                    get_window_placement: std::mem::transmute::<*mut c_void, GetWindowPlacementFn>(
+                        p_placement,
+                    ),
+                })
+            })
+            .as_ref()
+    }
+
+    /// 同步查询 Win32 真实窗口状态，返回 (maximized, minimized)
+    pub fn query_native_window_flags(window: &WebviewWindow) -> Option<(bool, bool)> {
+        let procs = resolve_user32_procs()?;
+        let Ok(hwnd) = window.hwnd() else {
+            return None;
+        };
+        if hwnd.0.is_null() {
+            return None;
+        }
+
+        let mut wp = WindowPlacement {
+            length: std::mem::size_of::<WindowPlacement>() as u32,
+            ..Default::default()
+        };
+
+        // SAFETY: hwnd 非空且 wp.length 已按 Win32 GetWindowPlacement 规范初始化
+        let (zoomed, iconic, placement_ok) = unsafe {
+            (
+                (procs.is_zoomed)(hwnd.0) != 0,
+                (procs.is_iconic)(hwnd.0) != 0,
+                (procs.get_window_placement)(hwnd.0, &mut wp) != 0,
+            )
+        };
+
+        let maximized = zoomed || (placement_ok && wp.show_cmd == SW_SHOWMAXIMIZED);
+        let minimized = iconic || (placement_ok && wp.show_cmd == SW_SHOWMINIMIZED);
+        Some((maximized, minimized))
+    }
+}
+
+#[cfg(all(not(test), not(target_os = "windows")))]
+mod win_native {
+    use tauri::WebviewWindow;
+
+    pub fn query_native_window_flags(_window: &WebviewWindow) -> Option<(bool, bool)> {
+        None
+    }
+}
+
+/// 跨平台权威判断主窗口是否处于最大化状态
+#[cfg(not(test))]
+fn is_window_maximized_authoritative(window: &WebviewWindow) -> Option<bool> {
+    let tauri_maximized = window.is_maximized().ok()?;
+    let native_maximized = win_native::query_native_window_flags(window).map(|(m, _)| m);
+    Some(native_maximized.map_or(tauri_maximized, |nm| tauri_maximized || nm))
+}
+
 /// 采样当前原生窗口的实时几何与状态
 #[cfg(not(test))]
 fn sample_live_window(window: &WebviewWindow) -> Option<LiveWindowSample> {
-    let maximized = window.is_maximized().unwrap_or(false);
-    let minimized = window.is_minimized().unwrap_or(false);
-    let fullscreen = window.is_fullscreen().unwrap_or(false);
+    let tauri_maximized = window.is_maximized().ok()?;
+    let tauri_minimized = window.is_minimized().ok()?;
+    let fullscreen = window.is_fullscreen().ok()?;
     let pos = window.outer_position().ok()?;
     let size = window.inner_size().ok()?;
+
+    let (maximized, minimized) = match win_native::query_native_window_flags(window) {
+        Some((native_max, native_min)) => {
+            (tauri_maximized || native_max, tauri_minimized || native_min)
+        }
+        None => (tauri_maximized, tauri_minimized),
+    };
+
+    let monitor_work_area = window
+        .current_monitor()
+        .ok()
+        .flatten()
+        .map(|m| MonitorWorkArea::from_monitor(&m));
+
+    let scale_factor = monitor_work_area
+        .map(|m| m.scale_factor)
+        .or_else(|| window.scale_factor().ok())
+        .filter(|&s| is_valid_scale_factor(s));
 
     Some(LiveWindowSample {
         x: pos.x,
@@ -440,6 +804,8 @@ fn sample_live_window(window: &WebviewWindow) -> Option<LiveWindowSample> {
         maximized,
         minimized,
         fullscreen,
+        scale_factor,
+        monitor_work_area,
     })
 }
 
@@ -488,8 +854,11 @@ mod win_cloak {
         let Ok(hwnd) = window.hwnd() else {
             return false;
         };
+        if hwnd.0.is_null() {
+            return false;
+        }
         let value: i32 = if cloaked { 1 } else { 0 };
-        // SAFETY: hwnd 与 value 指针及长度均按 Win32 DwmSetWindowAttribute(DWMWA_CLOAK) 规范传入
+        // SAFETY: hwnd 非空且 value 指针与长度均按 Win32 DwmSetWindowAttribute(DWMWA_CLOAK) 规范传入
         let hr = unsafe {
             func(
                 hwnd.0,
@@ -537,6 +906,56 @@ fn uncloak_window_once(window: &WebviewWindow, state: &WindowStateManager) {
     let _ = window.set_focus();
 }
 
+/// 在启动阶段对隐藏窗口安全施加最大化，保持 DWM Cloak 直至 reveal_main_window 统一解封，避免 SW_MAXIMIZE -> SW_HIDE 造成空窗闪框
+#[cfg(not(test))]
+fn apply_initial_maximize_cloaked(window: &WebviewWindow) {
+    let _ = win_cloak::set_window_cloaked(window, true);
+    let _ = window.maximize();
+}
+
+/// 将窗口物理坐标与尺寸恢复为指定普通几何（先移动以匹配目标显示器 DPI 再设尺寸）
+#[cfg(not(test))]
+fn apply_normal_window_bounds(window: &WebviewWindow, bounds: &PersistedWindowState) {
+    let _ = window.set_position(Position::Physical(PhysicalPosition::new(
+        bounds.x, bounds.y,
+    )));
+    let _ = window.set_size(Size::Physical(PhysicalSize::new(
+        bounds.width,
+        bounds.height,
+    )));
+}
+
+/// 从异常的全屏普通态自愈回目标普通小窗口尺寸，并更新内存快照与防抖落盘
+#[cfg(not(test))]
+fn heal_to_normal_window_bounds(
+    window: &WebviewWindow,
+    state: &WindowStateManager,
+    prev: Option<&PersistedWindowState>,
+    current_area: Option<&MonitorWorkArea>,
+) {
+    let Some(_guard) = RestoringGeometryGuard::try_acquire(&state.restoring_geometry) else {
+        return;
+    };
+
+    let target = match prev {
+        Some(existing)
+            if existing.is_valid_dimensions()
+                && !current_area
+                    .is_some_and(|area| is_covering_work_area(existing.width, existing.height, area)) =>
+        {
+            PersistedWindowState {
+                maximized: false,
+                ..existing.clone()
+            }
+        }
+        _ => default_centered_bounds(window, false),
+    };
+
+    apply_normal_window_bounds(window, &target);
+    state.set_snapshot(Some(target));
+    state.schedule_debounced_save();
+}
+
 /// 幂等地显示主窗口，并在首次启动尚无基线时记录默认几何快照
 #[cfg(not(test))]
 fn reveal_main_window(
@@ -551,7 +970,11 @@ fn reveal_main_window(
 
     log::info!(
         "显示主窗口 (来源: {}, is_dark: {:?})",
-        if from_frontend { "frontend" } else { "fallback_timeout" },
+        if from_frontend {
+            "frontend"
+        } else {
+            "fallback_timeout"
+        },
         is_dark
     );
 
@@ -564,6 +987,7 @@ fn reveal_main_window(
 
     let _ = window.show();
     if !cloaked {
+        win_cloak::set_window_cloaked(window, false);
         state.mark_uncloaked_once();
         let _ = window.set_focus();
     } else {
@@ -587,6 +1011,9 @@ fn reveal_main_window(
             state.set_snapshot(initial);
         }
     }
+
+    // 在 show() 及基线采样完成后再放开运行期事件采集，屏蔽显窗瞬态事件
+    state.mark_events_ready();
 }
 
 /// 启动阶段：恢复主窗口尺寸/位置/最大化状态（保持隐藏等待首帧就绪后显示），并挂载事件监听
@@ -632,14 +1059,22 @@ pub fn setup_main_window(app: &tauri::App) {
                         let _ = window.set_position(Position::Physical(PhysicalPosition::new(x, y)));
                         let _ = window.set_size(Size::Physical(PhysicalSize::new(width, height)));
                         if maximized {
-                            let _ = window.maximize();
+                            apply_initial_maximize_cloaked(&window);
                         }
+                        let scale_factor = window
+                            .current_monitor()
+                            .ok()
+                            .flatten()
+                            .map(|m| m.scale_factor())
+                            .or(saved.scale_factor)
+                            .filter(|&s| is_valid_scale_factor(s));
                         manager.set_snapshot(Some(PersistedWindowState {
                             x,
                             y,
                             width,
                             height,
                             maximized,
+                            scale_factor,
                         }));
                     }
                     RestoredPlacement::CenteredFallback {
@@ -654,25 +1089,28 @@ pub fn setup_main_window(app: &tauri::App) {
                             let _ = window
                                 .set_position(Position::Physical(PhysicalPosition::new(cx, cy)));
                             let _ = window.set_size(Size::Physical(PhysicalSize::new(cw, ch)));
-                            Some((cx, cy, cw, ch))
+                            Some((cx, cy, cw, ch, Some(area.scale_factor)))
                         } else {
-                            let _ = window.set_size(Size::Physical(PhysicalSize::new(width, height)));
+                            let _ =
+                                window.set_size(Size::Physical(PhysicalSize::new(width, height)));
                             let _ = window.center();
+                            let scale = window.scale_factor().ok().filter(|&s| is_valid_scale_factor(s));
                             window
                                 .outer_position()
                                 .ok()
-                                .map(|pos| (pos.x, pos.y, width, height))
+                                .map(|pos| (pos.x, pos.y, width, height, scale))
                         };
                         if maximized {
-                            let _ = window.maximize();
+                            apply_initial_maximize_cloaked(&window);
                         }
-                        if let Some((cx, cy, cw, ch)) = centered_coords {
+                        if let Some((cx, cy, cw, ch, scale_factor)) = centered_coords {
                             manager.set_snapshot(Some(PersistedWindowState {
                                 x: cx,
                                 y: cy,
                                 width: cw,
                                 height: ch,
                                 maximized,
+                                scale_factor,
                             }));
                         } else {
                             manager.set_snapshot(Some(saved));
@@ -702,12 +1140,36 @@ pub fn setup_main_window(app: &tauri::App) {
         let state = app_handle.state::<WindowStateManager>();
         match event {
             WindowEvent::Moved(_) | WindowEvent::Resized(_) => {
-                // 显窗前忽略操作系统或布局初始化触发的瞬态事件，防止覆盖已恢复快照
-                if !state.is_shown() || !state.is_enabled() {
+                // 显窗及基线就绪前或正在主动几何自愈时忽略瞬态事件，防止覆盖已恢复快照
+                if !state.is_events_ready()
+                    || !state.is_enabled()
+                    || state.is_restoring_geometry()
+                {
                     return;
                 }
                 if let Some(sample) = sample_live_window(&window_clone) {
                     let prev = state.get_snapshot();
+                    let covering_area = sample
+                        .monitor_work_area
+                        .as_ref()
+                        .is_some_and(|area| is_covering_work_area(sample.width, sample.height, area));
+
+                    // 若此前为最大化而当前非最大化/非最小化/非全屏且尺寸仍占满工作区（如 WM_DPICHANGED 丢标志锁死），主动自愈回普通窗口尺寸
+                    if prev.as_ref().is_some_and(|p| p.maximized)
+                        && !sample.maximized
+                        && !sample.minimized
+                        && !sample.fullscreen
+                        && covering_area
+                    {
+                        heal_to_normal_window_bounds(
+                            &window_clone,
+                            &state,
+                            prev.as_ref(),
+                            sample.monitor_work_area.as_ref(),
+                        );
+                        return;
+                    }
+
                     let next = compute_next_snapshot(&window_clone, prev.as_ref(), &sample, false);
                     if next != prev {
                         state.set_snapshot(next);
@@ -715,14 +1177,121 @@ pub fn setup_main_window(app: &tauri::App) {
                     }
                 }
             }
-            WindowEvent::CloseRequested { .. } => {
-                if !state.is_enabled() {
+            WindowEvent::ScaleFactorChanged { .. } => {
+                if !state.is_events_ready()
+                    || !state.is_enabled()
+                    || state.is_restoring_geometry()
+                {
                     return;
                 }
                 if let Some(sample) = sample_live_window(&window_clone) {
                     let prev = state.get_snapshot();
-                    let next = compute_next_snapshot(&window_clone, prev.as_ref(), &sample, false);
-                    state.set_snapshot(next);
+                    if sample.minimized || sample.fullscreen {
+                        return;
+                    }
+                    if sample.maximized {
+                        let next =
+                            compute_next_snapshot(&window_clone, prev.as_ref(), &sample, false);
+                        if next != prev {
+                            state.set_snapshot(next);
+                            state.schedule_debounced_save();
+                        }
+                        return;
+                    }
+
+                    // 非最大化状态下发生 DPI/拓扑变化，检查是否越出当前可见工作区
+                    if let Some(candidate) = merge_window_snapshot(prev.as_ref(), &sample) {
+                        let monitors: Vec<MonitorWorkArea> = window_clone
+                            .available_monitors()
+                            .unwrap_or_default()
+                            .iter()
+                            .map(MonitorWorkArea::from_monitor)
+                            .collect();
+                        let primary = window_clone
+                            .primary_monitor()
+                            .ok()
+                            .flatten()
+                            .map(|m| MonitorWorkArea::from_monitor(&m));
+
+                        if let Some(placement) =
+                            resolve_restored_geometry(&candidate, &monitors, primary)
+                        {
+                            match placement {
+                                RestoredPlacement::Positioned {
+                                    x,
+                                    y,
+                                    width,
+                                    height,
+                                    ..
+                                } if x != sample.x
+                                    || y != sample.y
+                                    || width != sample.width
+                                    || height != sample.height =>
+                                {
+                                    if let Some(_guard) =
+                                        RestoringGeometryGuard::try_acquire(&state.restoring_geometry)
+                                    {
+                                        let corrected = PersistedWindowState {
+                                            x,
+                                            y,
+                                            width,
+                                            height,
+                                            maximized: false,
+                                            scale_factor: candidate.scale_factor,
+                                        };
+                                        apply_normal_window_bounds(&window_clone, &corrected);
+                                        state.set_snapshot(Some(corrected));
+                                        state.schedule_debounced_save();
+                                    }
+                                    return;
+                                }
+                                RestoredPlacement::CenteredFallback { width, height, .. } => {
+                                    if let Some(_guard) =
+                                        RestoringGeometryGuard::try_acquire(&state.restoring_geometry)
+                                    {
+                                        let target = primary.or_else(|| monitors.first().copied());
+                                        let corrected = if let Some(area) = target {
+                                            let (cx, cy, cw, ch) =
+                                                centered_geometry_in_area(&area, width, height);
+                                            PersistedWindowState {
+                                                x: cx,
+                                                y: cy,
+                                                width: cw,
+                                                height: ch,
+                                                maximized: false,
+                                                scale_factor: Some(area.scale_factor),
+                                            }
+                                        } else {
+                                            default_centered_bounds(&window_clone, false)
+                                        };
+                                        apply_normal_window_bounds(&window_clone, &corrected);
+                                        state.set_snapshot(Some(corrected));
+                                        state.schedule_debounced_save();
+                                    }
+                                    return;
+                                }
+                                _ => {}
+                            }
+                        }
+
+                        if Some(&candidate) != prev.as_ref() {
+                            state.set_snapshot(Some(candidate));
+                            state.schedule_debounced_save();
+                        }
+                    }
+                }
+            }
+            WindowEvent::CloseRequested { .. } => {
+                if !state.is_enabled() {
+                    return;
+                }
+                if state.is_events_ready() {
+                    if let Some(sample) = sample_live_window(&window_clone) {
+                        let prev = state.get_snapshot();
+                        let next =
+                            compute_next_snapshot(&window_clone, prev.as_ref(), &sample, false);
+                        state.set_snapshot(next);
+                    }
                 }
                 flush_snapshot_internal(
                     &app_handle,
@@ -730,14 +1299,16 @@ pub fn setup_main_window(app: &tauri::App) {
                     &state.snapshot,
                     &state.persist_lock,
                 );
+                state.mark_closed_flushed();
             }
-            WindowEvent::Destroyed if state.is_enabled() => {
+            WindowEvent::Destroyed if state.is_enabled() && !state.is_closed_flushed() => {
                 flush_snapshot_internal(
                     &app_handle,
                     &state.enabled,
                     &state.snapshot,
                     &state.persist_lock,
                 );
+                state.mark_closed_flushed();
             }
             _ => {}
         }
@@ -760,6 +1331,86 @@ pub fn show_main_window(
 #[tauri::command]
 pub fn uncloak_main_window(window: WebviewWindow, state: State<'_, WindowStateManager>) {
     uncloak_window_once(&window, &state);
+}
+
+/// 权威查询主窗口当前是否处于最大化状态（优先结合 Win32 原生标志）
+#[cfg(not(test))]
+#[tauri::command]
+pub fn is_main_window_maximized(window: WebviewWindow) -> Result<bool, String> {
+    if let Some(maximized) = is_window_maximized_authoritative(&window) {
+        return Ok(maximized);
+    }
+    window
+        .is_maximized()
+        .map_err(|e| format!("查询窗口最大化状态失败: {}", e))
+}
+
+/// 权威切换主窗口最大化/还原状态，并在系统还原仍占满屏幕时主动自愈回普通尺寸
+#[cfg(not(test))]
+#[tauri::command]
+pub fn toggle_main_window_maximize(
+    window: WebviewWindow,
+    state: State<'_, WindowStateManager>,
+) -> Result<bool, String> {
+    let currently_maximized = is_window_maximized_authoritative(&window)
+        .unwrap_or_else(|| window.is_maximized().unwrap_or(false));
+    let prev = state.get_snapshot();
+
+    if currently_maximized {
+        window
+            .unmaximize()
+            .map_err(|e| format!("恢复窗口失败: {}", e))?;
+
+        if state.is_enabled() {
+            if let Some(sample) = sample_live_window(&window) {
+                let still_covering = sample
+                    .monitor_work_area
+                    .as_ref()
+                    .is_some_and(|area| is_covering_work_area(sample.width, sample.height, area));
+                if still_covering {
+                    if prev.is_some() {
+                        heal_to_normal_window_bounds(
+                            &window,
+                            &state,
+                            prev.as_ref(),
+                            sample.monitor_work_area.as_ref(),
+                        );
+                    }
+                } else {
+                    let next = compute_next_snapshot(&window, prev.as_ref(), &sample, false);
+                    if next != prev {
+                        state.set_snapshot(next);
+                        state.schedule_debounced_save();
+                    }
+                }
+            }
+        }
+        return Ok(false);
+    }
+
+    // 处理 WM_DPICHANGED 丢标志锁死：系统标志已变成未最大化，但快照曾记录最大化且当前窗口仍占满工作区
+    if prev.as_ref().is_some_and(|p| p.maximized) {
+        if let Some(sample) = sample_live_window(&window) {
+            let still_covering = sample
+                .monitor_work_area
+                .as_ref()
+                .is_some_and(|area| is_covering_work_area(sample.width, sample.height, area));
+            if still_covering {
+                heal_to_normal_window_bounds(
+                    &window,
+                    &state,
+                    prev.as_ref(),
+                    sample.monitor_work_area.as_ref(),
+                );
+                return Ok(false);
+            }
+        }
+    }
+
+    window
+        .maximize()
+        .map_err(|e| format!("最大化窗口失败: {}", e))?;
+    Ok(true)
 }
 
 /// 读取“记住窗口大小与位置”开关状态
@@ -809,27 +1460,39 @@ fn default_centered_bounds(window: &WebviewWindow, maximized: bool) -> Persisted
 
     if let Some(mon) = monitor {
         let scale = mon.scale_factor();
+        let valid_scale = if is_valid_scale_factor(scale) {
+            scale
+        } else {
+            1.0
+        };
         let area = MonitorWorkArea::from_monitor(&mon);
-        let (x, y, width, height) = centered_geometry_in_area(
-            &area,
-            (DEFAULT_LOGICAL_WIDTH * scale).round() as u32,
-            (DEFAULT_LOGICAL_HEIGHT * scale).round() as u32,
-        );
+        let (def_w, def_h) = default_physical_size_for_scale(valid_scale);
+        let (x, y, width, height) = centered_geometry_in_area(&area, def_w, def_h);
         return PersistedWindowState {
             x,
             y,
             width,
             height,
             maximized,
+            scale_factor: Some(valid_scale),
         };
     }
+
+    let raw_scale = window.scale_factor().unwrap_or(1.0);
+    let valid_scale = if is_valid_scale_factor(raw_scale) {
+        raw_scale
+    } else {
+        1.0
+    };
+    let (width, height) = default_physical_size_for_scale(valid_scale);
 
     PersistedWindowState {
         x: 0,
         y: 0,
-        width: DEFAULT_LOGICAL_WIDTH as u32,
-        height: DEFAULT_LOGICAL_HEIGHT as u32,
+        width,
+        height,
         maximized,
+        scale_factor: Some(valid_scale),
     }
 }
 
@@ -908,6 +1571,23 @@ mod tests {
             y,
             width,
             height,
+            scale_factor: 1.0,
+        }
+    }
+
+    fn sample_monitor_with_scale(
+        x: i32,
+        y: i32,
+        width: u32,
+        height: u32,
+        scale_factor: f64,
+    ) -> MonitorWorkArea {
+        MonitorWorkArea {
+            x,
+            y,
+            width,
+            height,
+            scale_factor,
         }
     }
 
@@ -919,6 +1599,7 @@ mod tests {
             width: 1010,
             height: 680,
             maximized: false,
+            scale_factor: Some(1.0),
         };
 
         let maximized_sample = LiveWindowSample {
@@ -929,6 +1610,8 @@ mod tests {
             maximized: true,
             minimized: false,
             fullscreen: false,
+            scale_factor: Some(1.0),
+            monitor_work_area: Some(sample_monitor(0, 0, 1920, 1040)),
         };
 
         let next = merge_window_snapshot(Some(&prev), &maximized_sample)
@@ -949,6 +1632,7 @@ mod tests {
             width: 1100,
             height: 720,
             maximized: false,
+            scale_factor: Some(1.0),
         };
 
         // Windows 最小化时坐标常为 -32000，宽高为 160x28
@@ -960,6 +1644,8 @@ mod tests {
             maximized: false,
             minimized: true,
             fullscreen: false,
+            scale_factor: Some(1.0),
+            monitor_work_area: Some(sample_monitor(0, 0, 1920, 1040)),
         };
         assert_eq!(
             merge_window_snapshot(Some(&prev), &minimized_sample),
@@ -974,6 +1660,8 @@ mod tests {
             maximized: false,
             minimized: false,
             fullscreen: true,
+            scale_factor: Some(1.0),
+            monitor_work_area: Some(sample_monitor(0, 0, 1920, 1040)),
         };
         assert_eq!(
             merge_window_snapshot(Some(&prev), &fullscreen_sample),
@@ -989,6 +1677,7 @@ mod tests {
             width: 1010,
             height: 680,
             maximized: true,
+            scale_factor: Some(1.0),
         };
 
         let restored_sample = LiveWindowSample {
@@ -999,6 +1688,8 @@ mod tests {
             maximized: false,
             minimized: false,
             fullscreen: false,
+            scale_factor: Some(1.0),
+            monitor_work_area: Some(sample_monitor(0, 0, 1920, 1040)),
         };
 
         let next = merge_window_snapshot(Some(&prev), &restored_sample).unwrap();
@@ -1010,6 +1701,47 @@ mod tests {
                 width: 1200,
                 height: 760,
                 maximized: false,
+                scale_factor: Some(1.0),
+            }
+        );
+    }
+
+    #[test]
+    fn test_merge_window_snapshot_protects_normal_bounds_when_unmaximized_still_covers_work_area()
+    {
+        let area = sample_monitor(0, 0, 1920, 1040);
+        let prev = PersistedWindowState {
+            x: 120,
+            y: 80,
+            width: 1010,
+            height: 680,
+            maximized: true,
+            scale_factor: Some(1.0),
+        };
+
+        // 模拟最大化后瞬态 maximized=false（如最小化还原或 WM_DPICHANGED 丢标志）但尺寸仍占满工作区
+        let transient_fullscreen = LiveWindowSample {
+            x: 0,
+            y: 0,
+            width: 1920,
+            height: 1040,
+            maximized: false,
+            minimized: false,
+            fullscreen: false,
+            scale_factor: Some(1.0),
+            monitor_work_area: Some(area),
+        };
+
+        let next = merge_window_snapshot(Some(&prev), &transient_fullscreen).unwrap();
+        assert_eq!(
+            next,
+            PersistedWindowState {
+                x: 120,
+                y: 80,
+                width: 1010,
+                height: 680,
+                maximized: false,
+                scale_factor: Some(1.0),
             }
         );
     }
@@ -1023,6 +1755,7 @@ mod tests {
             width: 1200,
             height: 800,
             maximized: true,
+            scale_factor: Some(1.0),
         };
 
         let placement = resolve_restored_geometry(&saved, &monitors, Some(monitors[0])).unwrap();
@@ -1039,6 +1772,31 @@ mod tests {
     }
 
     #[test]
+    fn test_resolve_restored_geometry_heals_polluted_maximized_fullscreen_snapshot() {
+        let monitor = sample_monitor_with_scale(0, 0, 1920, 1040, 1.0);
+        let polluted = PersistedWindowState {
+            x: 0,
+            y: 0,
+            width: 1920,
+            height: 1040,
+            maximized: true,
+            scale_factor: Some(1.0),
+        };
+
+        let placement = resolve_restored_geometry(&polluted, &[monitor], Some(monitor)).unwrap();
+        assert_eq!(
+            placement,
+            RestoredPlacement::Positioned {
+                x: 455,
+                y: 180,
+                width: 1010,
+                height: 680,
+                maximized: true,
+            }
+        );
+    }
+
+    #[test]
     fn test_resolve_restored_geometry_falls_back_when_secondary_monitor_disconnected() {
         let primary = sample_monitor(0, 0, 1920, 1040);
         // 曾经摆在右侧副屏 (x=2100)
@@ -1048,6 +1806,7 @@ mod tests {
             width: 1280,
             height: 800,
             maximized: true,
+            scale_factor: Some(1.0),
         };
 
         let placement = resolve_restored_geometry(&saved, &[primary], Some(primary)).unwrap();
@@ -1062,20 +1821,120 @@ mod tests {
     }
 
     #[test]
-    fn test_resolve_restored_geometry_rejects_corrupted_small_dimensions() {
+    fn test_resolve_restored_geometry_scales_across_dpi_on_fallback() {
+        let primary_100 = sample_monitor_with_scale(0, 0, 1920, 1040, 1.0);
+        // 原在 200% DPI 4K 副屏上的 2020x1360 物理像素窗口（对应 1010x680 逻辑尺寸）
+        let saved_200 = PersistedWindowState {
+            x: 2500,
+            y: 100,
+            width: 2020,
+            height: 1360,
+            maximized: false,
+            scale_factor: Some(2.0),
+        };
+
+        let placement =
+            resolve_restored_geometry(&saved_200, &[primary_100], Some(primary_100)).unwrap();
+        assert_eq!(
+            placement,
+            RestoredPlacement::CenteredFallback {
+                width: 1010,
+                height: 680,
+                maximized: false,
+            }
+        );
+    }
+
+    #[test]
+    fn test_resolve_restored_geometry_rejects_corrupted_small_oversized_and_bad_scale() {
         let primary = sample_monitor(0, 0, 1920, 1040);
-        let corrupted = PersistedWindowState {
+        let corrupted_small = PersistedWindowState {
             x: 100,
             y: 100,
             width: 80,
             height: 40,
             maximized: false,
+            scale_factor: Some(1.0),
         };
-
         assert_eq!(
-            resolve_restored_geometry(&corrupted, &[primary], Some(primary)),
+            resolve_restored_geometry(&corrupted_small, &[primary], Some(primary)),
             None
         );
+
+        let corrupted_huge = PersistedWindowState {
+            x: 100,
+            y: 100,
+            width: 20_000,
+            height: 20_000,
+            maximized: false,
+            scale_factor: Some(1.0),
+        };
+        assert_eq!(
+            resolve_restored_geometry(&corrupted_huge, &[primary], Some(primary)),
+            None
+        );
+
+        let bad_scale = PersistedWindowState {
+            x: 100,
+            y: 100,
+            width: 1010,
+            height: 680,
+            maximized: false,
+            scale_factor: Some(12.0),
+        };
+        assert_eq!(
+            resolve_restored_geometry(&bad_scale, &[primary], Some(primary)),
+            None
+        );
+
+        let nan_scale = PersistedWindowState {
+            x: 100,
+            y: 100,
+            width: 1010,
+            height: 680,
+            maximized: false,
+            scale_factor: Some(f64::NAN),
+        };
+        assert_eq!(
+            resolve_restored_geometry(&nan_scale, &[primary], Some(primary)),
+            None
+        );
+    }
+
+    #[test]
+    fn test_persisted_window_state_deserializes_legacy_json_without_scale_factor() {
+        let legacy_json = r#"{"x":100,"y":120,"width":1010,"height":680,"maximized":true}"#;
+        let parsed: PersistedWindowState = serde_json::from_str(legacy_json).unwrap();
+        assert_eq!(parsed.scale_factor, None);
+        assert!(parsed.is_valid_dimensions());
+    }
+
+    #[test]
+    fn test_backup_corrupt_settings_file_renames_invalid_and_keeps_valid() {
+        let ts = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map(|d| d.as_nanos())
+            .unwrap_or(0);
+        let dir = std::env::temp_dir().join(format!("moyu_ws_test_{}", ts));
+        std::fs::create_dir_all(&dir).unwrap();
+
+        let valid_path = dir.join("valid.json");
+        std::fs::write(&valid_path, r#"{"progress_1":"50%"}"#).unwrap();
+        assert!(!backup_corrupt_settings_file(&valid_path));
+        assert!(valid_path.exists());
+
+        let corrupt_path = dir.join("corrupt.json");
+        std::fs::write(&corrupt_path, "{broken json").unwrap();
+        assert!(backup_corrupt_settings_file(&corrupt_path));
+        assert!(!corrupt_path.exists());
+
+        let has_backup = std::fs::read_dir(&dir)
+            .unwrap()
+            .flatten()
+            .any(|entry| entry.file_name().to_string_lossy().contains("corrupt.json.corrupt."));
+        assert!(has_backup);
+
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]
@@ -1096,7 +1955,13 @@ mod tests {
     #[test]
     fn test_centered_geometry_in_area_clamps_and_centers() {
         let area = sample_monitor(100, 40, 1440, 900);
-        assert_eq!(centered_geometry_in_area(&area, 1010, 680), (315, 150, 1010, 680));
-        assert_eq!(centered_geometry_in_area(&area, 2000, 1200), (100, 40, 1440, 900));
+        assert_eq!(
+            centered_geometry_in_area(&area, 1010, 680),
+            (315, 150, 1010, 680)
+        );
+        assert_eq!(
+            centered_geometry_in_area(&area, 2000, 1200),
+            (100, 40, 1440, 900)
+        );
     }
 }

@@ -71,12 +71,12 @@ export async function loadRememberWindowState(options = {}) {
 export async function saveRememberWindowState(enabled, options = {}) {
   const normalized = Boolean(enabled);
   const storage = options.storage ?? getDefaultStorage();
-  writeLocalFallback(storage, normalized);
-
   const invoker = resolveInvoker(options.invokeFn);
+
   if (invoker) {
     try {
       await invoker('set_remember_window_state', { enabled: normalized });
+      writeLocalFallback(storage, normalized);
       return true;
     } catch (err) {
       console.error('Failed to sync remember window state:', err);
@@ -84,5 +84,172 @@ export async function saveRememberWindowState(enabled, options = {}) {
     }
   }
 
+  writeLocalFallback(storage, normalized);
   return true;
+}
+
+/**
+ * 查询主窗口当前是否处于最大化状态（优先调用后端权威判定，不可用时回退至原生窗口 API）
+ * @param {{ invokeFn?: Function, win?: { isMaximized?: Function } }} [options]
+ * @returns {Promise<boolean|null>}
+ */
+export async function queryMainWindowMaximized(options = {}) {
+  const invoker = resolveInvoker(options.invokeFn);
+  if (invoker) {
+    try {
+      const maximized = await invoker('is_main_window_maximized');
+      if (typeof maximized === 'boolean') {
+        return maximized;
+      }
+    } catch {
+      // 后端权威命令不可用时优雅降级至窗口原生接口
+    }
+  }
+
+  const win = options.win;
+  if (win && typeof win.isMaximized === 'function') {
+    try {
+      const maximized = await win.isMaximized();
+      if (typeof maximized === 'boolean') {
+        return maximized;
+      }
+    } catch {
+      // 忽略窗口查询异常
+    }
+  }
+
+  return null;
+}
+
+/**
+ * 切换主窗口最大化/还原状态（优先调用后端权威命令，不可用时回退至原生窗口 API）
+ * @param {{ invokeFn?: Function, win?: { toggleMaximize?: Function, isMaximized?: Function } }} [options]
+ * @returns {Promise<boolean|null>}
+ */
+export async function toggleMainWindowMaximize(options = {}) {
+  const invoker = resolveInvoker(options.invokeFn);
+  if (invoker) {
+    try {
+      const maximized = await invoker('toggle_main_window_maximize');
+      if (typeof maximized === 'boolean') {
+        return maximized;
+      }
+    } catch {
+      // 后端权威命令不可用时优雅降级至窗口原生接口
+    }
+  }
+
+  const win = options.win;
+  if (win && typeof win.toggleMaximize === 'function') {
+    try {
+      await win.toggleMaximize();
+      if (typeof win.isMaximized === 'function') {
+        const maximized = await win.isMaximized();
+        if (typeof maximized === 'boolean') {
+          return maximized;
+        }
+      }
+    } catch {
+      // 忽略窗口切换异常
+    }
+  }
+
+  return null;
+}
+
+/**
+ * 创建窗口最大化状态同步控制器，统一处理 StrictMode 卸载竞态、请求序号防乱序及事件防抖
+ * @param {{
+ *   win?: { isMaximized?: Function, onResized?: Function } | null,
+ *   invokeFn?: Function,
+ *   onMaximizedChange?: (maximized: boolean) => void,
+ *   debounceMs?: number
+ * }} [options]
+ */
+export function createWindowMaximizedMonitor(options = {}) {
+  const { win = null, invokeFn, onMaximizedChange, debounceMs = 50 } = options;
+  let cancelled = false;
+  let reqSeq = 0;
+  let unlisten = null;
+  let debounceTimer = null;
+
+  const refresh = async () => {
+    const seq = ++reqSeq;
+    const maximized = await queryMainWindowMaximized({ invokeFn, win });
+    if (cancelled || seq !== reqSeq || typeof maximized !== 'boolean') {
+      return;
+    }
+    onMaximizedChange?.(maximized);
+  };
+
+  const start = () => {
+    void refresh();
+    if (!win || typeof win.onResized !== 'function') {
+      return;
+    }
+
+    try {
+      Promise.resolve(
+        win.onResized(() => {
+          if (cancelled) return;
+          if (debounceTimer !== null) {
+            clearTimeout(debounceTimer);
+            debounceTimer = null;
+          }
+          if (debounceMs <= 0) {
+            void refresh();
+          } else {
+            debounceTimer = setTimeout(() => {
+              debounceTimer = null;
+              if (!cancelled) {
+                void refresh();
+              }
+            }, debounceMs);
+          }
+        })
+      )
+        .then((u) => {
+          if (typeof u !== 'function') return;
+          if (cancelled) {
+            try {
+              u();
+            } catch {
+              // 忽略卸载后的退订异常
+            }
+          } else {
+            unlisten = u;
+          }
+        })
+        .catch(() => {});
+    } catch {
+      // 忽略非原生窗口环境异常
+    }
+  };
+
+  const applyAuthoritativeState = (maximized) => {
+    reqSeq += 1;
+    if (!cancelled && typeof maximized === 'boolean') {
+      onMaximizedChange?.(maximized);
+    }
+  };
+
+  const stop = () => {
+    cancelled = true;
+    reqSeq += 1;
+    if (debounceTimer !== null) {
+      clearTimeout(debounceTimer);
+      debounceTimer = null;
+    }
+    if (unlisten) {
+      const fn = unlisten;
+      unlisten = null;
+      try {
+        fn();
+      } catch {
+        // 忽略退订异常
+      }
+    }
+  };
+
+  return { start, stop, refresh, applyAuthoritativeState };
 }

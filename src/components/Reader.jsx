@@ -325,7 +325,7 @@ export default function Reader({ bookData, onClose, jumpToSibling, jumpToChapter
   const paginationLabel = engineRef.current ? engineRef.current.getPaginationLabel() : '';
 
   return (
-    <div className="fixed top-8 inset-x-0 bottom-0 z-40 flex flex-col bg-white dark:bg-[#181818] text-slate-800 dark:text-[#cccccc] select-none">
+    <div className="fixed top-[33px] inset-x-0 bottom-0 z-40 flex flex-col bg-white dark:bg-[#181818] text-slate-800 dark:text-[#cccccc] select-none">
       {/* Dynamic Unified Header Control Bar */}
       <ReaderHeader 
         bookData={bookData}

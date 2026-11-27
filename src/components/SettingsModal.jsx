@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { X, Save } from 'lucide-react';
 import { useI18n } from '../i18n';
 import { loadRememberWindowState, saveRememberWindowState } from '../utils/windowStatePrefs';
@@ -8,13 +8,17 @@ export default function SettingsModal({ isOpen, onClose }) {
   const [morseFreq, setMorseFreq] = useState(700);
   const [startupBehavior, setStartupBehavior] = useState('restore');
   const [rememberWindowState, setRememberWindowState] = useState(true);
+  const [saveError, setSaveError] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
+  const initialRememberWindowStateRef = useRef(true);
 
-  const { t } = useI18n();
+  const { t, activeLang } = useI18n();
 
   // 读取保存的设置（打开弹窗时刷新一次）
   useEffect(() => {
     if (!isOpen) return;
     let active = true;
+    setSaveError('');
 
     const savedSpeed = localStorage.getItem('pref_morse_speed');
     const savedFreq = localStorage.getItem('pref_morse_freq');
@@ -24,7 +28,10 @@ export default function SettingsModal({ isOpen, onClose }) {
     if (savedStartup) setStartupBehavior(savedStartup);
 
     loadRememberWindowState().then((val) => {
-      if (active) setRememberWindowState(val);
+      if (active) {
+        initialRememberWindowStateRef.current = val;
+        setRememberWindowState(val);
+      }
     });
 
     return () => {
@@ -32,11 +39,42 @@ export default function SettingsModal({ isOpen, onClose }) {
     };
   }, [isOpen]);
 
+  // ESC 键关闭弹窗
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
+
   const handleSave = async () => {
+    if (isSaving) return;
+    setSaveError('');
+
+    if (rememberWindowState !== initialRememberWindowStateRef.current) {
+      setIsSaving(true);
+      try {
+        const ok = await saveRememberWindowState(rememberWindowState);
+        if (!ok) {
+          setRememberWindowState(initialRememberWindowStateRef.current);
+          setSaveError(
+            activeLang === 'en'
+              ? 'Failed to sync window state preference. Reverted.'
+              : '保存窗口记忆设置失败，已恢复原状态，请重试。'
+          );
+          return;
+        }
+        initialRememberWindowStateRef.current = rememberWindowState;
+      } finally {
+        setIsSaving(false);
+      }
+    }
+
     localStorage.setItem('pref_morse_speed', morseSpeed);
     localStorage.setItem('pref_morse_freq', morseFreq);
     localStorage.setItem('pref_startup', startupBehavior);
-    await saveRememberWindowState(rememberWindowState);
 
     // 通知其他组件设置已更改
     window.dispatchEvent(new Event('moyu_settings_changed'));
@@ -46,7 +84,7 @@ export default function SettingsModal({ isOpen, onClose }) {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/40 dark:bg-black/60 z-[100] flex items-center justify-center backdrop-blur-sm select-none">
+    <div className="fixed top-8 inset-x-0 bottom-0 bg-black/40 dark:bg-black/60 z-[100] flex items-center justify-center backdrop-blur-sm select-none">
       <div className="bg-white dark:bg-[#1e1e1e] border border-slate-300 dark:border-[#333333] rounded-lg shadow-2xl w-[480px] max-w-[90vw] overflow-hidden flex flex-col">
 
         {/* Modal Header */}
@@ -75,13 +113,21 @@ export default function SettingsModal({ isOpen, onClose }) {
               <input
                 type="checkbox"
                 checked={rememberWindowState}
-                onChange={(e) => setRememberWindowState(e.target.checked)}
+                onChange={(e) => {
+                  setRememberWindowState(e.target.checked);
+                  if (saveError) setSaveError('');
+                }}
                 className="w-4 h-4 rounded accent-indigo-600 cursor-pointer shrink-0"
               />
               <span className="text-[12.5px] text-slate-600 dark:text-[#bbbbbb] group-hover:text-slate-900 dark:group-hover:text-white transition-colors">
                 {t('settings.startup.rememberWindow')}
               </span>
             </label>
+            {saveError && (
+              <p className="text-[12px] text-rose-600 dark:text-rose-400 font-medium">
+                {saveError}
+              </p>
+            )}
           </div>
 
           <div className="h-px w-full bg-slate-200 dark:bg-[#333333]"></div>
